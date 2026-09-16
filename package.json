@@ -1,0 +1,47 @@
+{
+  "name": "aureal-finance-ai",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Aureal Finance AI — a premium personal financial operating system (PWA).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "tsc -b --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "qa": "node scripts/qa/run-all.mjs",
+    "qa:responsive": "node scripts/qa/responsive.mjs",
+    "qa:a11y": "node scripts/qa/accessibility.mjs",
+    "qa:flows": "node scripts/qa/flows.mjs",
+    "qa:states": "node scripts/qa/states.mjs",
+    "qa:screenshots": "node scripts/qa/screenshots.mjs",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.20.3",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.2",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.12.0",
+    "playwright": "^1.63.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.70.0",
+    "vite": "^5.4.9",
+    "vite-plugin-pwa": "^0.20.5",
+    "vitest": "^2.1.3"
+  }
+}

@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Aureal Finance AI — design tokens.
+ *
+ * Light and dark are two designed palettes, not an inversion. Dark keeps the
+ * deep navy "command centre" feel of the product; light is a bright, calm
+ * fintech surface with real borders instead of elevation-by-brightness.
+ */
+@layer base {
+  :root {
+    /* Light mode */
+    --background: 244 247 252;
+    --surface: 244 247 252;
+    --surface-lowest: 255 255 255;
+    --surface-low: 255 255 255;
+    --surface-base: 255 255 255;
+    --surface-high: 238 242 249;
+    --surface-highest: 226 232 243;
+    --surface-bright: 255 255 255;
+
+    --border: 224 231 241;
+    --border-strong: 199 210 226;
+
+    --text: 11 19 43;
+    --muted: 71 85 105;
+    --faint: 95 109 133;
+
+    --primary: 29 78 216;
+    --primary-strong: 37 99 235;
+    --on-primary: 255 255 255;
+    --primary-soft: 219 231 255;
+
+    --secondary: 79 70 229;
+    --on-secondary: 255 255 255;
+
+    --success: 4 120 87;
+    --on-success: 255 255 255;
+    --warning: 180 83 9;
+    --on-warning: 255 255 255;
+    --danger: 190 18 60;
+    --on-danger: 255 255 255;
+    --info: 2 132 199;
+
+    --shadow: 15 23 42;
+
+    color-scheme: light;
+  }
+
+  .dark {
+    --background: 5 20 36;
+    --surface: 5 20 36;
+    --surface-lowest: 1 15 31;
+    --surface-low: 13 28 45;
+    --surface-base: 18 33 49;
+    --surface-high: 28 43 60;
+    --surface-highest: 39 54 71;
+    --surface-bright: 44 58 76;
+
+    --border: 35 48 66;
+    --border-strong: 66 71 84;
+
+    --text: 212 228 250;
+    --muted: 194 198 214;
+    --faint: 140 144 159;
+
+    --primary: 173 198 255;
+    --primary-strong: 77 142 255;
+    --on-primary: 0 26 66;
+    --primary-soft: 22 46 84;
+
+    --secondary: 192 193 255;
+    --on-secondary: 16 0 169;
+
+    --success: 78 222 163;
+    --on-success: 0 56 36;
+    --warning: 251 191 36;
+    --on-warning: 61 40 0;
+    --danger: 255 180 171;
+    --on-danger: 105 0 5;
+    --info: 125 211 252;
+
+    --shadow: 0 0 0;
+
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-text font-sans antialiased;
+    margin: 0;
+    overscroll-behavior-y: none;
+    /* Respect the iOS/Android safe areas so the PWA never sits under a notch. */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Numbers must line up in columns; every monetary figure uses this. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  /* A single, consistent, always-visible focus ring (WCAG 2.2 AA). */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary-strong ring-offset-2 ring-offset-background;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-border-strong;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /* The card surface, for places that need it as a class rather than the
+     <Card> component (links, buttons). Padding is part of the surface. */
+  .card {
+    @apply rounded-2xl border border-border bg-surface-base p-5 shadow-card;
+  }
+
+  .hide-scrollbar {
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Skeleton shimmer used by every loading state. */
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-surface-high;
+  }
+  .skeleton::after {
+    @apply absolute inset-0 animate-shimmer;
+    content: '';
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      rgb(var(--surface-high) / 0) 0,
+      rgb(var(--surface-highest) / 0.85) 50%,
+      rgb(var(--surface-high) / 0) 100%
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
