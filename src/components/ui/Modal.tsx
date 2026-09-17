@@ -7,6 +7,14 @@ import { Button, IconButton } from './Button';
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
+/**
+ * What a dialog should land on when it opens. The close button is a focusable
+ * element too, and it is first in the DOM — so focusing "the first focusable
+ * thing" puts the caret on X, where the next keypress dismisses the dialog the
+ * person just opened. Fields first; a caller can override with `data-autofocus`.
+ */
+const FIELDS = 'input:not([disabled]),select:not([disabled]),textarea:not([disabled])';
+
 interface ModalProps {
   open: boolean;
   onClose: () => void;
@@ -27,21 +35,47 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreTo = useRef<HTMLElement | null>(null);
 
+  // Every caller writes `onClose={() => setThing(false)}` inline, so the
+  // function is a new one on each of the parent's renders. Held in a ref, that
+  // churn cannot invalidate the effects below; as a dependency it re-ran them
+  // on each keystroke, and the re-run moved focus out of the field being typed
+  // into and onto the close button.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  // Opening and closing: scroll lock, where focus lands, and where it returns.
+  // Keyed on `open` alone, so it runs exactly twice per visit.
   useEffect(() => {
     if (!open) return;
     restoreTo.current = document.activeElement as HTMLElement | null;
     document.body.style.overflow = 'hidden';
 
     const panel = panelRef.current;
-    panel?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    const target =
+      panel?.querySelector<HTMLElement>('[data-autofocus]') ??
+      panel?.querySelector<HTMLElement>(FIELDS) ??
+      panel;
+    target?.focus();
+
+    return () => {
+      document.body.style.overflow = '';
+      restoreTo.current?.focus();
+    };
+  }, [open]);
+
+  // Escape to dismiss, Tab to cycle within the dialog.
+  useEffect(() => {
+    if (!open) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
-      // Keep focus inside the dialog while it is open.
+      const panel = panelRef.current;
       if (e.key !== 'Tab' || !panel) return;
       const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
         (el) => el.offsetParent !== null,
@@ -59,12 +93,8 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
     };
 
     document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = '';
-      restoreTo.current?.focus();
-    };
-  }, [open, onClose]);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open]);
 
   if (!open) return null;
 
@@ -82,6 +112,9 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        // A dialog with no field of its own (a confirmation) focuses the panel
+        // rather than its destructive button.
+        tabIndex={-1}
         className={cn(
           'relative flex max-h-[92vh] w-full flex-col bg-[rgb(var(--surface-base))] shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),inset_0_1px_0_0_rgb(255_255_255/0.06),0_32px_80px_-24px_rgb(var(--ambient)/0.8)]',
           widths[size],
