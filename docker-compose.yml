@@ -1,0 +1,18 @@
+# Runs the built app on http://localhost:8080.
+#
+# There is no backend service here: Supabase is the backend, and the browser
+# talks to it directly. Row-level security is what keeps one person's data
+# from another's, so there is no server of ours in between to enforce it.
+#
+# Copy .env.example to .env first. The values are build arguments, not runtime
+# environment: changing them means `docker compose build`, not just `up`.
+services:
+  web:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+    ports:
+      - '8080:80'
+    restart: unless-stopped

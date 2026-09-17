@@ -1,0 +1,12 @@
+node_modules
+dist
+dev-dist
+.git
+.github
+.env
+.env.*
+!.env.example
+coverage
+*.log
+supabase
+scripts/qa
