@@ -51,7 +51,15 @@ export const clamp = (value: number, min: number, max: number): number =>
  * reads as "IC" rather than "I2".
  */
 export const initials = (name: string): string => {
-  const words = name.replace(/[^a-zA-Z0-9 ]/g, ' ').split(' ').filter(Boolean);
+  const words = name
+    // An apostrophe is dropped rather than split on, so a possessive stays
+    // part of its word: "Sainsbury's" is one word and reads "SA". Splitting
+    // on it made the trailing "s" a second word, and half the high street
+    // — Sainsbury's, McDonald's, Domino's — came out as "SS", "MS", "DS".
+    .replace(/['’]/g, '')
+    .replace(/[^a-zA-Z0-9 ]/g, ' ')
+    .split(' ')
+    .filter(Boolean);
   const letterWords = words.filter((w) => /^[a-zA-Z]/.test(w));
   const source = letterWords.length > 0 ? letterWords : words;
   if (source.length >= 2) return (source[0]![0]! + source[1]![0]!).toUpperCase();

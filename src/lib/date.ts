@@ -46,34 +46,52 @@ export const monthKey = (iso: string): string => iso.slice(0, 7);
 
 export const isSameMonth = (a: string, b: string): boolean => monthKey(a) === monthKey(b);
 
+/** Whether a string is a date these helpers can do anything with. */
+export const isValidISO = (iso: string): boolean => !Number.isNaN(parseISO(iso).getTime());
+
+/**
+ * Every date on screen comes from somewhere a person can empty: a `<input
+ * type="date">` hands back `''` the moment it is cleared. `Intl` throws
+ * RangeError on an invalid date, and these run during render, so one cleared
+ * field used to take its whole dialog down with it. A dash is the honest
+ * rendering of a date that is not there.
+ */
+const EMPTY = '—';
+
 const FMT = (opts: Intl.DateTimeFormatOptions, locale = 'en-GB') =>
   new Intl.DateTimeFormat(locale, opts);
 
-export const formatDay = (iso: string): string => FMT({ day: 'numeric', month: 'short' }).format(parseISO(iso));
+const format = (opts: Intl.DateTimeFormatOptions, iso: string): string => {
+  const d = parseISO(iso);
+  return Number.isNaN(d.getTime()) ? EMPTY : FMT(opts).format(d);
+};
+
+export const formatDay = (iso: string): string => format({ day: 'numeric', month: 'short' }, iso);
 
 export const formatFullDate = (iso: string): string =>
-  FMT({ weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(parseISO(iso));
+  format({ weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, iso);
 
 export const formatMediumDate = (iso: string): string =>
-  FMT({ day: 'numeric', month: 'short', year: 'numeric' }).format(parseISO(iso));
+  format({ day: 'numeric', month: 'short', year: 'numeric' }, iso);
 
-export const formatMonthYear = (iso: string): string =>
-  FMT({ month: 'long', year: 'numeric' }).format(parseISO(iso));
+export const formatMonthYear = (iso: string): string => format({ month: 'long', year: 'numeric' }, iso);
 
 export const formatShortMonth = (iso: string): string =>
-  FMT({ month: 'short' }).format(parseISO(`${iso.slice(0, 7)}-01`));
+  format({ month: 'short' }, `${iso.slice(0, 7)}-01`);
 
 /** "Today", "Yesterday", "Tomorrow" or a normal date — for transaction groups. */
 export const relativeDayLabel = (iso: string, today: string): string => {
+  if (!isValidISO(iso) || !isValidISO(today)) return EMPTY;
   const diff = daysBetween(today, iso);
   if (diff === 0) return 'Today';
   if (diff === -1) return 'Yesterday';
   if (diff === 1) return 'Tomorrow';
-  return FMT({ weekday: 'long', day: 'numeric', month: 'short' }).format(parseISO(iso));
+  return format({ weekday: 'long', day: 'numeric', month: 'short' }, iso);
 };
 
 /** "Due in 3 days" / "3 days ago" — never make the user count. */
 export const relativeDueLabel = (iso: string, today: string): string => {
+  if (!isValidISO(iso) || !isValidISO(today)) return EMPTY;
   const diff = daysBetween(today, iso);
   if (diff === 0) return 'Due today';
   if (diff === 1) return 'Due tomorrow';
