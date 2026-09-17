@@ -220,3 +220,34 @@ describe('adjustToWorkingDay', () => {
     ).toEqual(['2026-01-30', '2026-02-27']);
   });
 });
+
+describe('an anchor day the schedule cannot use', () => {
+  // `new Date(y, m, 0)` is the last day of the *previous* month, so a monthly
+  // rule anchored to day 0 paid a month early, every month. It was reachable:
+  // choose Weekly + Sunday (anchorDay 0), then switch the frequency to
+  // Monthly. The form re-anchors now and the database rejects it, but rows can
+  // predate both, so the engine clamps too.
+  it('does not pay a month early when anchored to day 0', () => {
+    const broken = rule({ frequency: 'monthly', anchorDay: 0, startDate: '2026-04-01' });
+    expect(expandRecurrence(broken, '2026-04-01', '2026-06-30')).toEqual([
+      '2026-04-01',
+      '2026-05-01',
+      '2026-06-01',
+    ]);
+  });
+
+  it('clamps a negative anchor to the first of the month', () => {
+    const broken = rule({ frequency: 'monthly', anchorDay: -5, startDate: '2026-04-01' });
+    expect(expandRecurrence(broken, '2026-04-01', '2026-05-31')).toEqual(['2026-04-01', '2026-05-01']);
+  });
+
+  it('clamps an anchor beyond the end of the month to its last day', () => {
+    const broken = rule({ frequency: 'monthly', anchorDay: 99, startDate: '2026-04-01' });
+    expect(expandRecurrence(broken, '2026-04-01', '2026-05-31')).toEqual(['2026-04-30', '2026-05-31']);
+  });
+
+  it('ignores a fractional anchor rather than producing an invalid date', () => {
+    const broken = rule({ frequency: 'monthly', anchorDay: 3.7, startDate: '2026-04-01' });
+    expect(expandRecurrence(broken, '2026-04-01', '2026-04-30')).toEqual(['2026-04-03']);
+  });
+});

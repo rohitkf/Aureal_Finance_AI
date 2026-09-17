@@ -28,11 +28,21 @@ const alignToWeekday = (iso: string, weekday: number): string => {
   return addDays(iso, delta);
 };
 
-/** Snaps a date to the anchor day-of-month, clamping short months. */
+/**
+ * Snaps a date to the anchor day-of-month, clamping short months.
+ *
+ * Clamped at both ends. `new Date(y, m, 0)` is the last day of the *previous*
+ * month, so an anchor below 1 silently moves the whole schedule back a month —
+ * reachable through a weekly rule (where the same field holds a weekday, and
+ * Sunday is 0) being switched to monthly. The form no longer allows it and the
+ * database now rejects it, but the engine must not depend on either: rows can
+ * predate both.
+ */
 const alignToDayOfMonth = (iso: string, day: number): string => {
   const d = parseISO(iso);
   const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  return ISO(new Date(d.getFullYear(), d.getMonth(), Math.min(day, lastDay)));
+  const safe = Math.min(Math.max(Math.trunc(day) || 1, 1), lastDay);
+  return ISO(new Date(d.getFullYear(), d.getMonth(), safe));
 };
 
 /** The first occurrence on or after `from`, honouring the rule's anchor. */
