@@ -269,7 +269,7 @@ export const Budget = () => {
             <SelectField
               label="Category"
               value={editing.categoryId}
-              onChange={(e) => setEditing({ ...editing, categoryId: e.target.value })}
+              onChange={(value) => setEditing({ ...editing, categoryId: value })}
             >
               {expenseCategories.map((c) => (
                 <option key={c.id} value={c.id}>

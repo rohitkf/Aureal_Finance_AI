@@ -334,7 +334,7 @@ export const Forecast = () => {
               step={50}
               value={oneOff}
               onChange={(e) => setOneOff(Number(e.target.value))}
-              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[rgb(var(--hairline)/0.08)] accent-[rgb(var(--primary-strong))]"
+              className="slider h-2 w-full cursor-pointer appearance-none rounded-full bg-[rgb(var(--hairline)/0.08)] outline-none"
             />
             <div className="flex justify-between text-label-sm text-faint">
               <span>£0</span>
@@ -361,7 +361,7 @@ export const Forecast = () => {
               step={25}
               value={monthlyDelta}
               onChange={(e) => setMonthlyDelta(Number(e.target.value))}
-              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[rgb(var(--hairline)/0.08)] accent-[rgb(var(--secondary))]"
+              className="slider slider-secondary h-2 w-full cursor-pointer appearance-none rounded-full bg-[rgb(var(--hairline)/0.08)] outline-none"
             />
             <div className="flex justify-between text-label-sm text-faint">
               <span>Spend £500 less</span>

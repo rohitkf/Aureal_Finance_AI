@@ -142,7 +142,7 @@ export const AccountDialog = ({ open, onClose, editing }: AccountDialogProps) =>
             autoFocus={Boolean(editing)}
             required
           />
-          <SelectField label="Type" value={type} onChange={(e) => setType(e.target.value as AccountType)}>
+          <SelectField label="Type" value={type} onChange={(value) => setType(value as AccountType)}>
             {TYPES.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label} — {t.hint}

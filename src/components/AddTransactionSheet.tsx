@@ -12,7 +12,15 @@ import { FREQUENCY_LABELS, previewOccurrences } from '@/lib/recurrence';
 import { newId, useAppState, useCategories, useStore, useToday } from '@/lib/store';
 import type { Category, Frequency, RecurringPayment, Transaction, TransactionType } from '@/lib/types';
 import { Button } from './ui/Button';
-import { AmountField, SegmentedControl, SelectField, TextAreaField, TextField } from './ui/Field';
+import {
+  AmountField,
+  CheckboxField,
+  DateField,
+  SegmentedControl,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from './ui/Field';
 import { Modal } from './ui/Modal';
 import { useToast } from './ui/Toast';
 import { CategoryIcon } from './CategoryIcon';
@@ -310,7 +318,7 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
               <SelectField
                 label={type === 'transfer' ? 'From account' : 'Account'}
                 value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
+                onChange={(value) => setAccountId(value)}
               >
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -320,7 +328,7 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
               </SelectField>
 
               {type === 'transfer' ? (
-                <SelectField label="To account" value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
+                <SelectField label="To account" value={toAccountId} onChange={(value) => setToAccountId(value)}>
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name}
@@ -328,7 +336,7 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
                   ))}
                 </SelectField>
               ) : (
-                <SelectField label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                <SelectField label="Category" value={categoryId} onChange={(value) => setCategoryId(value)}>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -385,15 +393,14 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
               onChange={(e) => setMerchant(e.target.value)}
             />
             <div className="flex flex-col gap-2">
-              <TextField
+              <DateField
                 label="Date"
-                type="date"
                 value={date}
-                onChange={(e) => {
-                  // Typed by hand, so it is taken as meant — no snapping to a
+                onChange={(iso) => {
+                  // Chosen directly, so it is taken as meant — no snapping to a
                   // working day. Some things really do land at a weekend.
                   setDateMode('custom');
-                  setDate(e.target.value);
+                  setDate(iso);
                 }}
                 hint={date > today ? 'Future date — this will appear in your forecast.' : undefined}
               />
@@ -419,29 +426,19 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
               moment you record it, not on a separate trip later. */}
           {canRepeat && (
             <div className="space-y-4">
-              <label className="well flex items-center gap-3 p-3.5">
-                <input
-                  type="checkbox"
-                  checked={repeats}
-                  onChange={(e) => setRepeats(e.target.checked)}
-                  className="h-4 w-4 rounded accent-[rgb(var(--primary-strong))]"
-                />
-                <span className="min-w-0">
-                  <span className="block text-[14px] tracking-[-0.01em] text-text">
-                    This repeats
-                  </span>
-                  <span className="block text-[12.5px] leading-snug text-muted">
-                    Records this one now and adds it to your forecast from here on.
-                  </span>
-                </span>
-              </label>
+              <CheckboxField
+                checked={repeats}
+                onChange={setRepeats}
+                label="This repeats"
+                description="Records this one now and adds it to your forecast from here on."
+              />
 
               {repeats && (
                 <div className="space-y-4 pl-1">
                   <SelectField
                     label="How often"
                     value={frequency}
-                    onChange={(e) => setFrequency(e.target.value as Frequency)}
+                    onChange={(value) => setFrequency(value as Frequency)}
                   >
                     {INLINE_FREQUENCIES.map((f) => (
                       <option key={f} value={f}>
@@ -450,39 +447,19 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
                     ))}
                   </SelectField>
 
-                  <label className="well flex items-center gap-3 p-3.5">
-                    <input
-                      type="checkbox"
-                      checked={adjustToWorkingDay}
-                      onChange={(e) => setAdjustToWorkingDay(e.target.checked)}
-                      className="h-4 w-4 rounded accent-[rgb(var(--primary-strong))]"
-                    />
-                    <span className="min-w-0">
-                      <span className="block text-[14px] tracking-[-0.01em] text-text">
-                        Pay early if it lands at a weekend
-                      </span>
-                      <span className="block text-[12.5px] leading-snug text-muted">
-                        Moves back to the Friday, the way a salary arrives.
-                      </span>
-                    </span>
-                  </label>
+                  <CheckboxField
+                    checked={adjustToWorkingDay}
+                    onChange={setAdjustToWorkingDay}
+                    label="Pay early if it lands at a weekend"
+                    description="Moves back to the Friday, the way a salary arrives."
+                  />
 
-                  <label className="well flex items-center gap-3 p-3.5">
-                    <input
-                      type="checkbox"
-                      checked={isSubscription}
-                      onChange={(e) => setIsSubscription(e.target.checked)}
-                      className="h-4 w-4 rounded accent-[rgb(var(--primary-strong))]"
-                    />
-                    <span className="min-w-0">
-                      <span className="block text-[14px] tracking-[-0.01em] text-text">
-                        This is a subscription
-                      </span>
-                      <span className="block text-[12.5px] leading-snug text-muted">
-                        It’ll be tracked on the Subscriptions screen too.
-                      </span>
-                    </span>
-                  </label>
+                  <CheckboxField
+                    checked={isSubscription}
+                    onChange={setIsSubscription}
+                    label="This is a subscription"
+                    description="It’ll be tracked on the Subscriptions screen too."
+                  />
 
                   {/* A recurrence rule is abstract. Show the dates it produces,
                       so the weekend rollback is visible before saving. */}

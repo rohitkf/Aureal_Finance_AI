@@ -302,6 +302,68 @@
   }
 }
 
+/*
+ * The range slider's thumb.
+ *
+ * `appearance-none` only flattens the track; the handle keeps whatever the
+ * platform draws unless these two pseudo-elements are written out, so the same
+ * control looked like three different controls across browsers. `accent-color`
+ * does not help — it re-applies the platform's own styling in its own shape.
+ *
+ * The element itself stays native: it already handles arrow keys, Home and
+ * End, page steps and touch dragging correctly, and a hand-built slider would
+ * have to earn all of that back.
+ */
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1.25rem;
+  width: 1.25rem;
+  border-radius: 9999px;
+  background: rgb(var(--primary-strong));
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.25),
+    0 4px 12px -4px rgb(var(--primary-strong) / 0.7);
+  cursor: grab;
+  transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.slider::-webkit-slider-thumb:active {
+  transform: scale(1.12);
+  cursor: grabbing;
+}
+
+.slider::-moz-range-thumb {
+  height: 1.25rem;
+  width: 1.25rem;
+  border: 0;
+  border-radius: 9999px;
+  background: rgb(var(--primary-strong));
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.25),
+    0 4px 12px -4px rgb(var(--primary-strong) / 0.7);
+  cursor: grab;
+}
+
+.slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgb(var(--primary-strong) / 0.25);
+}
+
+.slider:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgb(var(--primary-strong) / 0.25);
+}
+
+.slider-secondary::-webkit-slider-thumb {
+  background: rgb(var(--secondary));
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.25),
+    0 4px 12px -4px rgb(var(--secondary) / 0.7);
+}
+
+.slider-secondary::-moz-range-thumb {
+  background: rgb(var(--secondary));
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

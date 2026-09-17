@@ -10,7 +10,15 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, Eyebrow } from '@/components/ui/Card';
-import { AmountField, SegmentedControl, SelectField, TextAreaField, TextField } from '@/components/ui/Field';
+import {
+  AmountField,
+  CheckboxField,
+  DateField,
+  SegmentedControl,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from '@/components/ui/Field';
 import { DayOfMonthPicker, LAST_DAY } from '@/components/ui/DayOfMonthPicker';
 import { reanchor, type DraftRule } from '@/lib/recurringDraft';
 import { Icon } from '@/components/ui/Icon';
@@ -393,7 +401,7 @@ const RecurringForm = ({
           <SelectField
             label="Category"
             value={draft.categoryId}
-            onChange={(e) => setDraft({ ...draft, categoryId: e.target.value })}
+            onChange={(value) => setDraft({ ...draft, categoryId: value })}
           >
             {categories.filter((c) => (draft.direction === 'in' ? c.kind === 'income' : c.kind === 'expense')).map((c) => (
               <option key={c.id} value={c.id}>
@@ -402,7 +410,7 @@ const RecurringForm = ({
             ))}
           </SelectField>
 
-          <SelectField label="Account" value={draft.accountId} onChange={(e) => setDraft({ ...draft, accountId: e.target.value })}>
+          <SelectField label="Account" value={draft.accountId} onChange={(value) => setDraft({ ...draft, accountId: value })}>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
@@ -413,8 +421,8 @@ const RecurringForm = ({
           <SelectField
             label="Frequency"
             value={draft.frequency}
-            onChange={(e) => {
-              const frequency = e.target.value as Frequency;
+            onChange={(value) => {
+              const frequency = value as Frequency;
               // `anchorDay` means a weekday (0-6) for weekly rules and a day of
               // the month (1-31) for monthly ones. Carrying the old number
               // across is how "Weekly, Sunday" became a monthly rule anchored
@@ -457,7 +465,7 @@ const RecurringForm = ({
             <SelectField
               label="Day of week"
               value={draft.anchorDay}
-              onChange={(e) => setDraft({ ...draft, anchorDay: e.target.value })}
+              onChange={(value) => setDraft({ ...draft, anchorDay: value })}
             >
               {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((d, i) => (
                 <option key={d} value={i}>
@@ -467,17 +475,16 @@ const RecurringForm = ({
             </SelectField>
           )}
 
-          <TextField
+          <DateField
             label="Start date"
-            type="date"
             value={draft.startDate}
-            onChange={(e) => setDraft({ ...draft, startDate: e.target.value })}
+            onChange={(startDate) => setDraft({ ...draft, startDate })}
           />
 
           <SelectField
             label="Ends"
             value={draft.endMode}
-            onChange={(e) => setDraft({ ...draft, endMode: e.target.value as DraftRule['endMode'] })}
+            onChange={(value) => setDraft({ ...draft, endMode: value as DraftRule['endMode'] })}
           >
             <option value="never">Never</option>
             <option value="date">On a date</option>
@@ -485,7 +492,11 @@ const RecurringForm = ({
           </SelectField>
 
           {draft.endMode === 'date' && (
-            <TextField label="End date" type="date" value={draft.endDate} onChange={(e) => setDraft({ ...draft, endDate: e.target.value })} />
+            <DateField
+              label="End date"
+              value={draft.endDate}
+              onChange={(endDate) => setDraft({ ...draft, endDate })}
+            />
           )}
           {draft.endMode === 'count' && (
             <TextField
@@ -497,35 +508,19 @@ const RecurringForm = ({
           )}
         </div>
 
-        <label className="flex items-center gap-3 well p-3.5">
-          <input
-            type="checkbox"
-            checked={draft.adjustToWorkingDay}
-            onChange={(e) => setDraft({ ...draft, adjustToWorkingDay: e.target.checked })}
-            aria-label="Pay early if it lands at a weekend"
-            className="h-4 w-4 rounded accent-[rgb(var(--primary-strong))]"
-          />
-          <span>
-            <span className="block text-body-md text-text">Pay early if it lands at a weekend</span>
-            <span className="block text-body-sm text-muted">
-              Moves back to the Friday, the way a salary arrives. The schedule itself doesn’t move.
-            </span>
-          </span>
-        </label>
+        <CheckboxField
+          checked={draft.adjustToWorkingDay}
+          onChange={(adjustToWorkingDay) => setDraft({ ...draft, adjustToWorkingDay })}
+          label="Pay early if it lands at a weekend"
+          description="Moves back to the Friday, the way a salary arrives. The schedule itself doesn’t move."
+        />
 
-        <label className="flex items-center gap-3 well p-3.5">
-          <input
-            type="checkbox"
-            checked={draft.isSubscription}
-            onChange={(e) => setDraft({ ...draft, isSubscription: e.target.checked })}
-            aria-label="This is a subscription"
-            className="h-4 w-4 rounded accent-[rgb(var(--primary-strong))]"
-          />
-          <span>
-            <span className="block text-body-md text-text">This is a subscription</span>
-            <span className="block text-body-sm text-muted">It’ll be tracked on the Subscriptions screen too.</span>
-          </span>
-        </label>
+        <CheckboxField
+          checked={draft.isSubscription}
+          onChange={(isSubscription) => setDraft({ ...draft, isSubscription })}
+          label="This is a subscription"
+          description="It’ll be tracked on the Subscriptions screen too."
+        />
 
         <TextAreaField label="Notes" placeholder="Optional" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
 

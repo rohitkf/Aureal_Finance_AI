@@ -130,6 +130,33 @@ their balance.
 
 ---
 
+## Controls
+
+**No control is the platform's.** A native `<select>` draws the operating
+system's menu, which no stylesheet reaches — on a dark surface it arrives as a
+white system list in a typeface the app never chose. `<input type="date">` is a
+wheel on iOS, a dialog on Android and a small grey box in desktop Chrome. Three
+devices, three apps.
+
+| Instead of | Use | Notes |
+| --- | --- | --- |
+| `<select>` | `SelectField` → `Select` | Listbox pattern. `onChange` hands over the **value**, not a DOM event — a synthetic `target.value` would be pretending to be something it is not |
+| `<input type="date">` | `DateField` → `DatePicker` | Speaks the same `YYYY-MM-DD` strings as the rest of the app, so nothing above it changes and no `Date` drifts across a timezone. Weeks start Monday |
+| `<input type="checkbox">` | `CheckboxField` | `role="checkbox"` button, so the tick and the focus ring are the app's |
+| A free-text number with a fixed range | A picker that cannot express an invalid value | `DayOfMonthPicker` is the model |
+
+`<input type="range">` stays native, and is the one deliberate exception: it
+already handles arrow keys, Home and End, page steps and touch dragging, and a
+hand-built slider would have to earn all of that back. What it does not do is
+draw its own thumb — `appearance-none` only flattens the track — so
+`::-webkit-slider-thumb` and `::-moz-range-thumb` are written out in
+`index.css`. `accent-color` is not a substitute: it re-applies the platform's
+styling in the platform's shape.
+
+Keyboard support is not optional on any of these. Every one is tested for it.
+
+---
+
 ## Performance guardrails
 
 - Animation is **transform and opacity only**. Nothing animates `width`, `height`, `top` or `left`,

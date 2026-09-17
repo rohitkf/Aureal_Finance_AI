@@ -131,7 +131,7 @@ export const NewCategoryDialog = ({ open, onClose, kind, editing, onCreated }: N
           <SelectField
             label="Kind"
             value={chosenKind}
-            onChange={(e) => setChosenKind(e.target.value as Category['kind'])}
+            onChange={(value) => setChosenKind(value as Category['kind'])}
             hint="Expense and income categories are offered separately when adding a transaction."
           >
             <option value="expense">Expense</option>
