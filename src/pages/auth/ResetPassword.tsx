@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { describeError, type DescribedError } from '@/lib/errors';
 import { useNavigate } from 'react-router-dom';
 import { passwordProblem, useAuth } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -19,7 +20,7 @@ export const ResetPassword = () => {
   const [ready, setReady] = useState<'checking' | 'ok' | 'invalid'>('checking');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DescribedError | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -48,11 +49,12 @@ export const ResetPassword = () => {
 
     const issue = passwordProblem(password);
     if (issue) {
-      setError(issue);
+      // Already written for a person; there is no underlying error to describe.
+      setError({ message: issue });
       return;
     }
     if (password !== confirm) {
-      setError('Those passwords don’t match.');
+      setError({ message: 'Those passwords don’t match.' });
       return;
     }
 
@@ -62,7 +64,7 @@ export const ResetPassword = () => {
       setDone(true);
       window.setTimeout(() => navigate('/', { replace: true }), 1400);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update your password.');
+      setError(describeError(err, 'Could not update your password.'));
     } finally {
       setBusy(false);
     }
@@ -100,7 +102,11 @@ export const ResetPassword = () => {
     <AuthLayout title="Set a new password" description="Choose something you haven't used here before.">
       <form onSubmit={submit} className="mt-9 space-y-5">
         {done && <FormNotice tone="success">Password updated. Taking you to your dashboard…</FormNotice>}
-        {error && <FormNotice tone="error">{error}</FormNotice>}
+        {error && (
+          <FormNotice tone="error" detail={error.detail}>
+            {error.message}
+          </FormNotice>
+        )}
 
         <TextField
           label="New password"

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { describeError, type DescribedError } from '@/lib/errors';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -15,7 +16,7 @@ export const SignIn = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DescribedError | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (!loading && user) return <Navigate to="/" replace />;
@@ -28,7 +29,7 @@ export const SignIn = () => {
       await signIn(email, password);
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not sign you in.');
+      setError(describeError(err, 'Could not sign you in.'));
     } finally {
       setBusy(false);
     }
@@ -56,7 +57,11 @@ export const SignIn = () => {
 
       <form onSubmit={submit} className="mt-9 space-y-5">
         {justConfirmed && <FormNotice tone="success">Email confirmed — you can sign in now.</FormNotice>}
-        {error && <FormNotice tone="error">{error}</FormNotice>}
+        {error && (
+          <FormNotice tone="error" detail={error.detail}>
+            {error.message}
+          </FormNotice>
+        )}
 
         <TextField
           label="Email"

@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { describeError } from '@/lib/errors';
+import { useDevMode } from '@/lib/devMode';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { money } from '@/lib/format';
@@ -23,7 +25,14 @@ const THEMES: Array<{ value: 'light' | 'dark' | 'system'; label: string; icon: I
   { value: 'system', label: 'System', icon: 'monitor' },
 ];
 
+/** Friendly text, with the underlying error appended in development mode. */
+const errorMessageWithDetail = (e: unknown): string => {
+  const described = describeError(e, 'Please try again.');
+  return described.detail ? `${described.message} — ${described.detail}` : described.message;
+};
+
 export const Settings = () => {
+  const [devMode, setDevMode] = useDevMode();
   const state = useAppState();
   const { dispatch, clearAll, loadSampleData } = useStore();
   const { user, signOut } = useAuth();
@@ -240,6 +249,20 @@ export const Settings = () => {
         />
       </Card>
 
+      {/* ---------------- Development mode ---------------- */}
+      <Card className="space-y-6" id="developer">
+        <CardHeader
+          title="Developer"
+          description="For diagnosing a problem on this device."
+        />
+        <Toggle
+          checked={devMode}
+          onChange={setDevMode}
+          label="Development mode"
+          description="Shows the underlying error whenever something fails, instead of the plain-English message. Applies to this device only, and stays on until you turn it off."
+        />
+      </Card>
+
       {/* ---------------- Bank connections ---------------- */}
       <Card className="space-y-6" id="connections">
         <CardHeader title="Bank connections" description="Where automatic transaction syncing will live." />
@@ -308,7 +331,7 @@ export const Settings = () => {
                 toast({
                   tone: 'danger',
                   title: 'Couldn’t load the sample data',
-                  description: e instanceof Error ? e.message : 'Please try again.',
+                  description: errorMessageWithDetail(e),
                 });
               } finally {
                 setBusy(null);
@@ -378,7 +401,7 @@ export const Settings = () => {
             toast({
               tone: 'danger',
               title: 'Couldn’t clear your data',
-              description: e instanceof Error ? e.message : 'Please try again.',
+              description: errorMessageWithDetail(e),
             });
           } finally {
             setBusy(null);

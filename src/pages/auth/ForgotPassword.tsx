@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { describeError, type DescribedError } from '@/lib/errors';
 import { useAuth } from '@/lib/auth';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
@@ -9,7 +10,7 @@ export const ForgotPassword = () => {
   const { requestPasswordReset } = useAuth();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DescribedError | null>(null);
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: FormEvent) => {
@@ -20,7 +21,7 @@ export const ForgotPassword = () => {
       await requestPasswordReset(email);
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send the reset link.');
+      setError(describeError(err, 'Could not send the reset link.'));
     } finally {
       setBusy(false);
     }
@@ -58,7 +59,11 @@ export const ForgotPassword = () => {
       }
     >
       <form onSubmit={submit} className="mt-9 space-y-5">
-        {error && <FormNotice tone="error">{error}</FormNotice>}
+        {error && (
+          <FormNotice tone="error" detail={error.detail}>
+            {error.message}
+          </FormNotice>
+        )}
 
         <TextField
           label="Email"

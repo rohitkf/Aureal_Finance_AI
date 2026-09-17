@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { describeError, type DescribedError } from '@/lib/errors';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { passwordProblem, useAuth } from '@/lib/auth';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -15,7 +16,7 @@ export const SignUp = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DescribedError | null>(null);
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -31,11 +32,12 @@ export const SignUp = () => {
 
     const issue = passwordProblem(password);
     if (issue) {
-      setError(issue);
+      // Already written for a person; there is no underlying error to describe.
+      setError({ message: issue });
       return;
     }
     if (password !== confirm) {
-      setError('Those passwords don’t match.');
+      setError({ message: 'Those passwords don’t match.' });
       return;
     }
 
@@ -45,7 +47,7 @@ export const SignUp = () => {
       if (needsConfirmation) setSent(true);
       else navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create your account.');
+      setError(describeError(err, 'Could not create your account.'));
     } finally {
       setBusy(false);
     }
@@ -86,7 +88,11 @@ export const SignUp = () => {
       }
     >
       <form onSubmit={submit} className="mt-9 space-y-5">
-        {error && <FormNotice tone="error">{error}</FormNotice>}
+        {error && (
+          <FormNotice tone="error" detail={error.detail}>
+            {error.message}
+          </FormNotice>
+        )}
 
         <TextField
           label="Your name"

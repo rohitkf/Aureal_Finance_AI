@@ -20,6 +20,7 @@ import type {
   Transaction,
   VirtualAccount,
 } from './types';
+import { describeError, errorMessage } from './errors';
 import { supabase } from './supabase';
 import { useAuth } from './auth';
 import { useToast } from '@/components/ui/Toast';
@@ -265,7 +266,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       if (!userRef.current) return;
       setState((prev) => ({ ...prev, ...next }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load your data.');
+      setError(errorMessage(e, 'Could not load your data.'));
     } finally {
       setLoading(false);
     }
@@ -302,8 +303,17 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           const slices = await work();
           await refresh(slices);
         } catch (e) {
-          const message = e instanceof Error ? e.message : 'Something went wrong.';
-          toast({ tone: 'danger', title: `Couldn’t ${label}`, description: message });
+          // The title already says what failed, so the description carries the
+          // reason — and the underlying error too, but only in development
+          // mode, which `describeError` decides.
+          const described = describeError(e, 'Please try again.');
+          toast({
+            tone: 'danger',
+            title: `Couldn’t ${label}`,
+            description: described.detail
+              ? `${described.message} — ${described.detail}`
+              : described.message,
+          });
           // Pull the server's version back so the screen never shows a change
           // that did not actually happen.
           void refresh(ALL);
