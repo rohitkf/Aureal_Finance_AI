@@ -80,6 +80,20 @@ Other things that are true and not guessable:
   each step, not advanced relatively — `alignToDayOfMonth` in
   `recurrence.ts`. Getting this wrong walks a rent payment backwards through
   the year.
+- **The working-day rollback is applied to the output, never to the cursor.**
+  `adjustToWorkingDay` moves an occurrence landing on a Saturday or Sunday
+  back to the Friday, because that is when a salary actually arrives. The
+  rule's anchor is untouched: feeding the adjusted date back into the schedule
+  would pull the payday two days earlier every month until a month-end salary
+  is arriving mid-month. A 36-month test asserts it does not.
+  **Weekends only** — bank holidays differ by nation and move every year, so a
+  hardcoded list is wrong the moment it goes stale. That is a decision, not a
+  gap, and `date.ts` says so.
+- **The date a payment landed on is not always its anchor.** Picking "last
+  working day of month" in a month ending on a Sunday gives the 29th, but the
+  rule means month-end: it anchors to 31 with the rollback on. Anchoring to 29
+  would pay on the 29th for ever. `AddTransactionSheet` tracks how the date was
+  chosen for exactly this reason.
 - **Every date is a plain `YYYY-MM-DD` string**, never a `Date`, so nothing
   drifts across a timezone. `date.ts` holds the arithmetic.
 - **Money crosses the wire as a string.** Postgres sends `numeric` as text

@@ -112,6 +112,12 @@ export interface RecurringPayment {
   endDate?: string;
   occurrences?: number;
   status: RecurringStatus;
+  /**
+   * Move an occurrence back to the previous weekday when it lands on one of
+   * the two days nobody is paid. An employer paying on the last day of the
+   * month pays on the Friday when the 31st is a Sunday.
+   */
+  adjustToWorkingDay?: boolean;
   isSubscription?: boolean;
   notes?: string;
 }

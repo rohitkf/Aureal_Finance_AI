@@ -117,3 +117,106 @@ describe('monthlyEquivalent', () => {
     expect(monthlyEquivalent({ amount: 10, frequency: 'fortnightly' })).toBeCloseTo(21.67, 1);
   });
 });
+
+describe('adjustToWorkingDay', () => {
+  const salary = (over: Partial<RecurringPayment> = {}): RecurringPayment =>
+    rule({
+      name: 'Salary',
+      direction: 'in',
+      amount: 3000,
+      // 31 clamps to the last day of every month, which is what "end of the
+      // month" means to a person.
+      anchorDay: 31,
+      startDate: '2026-01-01',
+      adjustToWorkingDay: true,
+      ...over,
+    });
+
+  it('pays on the last working day of every month for a whole year', () => {
+    // Every month of 2026, with the two-day rollback where the month ends at
+    // a weekend. This is the feature in one assertion.
+    expect(expandRecurrence(salary(), '2026-01-01', '2026-12-31')).toEqual([
+      '2026-01-30', // Sat 31st -> Fri
+      '2026-02-27', // Sat 28th -> Fri
+      '2026-03-31', // Tue
+      '2026-04-30', // Thu
+      '2026-05-29', // Sun 31st -> Fri
+      '2026-06-30', // Tue
+      '2026-07-31', // Fri
+      '2026-08-31', // Mon
+      '2026-09-30', // Wed
+      '2026-10-30', // Sat 31st -> Fri
+      '2026-11-30', // Mon
+      '2026-12-31', // Thu
+    ]);
+  });
+
+  it('does not drift: an adjusted date never becomes the next anchor', () => {
+    // The bug this guards against is feeding the rolled-back date back into
+    // the schedule, which walks the payday earlier every month until a salary
+    // paid at month end is arriving mid-month. Three years is enough for a
+    // two-day-per-month drift to be unmistakable.
+    const dates = expandRecurrence(salary(), '2026-01-01', '2028-12-31');
+    expect(dates).toHaveLength(36);
+    for (const d of dates) {
+      const dayOfMonth = Number(d.slice(8));
+      // Every payday is within three days of the end of its month, and never
+      // before the 26th of any month.
+      expect(dayOfMonth).toBeGreaterThanOrEqual(26);
+    }
+    // The last one is still at the end of its month, not dragged back to mid-December.
+    expect(dates[dates.length - 1]).toBe('2028-12-29'); // Sun 31st -> Fri
+  });
+
+  it('leaves the schedule alone when the flag is off', () => {
+    expect(expandRecurrence(salary({ adjustToWorkingDay: false }), '2026-01-01', '2026-03-31')).toEqual([
+      '2026-01-31',
+      '2026-02-28',
+      '2026-03-31',
+    ]);
+  });
+
+  it('treats an absent flag as off, so existing rules are untouched', () => {
+    const withoutFlag = salary();
+    delete withoutFlag.adjustToWorkingDay;
+    expect(expandRecurrence(withoutFlag, '2026-01-01', '2026-02-28')).toEqual([
+      '2026-01-31',
+      '2026-02-28',
+    ]);
+  });
+
+  it('includes a payment whose anchor is past the window but lands inside it', () => {
+    // The anchor is Sunday 31 May; the money arrives on Friday the 29th. Asking
+    // only about May must still find it.
+    expect(expandRecurrence(salary(), '2026-05-01', '2026-05-31')).toEqual(['2026-05-29']);
+    expect(expandRecurrence(salary(), '2026-05-01', '2026-05-29')).toEqual(['2026-05-29']);
+  });
+
+  it('excludes a payment that rolled back out of the window', () => {
+    // Asking about the 30th and 31st of May: the anchor is the 31st, but it
+    // was actually paid on the 29th, before this window starts.
+    expect(expandRecurrence(salary(), '2026-05-30', '2026-05-31')).toEqual([]);
+  });
+
+  it('rolls a weekly rule anchored to a Saturday back to the Friday', () => {
+    const weekend = rule({
+      frequency: 'weekly',
+      anchorDay: 6, // Saturday
+      startDate: '2026-01-01',
+      adjustToWorkingDay: true,
+    });
+    expect(expandRecurrence(weekend, '2026-01-01', '2026-01-31')).toEqual([
+      '2026-01-02',
+      '2026-01-09',
+      '2026-01-16',
+      '2026-01-23',
+      '2026-01-30',
+    ]);
+  });
+
+  it('still honours an end date against the anchor, not the adjusted date', () => {
+    expect(
+      expandRecurrence(salary({ endDate: '2026-02-28' }), '2026-01-01', '2026-12-31'),
+    ).toEqual(['2026-01-30', '2026-02-27']);
+  });
+});

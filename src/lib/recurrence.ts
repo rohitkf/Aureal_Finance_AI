@@ -1,5 +1,5 @@
 import type { Frequency, RecurringPayment } from './types';
-import { ISO, addDays, addMonths, parseISO } from './date';
+import { ISO, addDays, addMonths, parseISO, previousWorkingDay } from './date';
 
 export const FREQUENCY_LABELS: Record<Frequency, string> = {
   daily: 'Daily',
@@ -95,6 +95,16 @@ export const expandRecurrence = (
   if (rule.status !== 'active') return [];
   if (rule.startDate > to) return [];
 
+  // The cursor always walks the rule's own schedule; the working-day rollback
+  // is applied to what comes out, never to the cursor. Feeding an adjusted
+  // date back in would move the anchor a little earlier every period, and a
+  // salary would walk backwards through the month.
+  const roll = rule.adjustToWorkingDay ?? false;
+  // A rolled-back date lands up to two days before its anchor, so an anchor
+  // just past the window can still fall inside it. Scan slightly wider and
+  // filter on the date that actually happens.
+  const scanTo = roll ? addDays(to, 2) : to;
+
   const dates: string[] = [];
   let cursor = firstOccurrence(rule, from);
 
@@ -109,10 +119,16 @@ export const expandRecurrence = (
     }
   }
 
-  while (cursor <= to && dates.length < maxResults) {
+  while (cursor <= scanTo && dates.length < maxResults) {
     if (rule.endDate && cursor > rule.endDate) break;
     if (rule.occurrences && emitted >= rule.occurrences) break;
-    if (cursor >= from) dates.push(cursor);
+    // `occurrences` counts scheduled payments, so it is incremented for every
+    // anchor the rule reaches — including one whose adjusted date falls
+    // outside the window being asked about.
+    if (cursor >= from) {
+      const landed = roll ? previousWorkingDay(cursor) : cursor;
+      if (landed >= from && landed <= to) dates.push(landed);
+    }
     emitted += 1;
     cursor = advance(rule, cursor);
   }

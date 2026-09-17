@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { formatMediumDate, isValidISO } from '@/lib/date';
+import {
+  endOfMonth,
+  formatDay,
+  formatMediumDate,
+  isValidISO,
+  lastWorkingDayOfMonth,
+  parseISO,
+} from '@/lib/date';
 import { money } from '@/lib/format';
+import { FREQUENCY_LABELS, previewOccurrences } from '@/lib/recurrence';
 import { newId, useAppState, useCategories, useStore, useToday } from '@/lib/store';
-import type { Category, Transaction, TransactionType } from '@/lib/types';
+import type { Category, Frequency, RecurringPayment, Transaction, TransactionType } from '@/lib/types';
 import { Button } from './ui/Button';
 import { AmountField, SegmentedControl, SelectField, TextAreaField, TextField } from './ui/Field';
 import { Modal } from './ui/Modal';
@@ -16,6 +24,49 @@ const TYPE_OPTIONS: Array<{ value: TransactionType; label: string }> = [
   { value: 'income', label: 'Income' },
   { value: 'transfer', label: 'Transfer' },
 ];
+
+/**
+ * Frequencies offered inline. `custom` and the rarer cadences stay on the
+ * Recurring screen: this is the quick path, and a sheet that offers every
+ * option is the Recurring form with extra steps.
+ */
+const INLINE_FREQUENCIES: Frequency[] = ['weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'];
+
+/**
+ * How the date was chosen, which the recurrence needs and the date alone
+ * cannot tell it. "Last working day of month" in a month ending on a Saturday
+ * resolves to the 30th — but the rule still means month-end, so it anchors to
+ * 31 with the rollback on, not to "the 30th of every month".
+ */
+type DateMode = 'custom' | 'today' | 'monthEnd';
+
+/**
+ * Declared here rather than inside the sheet: a component defined during
+ * render is a new type on every render, so React unmounts and remounts it,
+ * which throws away focus and any state inside it.
+ */
+const Chip = ({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-pressed={active}
+    className={`rounded-full px-3.5 py-1.5 text-[12.5px] transition-all duration-500 ease-fluid active:scale-[0.97] ${
+      active
+        ? 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.3)]'
+        : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)] hover:text-text'
+    }`}
+  >
+    {children}
+  </button>
+);
 
 interface AddTransactionSheetProps {
   open: boolean;
@@ -45,6 +96,12 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
   const [error, setError] = useState<string | undefined>();
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
 
+  const [dateMode, setDateMode] = useState<DateMode>('today');
+  const [repeats, setRepeats] = useState(false);
+  const [frequency, setFrequency] = useState<Frequency>('monthly');
+  const [adjustToWorkingDay, setAdjustToWorkingDay] = useState(true);
+  const [isSubscription, setIsSubscription] = useState(false);
+
   const categories = useMemo(
     () => allCategories.filter((c) => (type === 'transfer' ? c.kind === 'transfer' : c.kind === type)),
     [allCategories, type],
@@ -60,6 +117,11 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
     setMerchant('');
     setNotes('');
     setDate(today);
+    setDateMode('today');
+    setRepeats(false);
+    setFrequency('monthly');
+    setAdjustToWorkingDay(true);
+    setIsSubscription(false);
     setError(undefined);
   }, [open, initialType, today]);
 
@@ -72,6 +134,52 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
     if (!accounts.some((a) => a.id === accountId)) setAccountId(accounts[0]?.id ?? '');
     if (!accounts.some((a) => a.id === toAccountId)) setToAccountId(accounts[1]?.id ?? accounts[0]?.id ?? '');
   }, [accounts, accountId, toAccountId]);
+
+  // A transfer moves money between the user's own accounts; a recurrence has
+  // a single direction, in or out, so there is nothing coherent to repeat.
+  const canRepeat = type !== 'transfer';
+
+  const setDateFromMode = (mode: DateMode) => {
+    setDateMode(mode);
+    if (mode === 'today') setDate(today);
+    if (mode === 'monthEnd') setDate(lastWorkingDayOfMonth(today));
+  };
+
+  /**
+   * The anchor the rule should use, which is not always the day the first
+   * payment lands on. Month-end anchors to 31 and lets `alignToDayOfMonth`
+   * clamp it, so February is the 28th and the rollback still applies.
+   */
+  const anchorFor = (freq: Frequency, iso: string): number => {
+    if (dateMode === 'monthEnd') return 31;
+    if (freq === 'weekly' || freq === 'fortnightly') return parseISO(iso).getDay();
+    return parseISO(iso).getDate();
+  };
+
+  // Preview dates for the rule as currently configured, so the rollback is
+  // visible before anything is saved.
+  const upcoming = useMemo(() => {
+    if (!repeats || !canRepeat || !isValidISO(date)) return [];
+    return previewOccurrences(
+      {
+        id: 'preview',
+        name: 'preview',
+        amount: 0,
+        direction: type === 'income' ? 'in' : 'out',
+        categoryId,
+        accountId,
+        frequency,
+        anchorDay: anchorFor(frequency, date),
+        startDate: date,
+        status: 'active',
+        adjustToWorkingDay,
+      },
+      date,
+      3,
+    );
+    // `anchorFor` reads dateMode, which is in the dependency list below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repeats, canRepeat, date, dateMode, type, categoryId, accountId, frequency, adjustToWorkingDay]);
 
   const parsed = Number.parseFloat(amount);
   // A date input can be cleared, and an empty date is not something the
@@ -114,10 +222,35 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
     };
 
     dispatch({ type: 'add-transaction', transaction });
+
+    // Both, deliberately: the person is recording something that happened and
+    // saying it happens again. Creating only the rule would leave the ledger
+    // missing the payment they just entered.
+    if (repeats && canRepeat) {
+      const rule: RecurringPayment = {
+        id: newId(),
+        name: transaction.merchant,
+        amount: transaction.amount,
+        direction: type === 'income' ? 'in' : 'out',
+        categoryId,
+        accountId,
+        frequency,
+        anchorDay: anchorFor(frequency, date),
+        startDate: date,
+        status: 'active',
+        adjustToWorkingDay,
+        isSubscription,
+      };
+      dispatch({ type: 'add-recurring', recurring: rule });
+    }
+
     toast({
       tone: 'success',
       title: `${type === 'income' ? 'Income' : type === 'transfer' ? 'Transfer' : 'Expense'} saved`,
-      description: `${money(transaction.amount)} · ${transaction.merchant}`,
+      description:
+        repeats && canRepeat
+          ? `${money(transaction.amount)} · ${transaction.merchant} · repeats ${FREQUENCY_LABELS[frequency].toLowerCase()}`
+          : `${money(transaction.amount)} · ${transaction.merchant}`,
     });
     onClose();
   };
@@ -251,14 +384,120 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
               value={merchant}
               onChange={(e) => setMerchant(e.target.value)}
             />
-            <TextField
-              label="Date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              hint={date > today ? 'Future date — this will appear in your forecast.' : undefined}
-            />
+            <div className="flex flex-col gap-2">
+              <TextField
+                label="Date"
+                type="date"
+                value={date}
+                onChange={(e) => {
+                  // Typed by hand, so it is taken as meant — no snapping to a
+                  // working day. Some things really do land at a weekend.
+                  setDateMode('custom');
+                  setDate(e.target.value);
+                }}
+                hint={date > today ? 'Future date — this will appear in your forecast.' : undefined}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Chip active={dateMode === 'today'} onClick={() => setDateFromMode('today')}>
+                  Today
+                </Chip>
+                <Chip active={dateMode === 'monthEnd'} onClick={() => setDateFromMode('monthEnd')}>
+                  Last working day of month
+                </Chip>
+              </div>
+              {dateMode === 'monthEnd' && lastWorkingDayOfMonth(today) !== endOfMonth(today) && (
+                <p className="text-[12.5px] leading-snug text-faint">
+                  {formatDay(endOfMonth(today))} is a weekend, so this lands on{' '}
+                  {formatDay(lastWorkingDayOfMonth(today))}.
+                </p>
+              )}
+            </div>
           </div>
+
+          {/* Repeating lives here rather than only on the Recurring screen,
+              because "this happens every month" is something you know at the
+              moment you record it, not on a separate trip later. */}
+          {canRepeat && (
+            <div className="space-y-4">
+              <label className="well flex items-center gap-3 p-3.5">
+                <input
+                  type="checkbox"
+                  checked={repeats}
+                  onChange={(e) => setRepeats(e.target.checked)}
+                  className="h-4 w-4 rounded accent-[rgb(var(--primary-strong))]"
+                />
+                <span className="min-w-0">
+                  <span className="block text-[14px] tracking-[-0.01em] text-text">
+                    This repeats
+                  </span>
+                  <span className="block text-[12.5px] leading-snug text-muted">
+                    Records this one now and adds it to your forecast from here on.
+                  </span>
+                </span>
+              </label>
+
+              {repeats && (
+                <div className="space-y-4 pl-1">
+                  <SelectField
+                    label="How often"
+                    value={frequency}
+                    onChange={(e) => setFrequency(e.target.value as Frequency)}
+                  >
+                    {INLINE_FREQUENCIES.map((f) => (
+                      <option key={f} value={f}>
+                        {FREQUENCY_LABELS[f]}
+                      </option>
+                    ))}
+                  </SelectField>
+
+                  <label className="well flex items-center gap-3 p-3.5">
+                    <input
+                      type="checkbox"
+                      checked={adjustToWorkingDay}
+                      onChange={(e) => setAdjustToWorkingDay(e.target.checked)}
+                      className="h-4 w-4 rounded accent-[rgb(var(--primary-strong))]"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-[14px] tracking-[-0.01em] text-text">
+                        Pay early if it lands at a weekend
+                      </span>
+                      <span className="block text-[12.5px] leading-snug text-muted">
+                        Moves back to the Friday, the way a salary arrives.
+                      </span>
+                    </span>
+                  </label>
+
+                  <label className="well flex items-center gap-3 p-3.5">
+                    <input
+                      type="checkbox"
+                      checked={isSubscription}
+                      onChange={(e) => setIsSubscription(e.target.checked)}
+                      className="h-4 w-4 rounded accent-[rgb(var(--primary-strong))]"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-[14px] tracking-[-0.01em] text-text">
+                        This is a subscription
+                      </span>
+                      <span className="block text-[12.5px] leading-snug text-muted">
+                        It’ll be tracked on the Subscriptions screen too.
+                      </span>
+                    </span>
+                  </label>
+
+                  {/* A recurrence rule is abstract. Show the dates it produces,
+                      so the weekend rollback is visible before saving. */}
+                  {upcoming.length > 0 && (
+                    <p className="text-[12.5px] leading-relaxed text-faint">
+                      Next:{' '}
+                      <span className="text-muted">
+                        {upcoming.map((d) => formatDay(d)).join(' · ')}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <TextAreaField
             label="Notes"
