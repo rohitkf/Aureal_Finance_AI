@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, Eyebrow } from '@/components/ui/Card';
 import { AmountField, SegmentedControl, SelectField, TextAreaField, TextField } from '@/components/ui/Field';
+import { DayOfMonthPicker, LAST_DAY } from '@/components/ui/DayOfMonthPicker';
+import { reanchor, type DraftRule } from '@/lib/recurringDraft';
 import { Icon } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { EmptyState, SkeletonRows } from '@/components/ui/States';
@@ -26,24 +28,7 @@ const STATUS_TABS: Array<{ value: RecurringStatus | 'all'; label: string }> = [
 
 const FREQUENCIES = Object.keys(FREQUENCY_LABELS) as Frequency[];
 
-interface DraftRule {
-  id?: string;
-  name: string;
-  amount: string;
-  direction: 'in' | 'out';
-  categoryId: string;
-  accountId: string;
-  frequency: Frequency;
-  customIntervalDays: string;
-  anchorDay: string;
-  startDate: string;
-  endMode: 'never' | 'date' | 'count';
-  endDate: string;
-  occurrences: string;
-  adjustToWorkingDay: boolean;
-  isSubscription: boolean;
-  notes: string;
-}
+
 
 const emptyDraft = (today: string, accountId: string): DraftRule => ({
   name: '',
@@ -428,7 +413,14 @@ const RecurringForm = ({
           <SelectField
             label="Frequency"
             value={draft.frequency}
-            onChange={(e) => setDraft({ ...draft, frequency: e.target.value as Frequency })}
+            onChange={(e) => {
+              const frequency = e.target.value as Frequency;
+              // `anchorDay` means a weekday (0-6) for weekly rules and a day of
+              // the month (1-31) for monthly ones. Carrying the old number
+              // across is how "Weekly, Sunday" became a monthly rule anchored
+              // to day 0 — which pays on the last day of the *previous* month.
+              setDraft({ ...draft, frequency, anchorDay: reanchor(draft, frequency) });
+            }}
           >
             {FREQUENCIES.map((f) => (
               <option key={f} value={f}>
@@ -447,12 +439,17 @@ const RecurringForm = ({
           )}
 
           {isMonthly && (
-            <TextField
+            <DayOfMonthPicker
               label="Payment day of month"
-              inputMode="numeric"
-              value={draft.anchorDay}
-              hint="Short months fall back to the last day."
-              onChange={(e) => setDraft({ ...draft, anchorDay: e.target.value.replace(/\D/g, '').slice(0, 2) })}
+              value={Number(draft.anchorDay) || 1}
+              onChange={(day) => setDraft({ ...draft, anchorDay: String(day) })}
+              hint={
+                Number(draft.anchorDay) === LAST_DAY
+                  ? 'Whatever day the month ends on — the 28th, 29th, 30th or 31st.'
+                  : Number(draft.anchorDay) > 28
+                    ? 'Short months fall back to their last day.'
+                    : undefined
+              }
             />
           )}
 
