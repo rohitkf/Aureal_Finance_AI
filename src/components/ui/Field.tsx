@@ -3,11 +3,12 @@ import {
   useId,
   type InputHTMLAttributes,
   type ReactNode,
-  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
 import { cn } from '@/lib/cn';
 import { Icon } from './Icon';
+import { Select } from './Select';
+import { DatePicker } from './DatePicker';
 
 /**
  * Controls are wells pressed into their surface — an inset hairline and a
@@ -89,40 +90,51 @@ export const TextField = forwardRef<HTMLInputElement, InputProps>(
 );
 TextField.displayName = 'TextField';
 
-type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
+interface SelectFieldProps {
   label: string;
+  value: string;
+  /** The chosen value. Not a DOM event — `Select` is not a `<select>`. */
+  onChange: (value: string) => void;
+  children: ReactNode;
   hint?: string;
   error?: string;
   hideLabel?: boolean;
   containerClassName?: string;
-};
+  className?: string;
+  disabled?: boolean;
+  placeholder?: string;
+}
 
-export const SelectField = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, hint, error, hideLabel, containerClassName, className, children, ...rest }, ref) => (
-    <Field label={label} hint={hint} error={error} hideLabel={hideLabel} className={containerClassName}>
-      {({ id, describedBy, invalid }) => (
-        <div className="relative">
-          <select
-            ref={ref}
-            id={id}
-            aria-describedby={describedBy}
-            aria-invalid={invalid || undefined}
-            className={cn(CONTROL, 'h-12 cursor-pointer appearance-none pr-11', invalid && INVALID, className)}
-            {...rest}
-          >
-            {children}
-          </select>
-          <Icon
-            name="chevron-down"
-            size={15}
-            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-faint"
-          />
-        </div>
-      )}
-    </Field>
-  ),
+export const SelectField = ({
+  label,
+  value,
+  onChange,
+  children,
+  hint,
+  error,
+  hideLabel,
+  containerClassName,
+  className,
+  disabled,
+  placeholder,
+}: SelectFieldProps) => (
+  <Field label={label} hint={hint} error={error} hideLabel={hideLabel} className={containerClassName}>
+    {({ id, describedBy, invalid }) => (
+      <Select
+        id={id}
+        value={value}
+        onChange={onChange}
+        describedBy={describedBy}
+        invalid={invalid}
+        disabled={disabled}
+        className={className}
+        placeholder={placeholder}
+      >
+        {children}
+      </Select>
+    )}
+  </Field>
 );
-SelectField.displayName = 'SelectField';
 
 type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   label: string;
@@ -292,6 +304,104 @@ export const Toggle = ({
           checked ? 'translate-x-[26px]' : 'translate-x-1',
         )}
       />
+    </span>
+  </button>
+);
+
+
+interface DateFieldProps {
+  label: string;
+  /** A `YYYY-MM-DD` string, or empty when there is no date yet. */
+  value: string;
+  onChange: (iso: string) => void;
+  hint?: string;
+  error?: string;
+  hideLabel?: boolean;
+  containerClassName?: string;
+  disabled?: boolean;
+  placeholder?: string;
+}
+
+/** A date, chosen from the app's own calendar rather than the platform's. */
+export const DateField = ({
+  label,
+  value,
+  onChange,
+  hint,
+  error,
+  hideLabel,
+  containerClassName,
+  disabled,
+  placeholder,
+}: DateFieldProps) => (
+  <Field label={label} hint={hint} error={error} hideLabel={hideLabel} className={containerClassName}>
+    {({ id, describedBy, invalid }) => (
+      <DatePicker
+        id={id}
+        value={value}
+        onChange={onChange}
+        describedBy={describedBy}
+        invalid={invalid}
+        disabled={disabled}
+        placeholder={placeholder}
+      />
+    )}
+  </Field>
+);
+
+
+/**
+ * A checkbox drawn by the app.
+ *
+ * `appearance-none` can tame a native one, but only up to the point where the
+ * platform disagrees — the tick glyph, the indeterminate state, the focus ring
+ * on iOS. This is a `role="checkbox"` button, so every pixel is the app's, and
+ * it keeps the whole row clickable the way the native label did.
+ */
+export const CheckboxField = ({
+  checked,
+  onChange,
+  label,
+  description,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+}) => (
+  <button
+    type="button"
+    role="checkbox"
+    aria-checked={checked}
+    disabled={disabled}
+    onClick={() => onChange(!checked)}
+    className={cn(
+      'well flex w-full items-start gap-3 p-3.5 text-left',
+      'outline-none transition-colors duration-400 ease-fluid',
+      'hover:bg-[rgb(var(--hairline)/0.06)]',
+      'focus-visible:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.55),0_0_0_3px_rgb(var(--primary-strong)/0.18)]',
+      'disabled:opacity-50',
+    )}
+  >
+    <span
+      aria-hidden="true"
+      className={cn(
+        'mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px]',
+        'transition-all duration-300 ease-fluid',
+        checked
+          ? 'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.25)]'
+          : 'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))]',
+      )}
+    >
+      {checked && <Icon name="check" size={12} />}
+    </span>
+    <span className="min-w-0">
+      <span className="block text-[14px] tracking-[-0.01em] text-text">{label}</span>
+      {description && (
+        <span className="mt-0.5 block text-[12.5px] leading-snug text-muted">{description}</span>
+      )}
     </span>
   </button>
 );

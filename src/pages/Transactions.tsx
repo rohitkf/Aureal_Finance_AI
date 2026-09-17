@@ -166,7 +166,7 @@ export const Transactions = () => {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <SelectField label="Month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
+          <SelectField label="Month" value={monthFilter} onChange={(value) => setMonthFilter(value)}>
             <option value="all">All time</option>
             {months.map((m) => (
               <option key={m} value={m}>
@@ -174,7 +174,7 @@ export const Transactions = () => {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Account" value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}>
+          <SelectField label="Account" value={accountFilter} onChange={(value) => setAccountFilter(value)}>
             <option value="all">All accounts</option>
             {state.accounts.map((a) => (
               <option key={a.id} value={a.id}>
@@ -182,7 +182,7 @@ export const Transactions = () => {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Category" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+          <SelectField label="Category" value={categoryFilter} onChange={(value) => setCategoryFilter(value)}>
             <option value="all">All categories</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>

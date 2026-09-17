@@ -6,7 +6,7 @@ import { newId, useAppState, useLoading, useSettings, useStore, useToday } from 
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, Eyebrow } from '@/components/ui/Card';
-import { TextField } from '@/components/ui/Field';
+import { DateField, TextField } from '@/components/ui/Field';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { Progress } from '@/components/ui/Progress';
@@ -274,7 +274,11 @@ export const Goals = () => {
                 value={draft.saved}
                 onChange={(e) => setDraft({ ...draft, saved: e.target.value.replace(/[^0-9.]/g, '') })}
               />
-              <TextField label="Target date" type="date" value={draft.targetDate} onChange={(e) => setDraft({ ...draft, targetDate: e.target.value })} />
+              <DateField
+                label="Target date"
+                value={draft.targetDate}
+                onChange={(targetDate) => setDraft({ ...draft, targetDate })}
+              />
               <TextField
                 label="Monthly contribution"
                 inputMode="decimal"

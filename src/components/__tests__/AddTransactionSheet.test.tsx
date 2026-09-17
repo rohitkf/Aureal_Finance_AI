@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Account, Category } from '@/lib/types';
@@ -63,6 +63,48 @@ const { AddTransactionSheet } = await import('../AddTransactionSheet');
 
 const open = () => render(<AddTransactionSheet open onClose={vi.fn()} />);
 
+/** Drives the app's dropdown, which is a listbox rather than a <select>. */
+const choose = async (
+  user: ReturnType<typeof userEvent.setup>,
+  field: string | RegExp,
+  option: string | RegExp,
+) => {
+  await user.click(screen.getByRole('combobox', { name: field }));
+  await user.click(screen.getByRole('option', { name: option }));
+};
+
+/** The date a DateField is showing, as the ISO string behind it. */
+const dateShown = (field = 'Date') => screen.getByLabelText(field).textContent ?? '';
+
+/** Opens the app's calendar and clicks a day, paging months as needed. */
+const pickDate = async (
+  user: ReturnType<typeof userEvent.setup>,
+  field: string,
+  iso: string,
+) => {
+  await user.click(screen.getByLabelText(field));
+  const target = new Date(`${iso}T00:00:00`);
+  const wanted = target.getFullYear() * 12 + target.getMonth();
+  for (let i = 0; i < 24; i += 1) {
+    const heading = screen.getByRole('grid').getAttribute('aria-label') ?? '';
+    const shown = new Date(`${heading} 1`);
+    const at = shown.getFullYear() * 12 + shown.getMonth();
+    if (at === wanted) break;
+    await user.click(screen.getByRole('button', { name: at < wanted ? 'Next month' : 'Previous month' }));
+  }
+  const label = target.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  await user.click(screen.getByRole('gridcell', { name: label }));
+};
+
+/** The labels a dropdown is currently offering. */
+const optionsOf = async (user: ReturnType<typeof userEvent.setup>, field: string | RegExp) => {
+  const trigger = screen.getByRole('combobox', { name: field });
+  await user.click(trigger);
+  const labels = screen.getAllByRole('option').map((o) => o.textContent);
+  await user.keyboard('{Escape}');
+  return labels;
+};
+
 beforeEach(() => {
   accounts = ACCOUNTS;
   today = '2026-03-15';
@@ -117,8 +159,7 @@ describe('Add transaction', () => {
     open();
 
     await user.keyboard('80');
-    await user.clear(screen.getByLabelText('Date'));
-    await user.type(screen.getByLabelText('Date'), '2026-04-20');
+    await pickDate(user, 'Date', '2026-04-20');
     await user.click(screen.getByRole('button', { name: /save transaction/i }));
 
     expect(dispatch.mock.calls[0][0].transaction).toMatchObject({
@@ -141,14 +182,10 @@ describe('Add transaction', () => {
     const user = userEvent.setup();
     open();
 
-    const categorySelect = () => screen.getByLabelText('Category');
-    expect(within(categorySelect()).getAllByRole('option').map((o) => o.textContent)).toEqual([
-      'Groceries',
-      'Eating out',
-    ]);
+    expect(await optionsOf(user, 'Category')).toEqual(['Groceries', 'Eating out']);
 
     await user.click(screen.getByRole('radio', { name: 'Income' }));
-    expect(within(categorySelect()).getAllByRole('option').map((o) => o.textContent)).toEqual(['Salary']);
+    expect(await optionsOf(user, 'Category')).toEqual(['Salary']);
   });
 
   it('will not transfer an account to itself', async () => {
@@ -157,7 +194,7 @@ describe('Add transaction', () => {
 
     await user.keyboard('100');
     await user.click(screen.getByRole('radio', { name: 'Transfer' }));
-    await user.selectOptions(screen.getByLabelText('To account'), 'acc-1');
+    await choose(user, 'To account', 'Current');
     await user.click(screen.getByRole('button', { name: /save transaction/i }));
 
     expect(dispatch).not.toHaveBeenCalled();
@@ -192,7 +229,7 @@ describe('Add transaction', () => {
 describe('date shortcuts', () => {
   it('defaults to today', () => {
     open();
-    expect(screen.getByLabelText('Date')).toHaveValue('2026-03-15');
+    expect(dateShown()).toBe('15 Mar 2026');
   });
 
   it('"Last working day of month" is the last day when that is a weekday', async () => {
@@ -200,7 +237,7 @@ describe('date shortcuts', () => {
     open();
     // March 2026 ends on Tuesday the 31st.
     await user.click(screen.getByRole('button', { name: /last working day of month/i }));
-    expect(screen.getByLabelText('Date')).toHaveValue('2026-03-31');
+    expect(dateShown()).toBe('31 Mar 2026');
   });
 
   it('rolls back to the Friday when the month ends at a weekend', async () => {
@@ -209,22 +246,18 @@ describe('date shortcuts', () => {
     open();
 
     await user.click(screen.getByRole('button', { name: /last working day of month/i }));
-    expect(screen.getByLabelText('Date')).toHaveValue('2026-05-29');
+    expect(dateShown()).toBe('29 May 2026');
     expect(screen.getByText(/is a weekend, so this lands on/i)).toBeInTheDocument();
   });
 
-  it('leaves a hand-picked weekend date exactly as typed', async () => {
+  it('leaves a hand-picked weekend date exactly as chosen', async () => {
     const user = userEvent.setup();
     open();
 
-    const dateField = screen.getByLabelText('Date');
-    await user.clear(dateField);
-    await user.type(dateField, '2026-05-31'); // a Sunday
+    await pickDate(user, 'Date', '2026-05-31'); // a Sunday
+    expect(dateShown()).toBe('31 May 2026');
 
-    expect(dateField).toHaveValue('2026-05-31');
-
-    await user.keyboard('{Escape}');
-    // And it is what gets saved.
+    // And it is what gets saved — no snapping to the Friday.
     await user.click(screen.getByLabelText('Amount'));
     await user.keyboard('10');
     await user.click(screen.getByRole('button', { name: /save transaction/i }));
@@ -290,9 +323,7 @@ describe('repeating a transaction', () => {
     open();
 
     await user.keyboard('12');
-    const dateField = screen.getByLabelText('Date');
-    await user.clear(dateField);
-    await user.type(dateField, '2026-03-25');
+    await pickDate(user, 'Date', '2026-03-25');
     await tickRepeats(user);
     await user.click(screen.getByRole('button', { name: /save transaction/i }));
 
@@ -306,7 +337,7 @@ describe('repeating a transaction', () => {
 
     await user.keyboard('9');
     await tickRepeats(user);
-    await user.selectOptions(screen.getByLabelText('How often'), 'weekly');
+    await choose(user, 'How often', 'Weekly');
     await user.click(screen.getByRole('button', { name: /save transaction/i }));
 
     const rule = savedRule();
