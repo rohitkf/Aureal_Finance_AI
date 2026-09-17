@@ -5,9 +5,10 @@
 -- is an `assert`, so the first wrong figure aborts the transaction and fails
 -- the build with the line that caught it.
 --
--- What this cannot check is row-level security: `auth.uid()` is stubbed to
--- null here, so the policies compile and attach but never make a decision.
--- Isolation between users is asserted against the live project instead.
+-- This file runs as the table owner, which row-level security does not apply
+-- to — deliberately, so the triggers can be examined without the policies in
+-- the way. Access control is asserted separately, as a signed-in user, in
+-- row_level_security.sql.
 
 begin;
 

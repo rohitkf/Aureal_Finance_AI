@@ -67,12 +67,16 @@ jobs:
             psql -d aureal_ci -v ON_ERROR_STOP=1 -q -f "$f"
           done
 
-      # Balances are maintained by a trigger, so they are only ever as correct
-      # as the trigger is. These assertions run in a transaction and roll back.
-      - name: Assert the balance trigger and sign-up provisioning
+      # Balances are maintained by a trigger and access is decided by policies,
+      # so both are only ever as correct as the SQL is. Each file runs in a
+      # transaction and rolls back, so they do not see each other's rows.
+      - name: Assert database behaviour and row-level security
         run: |
           set -euo pipefail
-          psql -d aureal_ci -v ON_ERROR_STOP=1 -f supabase/tests/balances_and_provisioning.sql
+          for f in supabase/tests/*.sql; do
+            echo "Running $f"
+            psql -d aureal_ci -v ON_ERROR_STOP=1 -f "$f"
+          done
 
       # A migration that has shipped is immutable; editing one leaves every
       # existing database on a schema no file describes any more.

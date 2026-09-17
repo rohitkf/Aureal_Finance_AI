@@ -23,3 +23,13 @@ begin
 end $$;
 
 grant usage on schema public to anon, authenticated, service_role;
+
+-- Supabase grants these roles full table privileges and relies entirely on
+-- row-level security to decide what they may actually touch. Mirroring that
+-- here is what lets the RLS tests mean anything: without the grants a policy
+-- test fails on "permission denied for table", which looks like the policy
+-- working and is not. The grant is the privilege; the policy is the boundary.
+alter default privileges in schema public
+  grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on sequences to anon, authenticated, service_role;
