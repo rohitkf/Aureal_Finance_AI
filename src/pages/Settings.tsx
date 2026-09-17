@@ -42,6 +42,7 @@ export const Settings = () => {
   const navigate = useNavigate();
 
   const [minimum, setMinimum] = useState(String(state.settings.minimumBalance));
+  const [minimumError, setMinimumError] = useState<string | undefined>();
   const [name, setName] = useState(state.settings.userName);
   const [confirmClear, setConfirmClear] = useState(false);
   const [categoryDialog, setCategoryDialog] = useState<{ open: boolean; editing: Category | null }>({
@@ -119,13 +120,25 @@ export const Settings = () => {
             label="Minimum balance"
             inputMode="decimal"
             value={minimum}
-            onChange={(e) => setMinimum(e.target.value.replace(/[^0-9.]/g, ''))}
+            error={minimumError}
+            onChange={(e) => {
+              setMinimum(e.target.value.replace(/[^0-9.]/g, ''));
+              setMinimumError(undefined);
+            }}
             onBlur={() => {
               const value = Number.parseFloat(minimum);
-              if (!Number.isFinite(value) || value < 0) {
-                setMinimum(String(state.settings.minimumBalance));
+              // It used to put the old figure back without a word, which looks
+              // like the app losing what you typed. Say what was wrong and keep
+              // it on screen so it can be corrected rather than retyped.
+              if (!Number.isFinite(value)) {
+                setMinimumError('Enter an amount, like 250.');
                 return;
               }
+              if (value < 0) {
+                setMinimumError('This is held back, so it can’t be less than £0.');
+                return;
+              }
+              if (value === state.settings.minimumBalance) return;
               dispatch({ type: 'update-settings', settings: { minimumBalance: value } });
               toast({ tone: 'success', title: 'Minimum balance updated', description: money(value) });
             }}

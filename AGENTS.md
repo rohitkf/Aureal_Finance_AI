@@ -195,6 +195,11 @@ holding.
   and set `search_path = ''`.
 - After applying a migration by hand, run `notify pgrst, 'reload schema';` so
   PostgREST sees it at once rather than whenever its cache turns over.
+- **A form refusing something is not the data being safe.** The browser holds
+  a publishable key and talks to PostgREST directly, so anyone can send a
+  request the form would never make. Row-level security decides *whose* row it
+  is; a check constraint is the only thing deciding whether the row makes
+  sense. Every rule a form enforces belongs in the schema as well.
 - Add assertions to `supabase/tests/` for anything a trigger or a policy does.
   CI applies the migrations to a bare Postgres and runs every file there.
   `row_level_security.sql` becomes a real signed-in user — `set local role
