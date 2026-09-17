@@ -40,6 +40,7 @@ interface DraftRule {
   endMode: 'never' | 'date' | 'count';
   endDate: string;
   occurrences: string;
+  adjustToWorkingDay: boolean;
   isSubscription: boolean;
   notes: string;
 }
@@ -57,6 +58,7 @@ const emptyDraft = (today: string, accountId: string): DraftRule => ({
   endMode: 'never',
   endDate: '',
   occurrences: '',
+  adjustToWorkingDay: false,
   isSubscription: false,
   notes: '',
 });
@@ -75,6 +77,7 @@ const toRule = (draft: DraftRule): RecurringPayment => ({
   endDate: draft.endMode === 'date' && draft.endDate ? draft.endDate : undefined,
   occurrences: draft.endMode === 'count' && draft.occurrences ? Number(draft.occurrences) : undefined,
   status: 'active',
+  adjustToWorkingDay: draft.adjustToWorkingDay,
   isSubscription: draft.isSubscription,
   notes: draft.notes.trim() || undefined,
 });
@@ -283,6 +286,7 @@ export const Recurring = () => {
                           endMode: rule.endDate ? 'date' : rule.occurrences ? 'count' : 'never',
                           endDate: rule.endDate ?? '',
                           occurrences: String(rule.occurrences ?? ''),
+                          adjustToWorkingDay: Boolean(rule.adjustToWorkingDay),
                           isSubscription: Boolean(rule.isSubscription),
                           notes: rule.notes ?? '',
                         })
@@ -495,6 +499,22 @@ const RecurringForm = ({
             />
           )}
         </div>
+
+        <label className="flex items-center gap-3 well p-3.5">
+          <input
+            type="checkbox"
+            checked={draft.adjustToWorkingDay}
+            onChange={(e) => setDraft({ ...draft, adjustToWorkingDay: e.target.checked })}
+            aria-label="Pay early if it lands at a weekend"
+            className="h-4 w-4 rounded accent-[rgb(var(--primary-strong))]"
+          />
+          <span>
+            <span className="block text-body-md text-text">Pay early if it lands at a weekend</span>
+            <span className="block text-body-sm text-muted">
+              Moves back to the Friday, the way a salary arrives. The schedule itself doesn’t move.
+            </span>
+          </span>
+        </label>
 
         <label className="flex items-center gap-3 well p-3.5">
           <input

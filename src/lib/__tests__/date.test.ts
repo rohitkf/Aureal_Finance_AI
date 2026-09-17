@@ -16,6 +16,9 @@ import {
   parseISO,
   relativeDayLabel,
   isValidISO,
+  isWorkingDay,
+  lastWorkingDayOfMonth,
+  previousWorkingDay,
   relativeDueLabel,
   startOfMonth,
 } from '../date';
@@ -201,5 +204,81 @@ describe('an emptied date field', () => {
     expect(formatMediumDate('')).toBe('—');
     expect(relativeDayLabel('', '2026-03-15')).toBe('—');
     expect(relativeDueLabel('', '2026-03-15')).toBe('—');
+  });
+});
+
+describe('working days', () => {
+  it('counts Monday to Friday, and nothing else', () => {
+    // 28 Sep 2026 is a Monday.
+    expect(isWorkingDay('2026-09-28')).toBe(true); // Mon
+    expect(isWorkingDay('2026-09-29')).toBe(true); // Tue
+    expect(isWorkingDay('2026-09-30')).toBe(true); // Wed
+    expect(isWorkingDay('2026-10-01')).toBe(true); // Thu
+    expect(isWorkingDay('2026-10-02')).toBe(true); // Fri
+    expect(isWorkingDay('2026-10-03')).toBe(false); // Sat
+    expect(isWorkingDay('2026-10-04')).toBe(false); // Sun
+  });
+
+  it('does not treat a bank holiday as a weekend', () => {
+    // Christmas Day 2026 is a Friday. Deliberately a working day here: bank
+    // holidays differ by nation and move every year, so a hardcoded list goes
+    // stale silently. Documented so the behaviour is a decision, not a gap.
+    expect(isWorkingDay('2026-12-25')).toBe(true);
+  });
+});
+
+describe('previousWorkingDay', () => {
+  it('leaves a working day alone', () => {
+    expect(previousWorkingDay('2026-09-30')).toBe('2026-09-30'); // Wed
+  });
+
+  it('walks a Saturday back one day and a Sunday back two', () => {
+    expect(previousWorkingDay('2026-10-03')).toBe('2026-10-02'); // Sat -> Fri
+    expect(previousWorkingDay('2026-10-04')).toBe('2026-10-02'); // Sun -> Fri
+  });
+
+  it('crosses a month boundary backwards', () => {
+    // Sunday 1 Nov 2026 belongs to the Friday in October.
+    expect(previousWorkingDay('2026-11-01')).toBe('2026-10-30');
+  });
+
+  it('crosses a year boundary backwards', () => {
+    // Saturday 1 Jan 2028 -> Friday 31 Dec 2027.
+    expect(previousWorkingDay('2028-01-01')).toBe('2027-12-31');
+  });
+
+  it('hands back an unreadable date untouched rather than looping', () => {
+    expect(previousWorkingDay('')).toBe('');
+    expect(previousWorkingDay('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('lastWorkingDayOfMonth', () => {
+  it('is the last day when that is a weekday', () => {
+    // September 2026 ends on Wednesday the 30th.
+    expect(lastWorkingDayOfMonth('2026-09-15')).toBe('2026-09-30');
+  });
+
+  it('rolls back off a Sunday', () => {
+    // 31 May 2026 is a Sunday, so payday is Friday the 29th.
+    expect(lastWorkingDayOfMonth('2026-05-01')).toBe('2026-05-29');
+    // 31 Jan 2027 is a Sunday.
+    expect(lastWorkingDayOfMonth('2027-01-20')).toBe('2027-01-29');
+  });
+
+  it('rolls back off a Saturday', () => {
+    // 31 Oct 2026 is a Saturday, so payday is Friday the 30th.
+    expect(lastWorkingDayOfMonth('2026-10-10')).toBe('2026-10-30');
+    // February in a short month: 28 Feb 2026 is a Saturday.
+    expect(lastWorkingDayOfMonth('2026-02-05')).toBe('2026-02-27');
+  });
+
+  it('handles a leap February', () => {
+    // 29 Feb 2028 is a Tuesday.
+    expect(lastWorkingDayOfMonth('2028-02-01')).toBe('2028-02-29');
+  });
+
+  it('takes any day in the month, not just the first', () => {
+    expect(lastWorkingDayOfMonth('2026-10-31')).toBe('2026-10-30');
   });
 });

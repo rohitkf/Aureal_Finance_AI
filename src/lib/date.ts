@@ -42,6 +42,46 @@ export const endOfMonth = (iso: string): string => {
   return ISO(new Date(d.getFullYear(), d.getMonth() + 1, 0));
 };
 
+/* ------------------------------------------------------------------ */
+/* Working days                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Monday to Friday. Bank holidays are deliberately not considered: they differ
+ * between England & Wales, Scotland and Northern Ireland, and they move every
+ * year, so a hardcoded list is wrong the moment it goes stale. Weekends are
+ * the case that actually moves a payday, and they never change.
+ */
+export const isWorkingDay = (iso: string): boolean => {
+  const day = parseISO(iso).getDay();
+  return day !== 0 && day !== 6;
+};
+
+/**
+ * The given day, or the most recent working day before it.
+ *
+ * Always backwards, because that is how a payday behaves: an employer paying
+ * on the last day of the month pays on the Friday when the 30th is a Sunday,
+ * never the Monday after. A date that is already a working day is returned
+ * untouched.
+ */
+export const previousWorkingDay = (iso: string): string => {
+  if (!isValidISO(iso)) return iso;
+  let out = iso;
+  // At most two steps: Sunday to Friday is the longest run.
+  while (!isWorkingDay(out)) out = addDays(out, -1);
+  return out;
+};
+
+/**
+ * When a salary paid "at the end of the month" actually lands.
+ *
+ * September 2026 ends on Wednesday the 30th, so that is the answer. If it
+ * ended on a Sunday the answer would be the Friday before.
+ */
+export const lastWorkingDayOfMonth = (iso: string): string =>
+  previousWorkingDay(endOfMonth(iso));
+
 export const monthKey = (iso: string): string => iso.slice(0, 7);
 
 export const isSameMonth = (a: string, b: string): boolean => monthKey(a) === monthKey(b);
