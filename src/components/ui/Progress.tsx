@@ -32,7 +32,7 @@ export const Progress = ({ value, max = 100, tone = 'primary', size = 'md', clas
       aria-valuemin={0}
       aria-valuemax={Math.round(max)}
       aria-label={label}
-      className={cn('w-full overflow-hidden rounded-full bg-surface-highest', HEIGHTS[size], className)}
+      className={cn('w-full overflow-hidden rounded-full bg-[rgb(var(--hairline)/0.08)]', HEIGHTS[size], className)}
     >
       <div
         className={cn('h-full rounded-full transition-[width] duration-500', TONES[tone])}
@@ -53,7 +53,7 @@ export const SegmentedBar = ({ segments, className }: { segments: Segment[]; cla
   const total = segments.reduce((s, x) => s + x.value, 0) || 1;
   const colors: Record<Segment['tone'], string> = { ...TONES, neutral: 'bg-surface-bright' };
   return (
-    <div className={cn('flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-surface-highest', className)}>
+    <div className={cn('flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-[rgb(var(--hairline)/0.08)]', className)}>
       {segments.map((s) => (
         <div
           key={s.label}

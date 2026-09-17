@@ -76,7 +76,7 @@ export const DonutChart = ({
                 strokeWidth={active && active !== a.id ? stroke - 6 : stroke}
                 strokeDasharray={`${a.dash} ${circumference - a.dash}`}
                 strokeDashoffset={-a.offset}
-                className="cursor-pointer transition-all duration-200"
+                className="cursor-pointer transition-all duration-200 ease-fluid"
                 opacity={active && active !== a.id ? 0.35 : 1}
                 onMouseEnter={() => setActive(a.id)}
                 onMouseLeave={() => setActive(null)}
@@ -106,7 +106,7 @@ export const DonutChart = ({
               onMouseLeave={() => setActive(null)}
               onFocus={() => setActive(a.id)}
               onBlur={() => setActive(null)}
-              className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-high"
+              className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors duration-400 ease-fluid hover:bg-surface-high"
             >
               <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: a.color }} />
               <span className="min-w-0 flex-1 truncate text-body-sm text-text">{a.label}</span>

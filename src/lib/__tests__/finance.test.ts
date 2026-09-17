@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   availableNow,
+  balanceHistory,
   budgetProgress,
   buildForecast,
   creditUtilisation,
@@ -213,6 +214,74 @@ describe('buildForecast', () => {
     };
     const forecast = buildForecast(state, TODAY, 10);
     expect(forecast.end).toBe(forecast.start);
+  });
+});
+
+describe('balanceHistory', () => {
+  it('walks today’s cash backwards through cleared transactions', () => {
+    const state: AppState = {
+      ...minimal(),
+      transactions: [
+        // £200 left on the 15th, so the 15th still closes at 1000 and it is
+        // the 14th that closed at 1200.
+        {
+          id: 'h1',
+          date: '2026-09-15',
+          merchant: 'Shop',
+          amount: 200,
+          type: 'expense',
+          accountId: 'a1',
+          categoryId: 'groceries',
+          status: 'cleared',
+        },
+      ],
+    };
+    // Oldest first: close of the 14th, 15th, 16th.
+    expect(balanceHistory(state, TODAY, 3)).toEqual([1200, 1000, 1000]);
+  });
+
+  it('ignores credit-card movements, which are not spendable cash', () => {
+    const state: AppState = {
+      ...minimal(),
+      transactions: [
+        {
+          id: 'h2',
+          date: '2026-09-15',
+          merchant: 'Card spend',
+          amount: 300,
+          type: 'expense',
+          accountId: 'c1',
+          categoryId: 'shopping',
+          status: 'cleared',
+        },
+      ],
+    };
+    expect(new Set(balanceHistory(state, TODAY, 3))).toEqual(new Set([1000]));
+  });
+
+  it('ignores scheduled transactions, which have not happened', () => {
+    const state: AppState = {
+      ...minimal(),
+      transactions: [
+        {
+          id: 'h3',
+          date: '2026-09-15',
+          merchant: 'Planned',
+          amount: 500,
+          type: 'expense',
+          accountId: 'a1',
+          categoryId: 'groceries',
+          status: 'scheduled',
+        },
+      ],
+    };
+    expect(new Set(balanceHistory(state, TODAY, 3))).toEqual(new Set([1000]));
+  });
+
+  it('returns the requested number of points, oldest first', () => {
+    const series = balanceHistory(base(), TODAY, 30);
+    expect(series).toHaveLength(30);
+    expect(series[series.length - 1]).toBe(availableNow(base().accounts));
   });
 });
 

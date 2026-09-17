@@ -80,11 +80,11 @@ export const Debts = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header>
         <Eyebrow>Debt</Eyebrow>
-        <h1 className="mt-1 font-display text-headline-lg text-text">What you owe</h1>
-        <p className="mt-1 max-w-2xl text-body-md text-muted">
+        <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">What you owe</h1>
+        <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-muted">
           Balances, utilisation and how long your current payments would take to clear everything.
         </p>
       </header>
@@ -189,7 +189,7 @@ export const Debts = () => {
                     label={`${card.name}: ${percent(util, 1)} of limit used`}
                   />
 
-                  <dl className="grid grid-cols-2 gap-3 border-t border-border pt-3 text-body-sm sm:grid-cols-4">
+                  <dl className="grid grid-cols-2 gap-3 border-t border-[rgb(var(--hairline)/0.08)] pt-3 text-body-sm sm:grid-cols-4">
                     <Item label="Available" value={money(availableCredit(card), { compact: true })} />
                     <Item label="Payment due" value={formatMediumDate(due)} />
                     <Item label="Minimum" value={money(card.minimumPayment ?? 0, { compact: true })} tone="danger" />
@@ -201,7 +201,7 @@ export const Debts = () => {
         </div>
       </section>
 
-      <Card tone="quiet" className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+      <Card tone="well" className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h3 className="font-display text-headline-sm text-text">Want to clear this faster?</h3>
           <p className="text-body-sm text-muted">

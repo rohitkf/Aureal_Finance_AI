@@ -23,10 +23,10 @@ const TONES = {
 };
 
 const ICON_TONES = {
-  neutral: 'bg-surface-highest text-muted',
-  success: 'bg-success/12 text-success',
-  danger: 'bg-danger/12 text-danger',
-  primary: 'bg-primary/12 text-primary',
+  neutral: 'bg-[rgb(var(--hairline)/0.06)] text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]',
+  success: 'bg-success/10 text-success shadow-[inset_0_0_0_1px_rgb(var(--success)/0.2)]',
+  danger: 'bg-danger/10 text-danger shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.2)]',
+  primary: 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.2)]',
 };
 
 /** The summary tile used across the dashboard, forecast and reports. */
@@ -42,20 +42,25 @@ export const MetricCard = ({
 }: MetricCardProps) => {
   const { maskBalances } = useSettings();
   return (
-    <div className={cn('card flex min-w-0 flex-col justify-between gap-3 p-4 sm:p-5', className)}>
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-label-sm uppercase tracking-wider text-faint">{label}</span>
+    <div className={cn('plate flex min-w-0 flex-col justify-between gap-4 p-5 sm:p-6', className)}>
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">{label}</span>
         {icon && (
-          <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', ICON_TONES[tone])}>
-            <Icon name={icon} size={16} />
+          <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', ICON_TONES[tone])}>
+            <Icon name={icon} size={15} />
           </span>
         )}
       </div>
       <div>
-        <div className={cn('tnum font-display text-metric-md sm:text-metric-lg', TONES[tone])}>
+        <div
+          className={cn(
+            'tnum font-display text-[clamp(1.5rem,2.6vw,1.95rem)] font-semibold leading-none tracking-[-0.035em]',
+            TONES[tone],
+          )}
+        >
           {money(value, { compact, masked: maskBalances })}
         </div>
-        {hint && <div className="mt-1 text-body-sm text-muted">{hint}</div>}
+        {hint && <div className="mt-2.5 text-[12.5px] leading-snug text-muted">{hint}</div>}
       </div>
       {footer}
     </div>

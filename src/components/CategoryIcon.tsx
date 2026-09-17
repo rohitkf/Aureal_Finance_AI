@@ -8,7 +8,7 @@ const ACCENTS: Record<string, string> = {
   secondary: 'bg-secondary/12 text-secondary',
   warning: 'bg-warning/14 text-warning',
   danger: 'bg-danger/12 text-danger',
-  neutral: 'bg-surface-highest text-muted',
+  neutral: 'bg-[rgb(var(--hairline)/0.08)] text-muted',
 };
 
 /**

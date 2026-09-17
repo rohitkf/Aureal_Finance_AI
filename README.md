@@ -77,7 +77,10 @@ what-if simulator on the forecast screen.
   state, sync status and utilisation all read without colour perception (WCAG 1.4.1).
 - **Virtual accounts are allocations, not extra money.** The Accounts screen says so explicitly and
   never presents an envelope as a separate balance.
-- **Light and dark are two designed palettes**, not an inversion — see `src/styles/index.css`.
+- **Light and dark are two designed palettes**, not an inversion — "Ethereal Glass" and "Soft
+  Structuralism" respectively. See [DESIGN.md](./DESIGN.md).
+- **Motion never hides content.** Scroll-entry animations are gated behind a flag the app sets at
+  runtime, with a timeout backstop, so a failed observer can never leave a balance invisible.
 
 ---
 
@@ -99,6 +102,7 @@ src/
   pages/            One file per screen
   data/             Categories and the demo dataset
   hooks/            Theme, media queries, element width, online status
+public/fonts/       Self-hosted variable woff2 (Geist, Plus Jakarta Sans) — 108KB
 ```
 
 ### The finance engine
@@ -128,6 +132,13 @@ to metric cards, progress bars, badges, empty states and skeletons.
 Charts are hand-built SVG, drawn against the **measured container width** rather than an abstract
 viewBox, so a 2px line stays 2px on a phone and on a monitor instead of being letterboxed or
 stretched. Every chart also exposes its full data as a screen-reader table (WCAG 1.1.1).
+
+### Surfaces
+
+Cards that lead a screen use a **double-bezel**: an outer tray holding an inner plate, with
+concentric radii and an inner top highlight, so they read as machined hardware rather than
+rectangles with borders. There are no 1px solid grey borders in the product — every edge is an
+inset hairline that works in both themes. See [DESIGN.md](./DESIGN.md).
 
 ---
 
@@ -165,7 +176,7 @@ Built to WCAG 2.2 AA and verified automatically on every screen in both themes:
 
 ```bash
 npm run verify        # lint + typecheck + unit tests + build
-npm test              # 27 unit tests covering the recurrence and finance engines
+npm test              # 31 unit tests covering the recurrence and finance engines
 ```
 
 Browser suites run against a preview build:

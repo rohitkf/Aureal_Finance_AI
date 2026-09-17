@@ -8,7 +8,7 @@ import { useAppState, useLoading, useSettings, useStore, useToday } from '@/lib/
 import { TransactionRow } from '@/components/TransactionRow';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
-import { Card, Eyebrow } from '@/components/ui/Card';
+import { Card, Eyebrow, Label } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
@@ -56,12 +56,12 @@ export const Subscriptions = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="space-y-8">
+      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Eyebrow>Subscriptions</Eyebrow>
-          <h1 className="mt-1 font-display text-headline-lg text-text">What you pay for every month</h1>
-          <p className="mt-1 text-body-md text-muted">
+          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">What you pay for every month</h1>
+          <p className="mt-3 text-[14px] leading-relaxed text-muted">
             Recurring charges, what they cost you over a year, and when each one is next taken.
           </p>
         </div>
@@ -133,7 +133,7 @@ export const Subscriptions = () => {
                 type="button"
                 onClick={() => setSelected(sub)}
                 className={cn(
-                  'card flex flex-col gap-4 text-left transition-colors hover:border-border-strong',
+                  'plate group flex flex-col gap-5 p-6 text-left transition-transform duration-500 ease-fluid hover:-translate-y-1',
                   sub.status !== 'active' && 'opacity-75',
                 )}
               >
@@ -157,7 +157,7 @@ export const Subscriptions = () => {
                   </p>
                 </div>
 
-                <dl className="space-y-1 border-t border-border pt-3 text-body-sm">
+                <dl className="space-y-1 border-t border-[rgb(var(--hairline)/0.08)] pt-3 text-body-sm">
                   <div className="flex justify-between">
                     <dt className="text-muted">Next payment</dt>
                     <dd className="font-medium text-text">
@@ -218,7 +218,7 @@ export const Subscriptions = () => {
         }
       >
         {selected && (
-          <div className="space-y-5">
+          <div className="space-y-8">
             <div className="grid gap-3 sm:grid-cols-3">
               <Stat label="Per month" value={money(monthlyEquivalent(selected), { compact: true })} />
               <Stat label="Per year" value={money(monthlyEquivalent(selected) * 12, { compact: true })} />
@@ -233,7 +233,7 @@ export const Subscriptions = () => {
             </div>
 
             {selected.notes && (
-              <p className="rounded-xl border border-border bg-surface-low p-3.5 text-body-sm text-muted">
+              <p className="well p-3.5 text-body-sm text-muted">
                 {selected.notes}
               </p>
             )}
@@ -244,7 +244,7 @@ export const Subscriptions = () => {
                 Linked transactions
               </p>
               {linkedTransactions.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-border p-4 text-center text-body-sm text-muted">
+                <p className="rounded-xl border border-dashed border-[rgb(var(--hairline)/0.16)] p-4 text-center text-body-sm text-muted">
                   No transactions have been matched to this subscription yet.
                 </p>
               ) : (
@@ -260,7 +260,7 @@ export const Subscriptions = () => {
               <p className="mb-2 text-label-md text-text">Upcoming payments</p>
               <ul className="space-y-1">
                 {previewOccurrences(selected, today, 4).map((date) => (
-                  <li key={date} className="flex items-center justify-between rounded-lg bg-surface-low px-3 py-2 text-body-sm">
+                  <li key={date} className="flex items-center justify-between rounded-xl bg-[rgb(var(--hairline)/0.04)] px-3.5 py-2.5 text-[13px]">
                     <span className="text-text">{formatMediumDate(date)}</span>
                     <span className="tnum text-muted">{money(selected.amount)}</span>
                   </li>
@@ -275,8 +275,8 @@ export const Subscriptions = () => {
 };
 
 const Stat = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-xl border border-border bg-surface-low p-3">
-    <Eyebrow>{label}</Eyebrow>
+  <div className="well p-3">
+    <Label>{label}</Label>
     <p className="tnum mt-0.5 text-metric-sm font-semibold text-text">{value}</p>
   </div>
 );

@@ -9,7 +9,7 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { SafeToSpendCard } from '@/components/SafeToSpendCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow } from '@/components/ui/Card';
+import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
 import { SelectField, TextField } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { Progress } from '@/components/ui/Progress';
@@ -81,12 +81,12 @@ export const Budget = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="space-y-8">
+      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Eyebrow>Budget</Eyebrow>
-          <h1 className="mt-1 font-display text-headline-lg text-text">{formatMonthYear(today)}</h1>
-          <p className="mt-1 text-body-md text-muted">
+          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">{formatMonthYear(today)}</h1>
+          <p className="mt-3 text-[14px] leading-relaxed text-muted">
             {daysLeft} day{daysLeft === 1 ? '' : 's'} left in the month
           </p>
         </div>
@@ -113,7 +113,7 @@ export const Budget = () => {
 
           <Card className="sm:col-span-3">
             <div className="flex items-center justify-between">
-              <Eyebrow>Overall progress</Eyebrow>
+              <Label>Overall progress</Label>
               <span className="tnum text-body-sm text-muted">
                 {percent(planned === 0 ? 0 : (spent / planned) * 100)} of plan used
               </span>
@@ -194,7 +194,7 @@ export const Budget = () => {
                       <button
                         type="button"
                         onClick={() => setEditing({ categoryId: b.categoryId, limit: String(b.limit) })}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-surface-high hover:text-text"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors duration-400 ease-fluid hover:bg-surface-high hover:text-text"
                         aria-label={`Edit ${category.name} budget`}
                       >
                         <Icon name="edit" size={15} />
@@ -202,7 +202,7 @@ export const Budget = () => {
                       <button
                         type="button"
                         onClick={() => setDeleting(b.categoryId)}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-surface-high hover:text-danger"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors duration-400 ease-fluid hover:bg-surface-high hover:text-danger"
                         aria-label={`Remove ${category.name} budget`}
                       >
                         <Icon name="trash" size={15} />
@@ -217,7 +217,7 @@ export const Budget = () => {
       </section>
 
       {unbudgeted.length > 0 && (
-        <Card tone="quiet" className="space-y-3">
+        <Card tone="well" className="space-y-3">
           <CardHeader
             title="Spending without a budget"
             description="You’re spending in these categories but haven’t set a limit."
@@ -226,7 +226,7 @@ export const Budget = () => {
             {unbudgeted.map(([id, amount]) => (
               <li
                 key={id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-base p-3"
+                className="flex items-center justify-between gap-3 well p-3"
               >
                 <span className="flex min-w-0 items-center gap-2.5">
                   <CategoryIcon categoryId={id} size="sm" />
@@ -325,7 +325,7 @@ const Summary = ({
   note: string;
 }) => (
   <Card>
-    <Eyebrow>{label}</Eyebrow>
+    <Label>{label}</Label>
     <p
       className={cn(
         'tnum mt-2 font-display text-metric-md',

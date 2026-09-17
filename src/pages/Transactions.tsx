@@ -111,11 +111,11 @@ export const Transactions = () => {
   };
 
   return (
-    <div className="space-y-5">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="space-y-8">
+      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Eyebrow>Transactions</Eyebrow>
-          <h1 className="mt-1 font-display text-headline-lg text-text">Your ledger</h1>
+          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">Your ledger</h1>
           {/* Separators only where the line has room; they would otherwise
               dangle at the end of a wrapped line on a phone. */}
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-body-sm text-muted">
@@ -138,7 +138,7 @@ export const Transactions = () => {
       </header>
 
       {/* ---------------- Filters ---------------- */}
-      <Card tone="quiet" className="space-y-3 p-4">
+      <Card tone="well" className="space-y-3 p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <TextField
             label="Search transactions"
@@ -346,7 +346,7 @@ const TransactionDetail = ({
 
   const body = (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-surface-low p-5 text-center">
+      <div className="well p-5 text-center">
         <Eyebrow>{transaction.status === 'scheduled' ? 'Scheduled amount' : 'Amount'}</Eyebrow>
         <p
           className={cn(
@@ -376,12 +376,12 @@ const TransactionDetail = ({
       </dl>
 
       {transaction.splits && transaction.splits.length > 1 && (
-        <div className="rounded-xl border border-border bg-surface-low p-3.5">
+        <div className="well p-3.5">
           <p className="mb-2 flex items-center gap-1.5 text-label-md text-text">
             <Icon name="pie" size={14} className="text-primary" />
             Split across {transaction.splits.length} categories
           </p>
-          <div className="mb-2 flex h-2 overflow-hidden rounded-full bg-surface-highest">
+          <div className="mb-2 flex h-2 overflow-hidden rounded-full bg-[rgb(var(--hairline)/0.08)]">
             {transaction.splits.map((s, i) => (
               <div
                 key={s.categoryId}
@@ -405,13 +405,13 @@ const TransactionDetail = ({
       {transaction.notes && (
         <div>
           <Eyebrow>Note</Eyebrow>
-          <p className="mt-1 rounded-xl border border-border bg-surface-low p-3.5 text-body-sm text-text">
+          <p className="mt-1 well p-3.5 text-body-sm text-text">
             {transaction.notes}
           </p>
         </div>
       )}
 
-      <div className="rounded-xl border border-border bg-surface-low p-3.5">
+      <div className="well p-3.5">
         <div className="flex items-center justify-between text-label-md text-text">
           <span className="font-semibold">{transaction.merchant}</span>
           <span className="text-muted">{merchantHistory.length} transactions</span>
@@ -448,7 +448,7 @@ const TransactionDetail = ({
 };
 
 const Row = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-center justify-between gap-3 rounded-lg px-1 py-2 hover:bg-surface-high/50">
+  <div className="flex items-center justify-between gap-3 rounded-lg px-1 py-2 hover:bg-[rgb(var(--hairline)/0.04)]">
     <dt className="text-body-sm text-muted">{label}</dt>
     <dd className="truncate text-body-sm font-medium text-text">{value}</dd>
   </div>

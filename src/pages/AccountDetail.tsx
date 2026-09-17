@@ -9,7 +9,7 @@ import { BalanceChart } from '@/components/charts/BalanceChart';
 import { TransactionRow } from '@/components/TransactionRow';
 import { Badge } from '@/components/ui/Badge';
 import { ButtonLink } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow } from '@/components/ui/Card';
+import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Progress } from '@/components/ui/Progress';
 import { EmptyState, ErrorState } from '@/components/ui/States';
@@ -134,7 +134,7 @@ export const AccountDetail = () => {
   const util = accountUtilisation(account);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <nav className="flex items-center gap-1.5 text-body-sm text-muted" aria-label="Breadcrumb">
         <Link to="/accounts" className="inline-flex min-h-[24px] items-center hover:text-text hover:underline">
           Accounts
@@ -273,7 +273,7 @@ export const AccountDetail = () => {
           ) : (
             <ul className="space-y-1.5">
               {linkedRecurring.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-low p-3.5">
+                <li key={r.id} className="flex items-center justify-between gap-3 well p-3.5">
                   <div className="min-w-0">
                     <p className="truncate text-body-md font-medium text-text">{r.name}</p>
                     <p className="text-body-sm text-muted">
@@ -300,8 +300,8 @@ export const AccountDetail = () => {
 };
 
 const Stat = ({ label, value, tone = 'text' }: { label: string; value: string; tone?: 'text' | 'danger' | 'primary' }) => (
-  <Card tone="quiet">
-    <Eyebrow>{label}</Eyebrow>
+  <Card tone="well">
+    <Label>{label}</Label>
     <p
       className={`tnum mt-1 font-display text-metric-md ${
         { text: 'text-text', danger: 'text-danger', primary: 'text-primary' }[tone]

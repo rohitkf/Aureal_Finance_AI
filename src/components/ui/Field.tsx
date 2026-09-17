@@ -1,9 +1,28 @@
-import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import {
+  forwardRef,
+  useId,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from 'react';
 import { cn } from '@/lib/cn';
 import { Icon } from './Icon';
 
+/**
+ * Controls are wells pressed into their surface — an inset hairline and a
+ * faint inner shadow — that lift to a ring on focus. No flat grey borders.
+ */
 const CONTROL =
-  'w-full rounded-xl border border-border bg-surface-low px-3.5 text-body-md text-text placeholder:text-faint transition-colors focus:border-primary-strong focus:outline-none focus:ring-2 focus:ring-primary-strong/40 disabled:opacity-60';
+  'w-full rounded-2xl bg-[rgb(var(--hairline)/0.04)] px-4 text-[14px] tracking-[-0.01em] text-text placeholder:text-faint ' +
+  'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha)),inset_0_1px_2px_rgb(var(--ambient)/0.06)] ' +
+  'outline-none transition-all duration-400 ease-fluid ' +
+  'focus:bg-[rgb(var(--hairline)/0.06)] focus:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.55),0_0_0_3px_rgb(var(--primary-strong)/0.18)] ' +
+  'disabled:opacity-50';
+
+const INVALID =
+  'shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.55)] ' +
+  'focus:shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.7),0_0_0_3px_rgb(var(--danger)/0.18)]';
 
 interface FieldShellProps {
   label: string;
@@ -22,18 +41,21 @@ export const Field = ({ label, hint, error, children, className, hideLabel }: Fi
   const describedBy = [errorId, hintId].filter(Boolean).join(' ') || undefined;
 
   return (
-    <div className={cn('flex flex-col gap-1.5', className)}>
-      <label htmlFor={id} className={cn('text-label-md text-muted', hideLabel && 'sr-only')}>
+    <div className={cn('flex flex-col gap-2', className)}>
+      <label
+        htmlFor={id}
+        className={cn('text-[10px] font-medium uppercase tracking-[0.18em] text-faint', hideLabel && 'sr-only')}
+      >
         {label}
       </label>
       {children({ id, describedBy, invalid: Boolean(error) })}
       {error ? (
-        <p id={errorId} role="alert" className="flex items-center gap-1 text-body-sm text-danger">
-          <Icon name="alert" size={14} />
+        <p id={errorId} role="alert" className="flex items-center gap-1.5 text-[12.5px] text-danger">
+          <Icon name="alert" size={13} />
           {error}
         </p>
       ) : hint ? (
-        <p id={hintId} className="text-body-sm text-faint">
+        <p id={hintId} className="text-[12.5px] leading-snug text-faint">
           {hint}
         </p>
       ) : null}
@@ -58,7 +80,7 @@ export const TextField = forwardRef<HTMLInputElement, InputProps>(
           id={id}
           aria-describedby={describedBy}
           aria-invalid={invalid || undefined}
-          className={cn(CONTROL, 'h-11', invalid && 'border-danger focus:ring-danger/40', className)}
+          className={cn(CONTROL, 'h-12', invalid && INVALID, className)}
           {...rest}
         />
       )}
@@ -85,15 +107,15 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectProps>(
             id={id}
             aria-describedby={describedBy}
             aria-invalid={invalid || undefined}
-            className={cn(CONTROL, 'h-11 appearance-none pr-10', invalid && 'border-danger', className)}
+            className={cn(CONTROL, 'h-12 cursor-pointer appearance-none pr-11', invalid && INVALID, className)}
             {...rest}
           >
             {children}
           </select>
           <Icon
             name="chevron-down"
-            size={16}
-            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-faint"
+            size={15}
+            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-faint"
           />
         </div>
       )}
@@ -119,7 +141,7 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaProps>(
           rows={3}
           aria-describedby={describedBy}
           aria-invalid={invalid || undefined}
-          className={cn(CONTROL, 'resize-none py-2.5', invalid && 'border-danger', className)}
+          className={cn(CONTROL, 'resize-none py-3.5', invalid && INVALID, className)}
           {...rest}
         />
       )}
@@ -129,48 +151,62 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaProps>(
 TextAreaField.displayName = 'TextAreaField';
 
 /**
- * The big £ amount input. This is the visual focus of every money form — the
- * user should be able to type an amount and save in a couple of seconds.
+ * The £ amount input — the focal point of every money form. Recording an
+ * expense should take a couple of seconds, so this is what the eye and the
+ * thumb land on first.
  */
-export const AmountField = forwardRef<HTMLInputElement, InputProps & { tone?: 'expense' | 'income' | 'transfer' }>(
-  ({ label, hint, error, tone = 'expense', className, ...rest }, ref) => {
-    const color =
-      tone === 'income' ? 'text-success' : tone === 'transfer' ? 'text-primary' : 'text-text';
-    return (
-      <Field label={label} hint={hint} error={error} hideLabel>
-        {({ id, describedBy, invalid }) => (
-          <div
-            className={cn(
-              'flex items-center justify-center gap-1 rounded-2xl border border-border bg-surface-low px-4 py-6 transition-colors focus-within:border-primary-strong focus-within:ring-2 focus-within:ring-primary-strong/30',
-              invalid && 'border-danger',
-            )}
+export const AmountField = forwardRef<
+  HTMLInputElement,
+  InputProps & { tone?: 'expense' | 'income' | 'transfer' }
+>(({ label, hint, error, tone = 'expense', className, ...rest }, ref) => {
+  const color = tone === 'income' ? 'text-success' : tone === 'transfer' ? 'text-primary' : 'text-text';
+  return (
+    <Field label={label} hint={hint} error={error} hideLabel>
+      {({ id, describedBy, invalid }) => (
+        <div
+          className={cn(
+            'flex items-baseline justify-center gap-1 rounded-[1.625rem] bg-[rgb(var(--hairline)/0.04)] px-5 py-8',
+            'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha)),inset_0_1px_2px_rgb(var(--ambient)/0.06)]',
+            'transition-all duration-400 ease-fluid',
+            'focus-within:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.5),0_0_0_4px_rgb(var(--primary-strong)/0.16)]',
+            invalid && INVALID,
+          )}
+        >
+          <span
+            aria-hidden="true"
+            className={cn('font-display text-[32px] font-semibold leading-none tracking-[-0.03em] opacity-40', color)}
           >
-            <span className={cn('font-display text-metric-lg leading-none', color)}>£</span>
-            <input
-              ref={ref}
-              id={id}
-              inputMode="decimal"
-              autoComplete="off"
-              placeholder="0.00"
-              aria-describedby={describedBy}
-              aria-invalid={invalid || undefined}
-              aria-label={label}
-              className={cn(
-                'tnum w-full min-w-0 border-0 bg-transparent p-0 text-center font-display text-[44px] font-bold leading-none tracking-tight placeholder:text-faint/50 focus:outline-none focus:ring-0',
-                color,
-                className,
-              )}
-              {...rest}
-            />
-          </div>
-        )}
-      </Field>
-    );
-  },
-);
+            £
+          </span>
+          <input
+            ref={ref}
+            id={id}
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="0.00"
+            aria-describedby={describedBy}
+            aria-invalid={invalid || undefined}
+            aria-label={label}
+            // `field-sizing: content` lets the input hug its value so the £
+            // and the number read as one centred figure. Browsers without it
+            // fall back to the default input width, still centred.
+            className={cn(
+              'tnum w-auto min-w-[3ch] max-w-full border-0 bg-transparent p-0 text-center font-display [field-sizing:content]',
+              'text-[clamp(2.75rem,10vw,3.25rem)] font-bold leading-none tracking-[-0.045em]',
+              'placeholder:text-faint/40 focus:outline-none focus:ring-0',
+              color,
+              className,
+            )}
+            {...rest}
+          />
+        </div>
+      )}
+    </Field>
+  );
+});
 AmountField.displayName = 'AmountField';
 
-/** A radio group rendered as segmented pills. */
+/** A radio group rendered as a pill track with a filled selection. */
 export const SegmentedControl = <T extends string>({
   value,
   onChange,
@@ -189,7 +225,11 @@ export const SegmentedControl = <T extends string>({
   <div
     role="radiogroup"
     aria-label={label}
-    className={cn('inline-flex flex-wrap gap-1 rounded-xl border border-border bg-surface-low p-1', className)}
+    className={cn(
+      'inline-flex flex-wrap gap-1 rounded-full bg-[rgb(var(--hairline)/0.04)] p-1',
+      'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]',
+      className,
+    )}
   >
     {options.map((o) => {
       const active = o.value === value;
@@ -201,9 +241,12 @@ export const SegmentedControl = <T extends string>({
           aria-checked={active}
           onClick={() => onChange(o.value)}
           className={cn(
-            'inline-flex items-center justify-center rounded-lg font-semibold transition-colors',
-            size === 'sm' ? 'min-h-[32px] px-3 text-label-md' : 'min-h-[40px] px-3.5 text-body-sm',
-            active ? 'bg-primary-strong text-white shadow-card dark:text-[rgb(var(--on-primary))]' : 'text-muted hover:text-text',
+            'inline-flex items-center justify-center rounded-full font-medium tracking-[-0.005em]',
+            'transition-all duration-500 ease-fluid active:scale-[0.97]',
+            size === 'sm' ? 'min-h-[32px] px-3.5 text-[12px]' : 'min-h-[40px] px-4 text-[13px]',
+            active
+              ? 'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.22),0_6px_16px_-8px_rgb(var(--primary-strong)/0.8)]'
+              : 'text-muted hover:text-text',
           )}
         >
           {o.label}
@@ -229,22 +272,24 @@ export const Toggle = ({
     role="switch"
     aria-checked={checked}
     onClick={() => onChange(!checked)}
-    className="flex w-full items-center justify-between gap-4 rounded-xl px-1 py-2 text-left transition-colors hover:bg-surface-high/60"
+    className="flex w-full items-center justify-between gap-5 rounded-2xl px-2 py-2.5 text-left transition-colors duration-400 ease-fluid hover:bg-[rgb(var(--hairline)/0.04)]"
   >
     <span className="min-w-0">
-      <span className="block text-body-md font-medium text-text">{label}</span>
-      {description && <span className="block text-body-sm text-muted">{description}</span>}
+      <span className="block text-[14px] tracking-[-0.01em] text-text">{label}</span>
+      {description && <span className="mt-0.5 block text-[12.5px] leading-snug text-muted">{description}</span>}
     </span>
     <span
       className={cn(
-        'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-        checked ? 'bg-primary-strong' : 'bg-surface-highest',
+        'relative h-7 w-[50px] shrink-0 rounded-full transition-all duration-500 ease-fluid',
+        checked
+          ? 'bg-primary-strong shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2),0_4px_12px_-4px_rgb(var(--primary-strong)/0.7)]'
+          : 'bg-[rgb(var(--hairline)/0.09)] shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]',
       )}
     >
       <span
         className={cn(
-          'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
-          checked ? 'translate-x-[22px]' : 'translate-x-0.5',
+          'absolute top-1 h-5 w-5 rounded-full bg-white shadow-[0_2px_6px_rgb(0_0_0/0.25)] transition-transform duration-500 ease-spring',
+          checked ? 'translate-x-[26px]' : 'translate-x-1',
         )}
       />
     </span>

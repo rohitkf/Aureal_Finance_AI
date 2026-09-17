@@ -42,10 +42,10 @@ export const Settings = () => {
   };
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-4xl space-y-8">
       <header>
         <Eyebrow>Settings</Eyebrow>
-        <h1 className="mt-1 font-display text-headline-lg text-text">Preferences & security</h1>
+        <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">Preferences & security</h1>
       </header>
 
       {/* ---------------- Profile ---------------- */}
@@ -106,10 +106,10 @@ export const Settings = () => {
               onClick={() => setTheme(t.value)}
               aria-pressed={preference === t.value}
               className={cn(
-                'flex items-center gap-3 rounded-xl border p-4 text-left transition-colors',
+                'flex items-center gap-3.5 rounded-2xl p-4 text-left transition-all duration-500 ease-fluid',
                 preference === t.value
-                  ? 'border-primary-strong bg-primary/8'
-                  : 'border-border bg-surface-low hover:border-border-strong',
+                  ? 'bg-primary/10 shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.35)]'
+                  : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)]',
               )}
             >
               <span
@@ -148,7 +148,7 @@ export const Settings = () => {
           {state.accounts.map((account) => (
             <li
               key={account.id}
-              className="flex items-center gap-3 rounded-xl border border-border bg-surface-low p-3.5"
+              className="flex items-center gap-3 well p-3.5"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-high text-primary">
                 <Icon name={account.type === 'credit' ? 'card' : 'bank'} size={18} />
@@ -271,7 +271,7 @@ const SecurityRow = ({
   description: string;
   action: React.ReactNode;
 }) => (
-  <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-low p-3.5">
+  <div className="flex items-center gap-3 well p-3.5">
     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success">
       <Icon name={icon} size={18} />
     </span>
@@ -341,7 +341,7 @@ const ConnectBankModal = ({ open, onClose }: { open: boolean; onClose: () => voi
                 <button
                   type="button"
                   onClick={() => connect(b)}
-                  className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface-low p-3.5 text-left transition-colors hover:bg-surface-high"
+                  className="flex w-full items-center gap-3 well p-3.5 text-left transition-colors duration-400 ease-fluid hover:bg-surface-high"
                 >
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-high text-body-sm font-bold text-primary">
                     {b[0]}

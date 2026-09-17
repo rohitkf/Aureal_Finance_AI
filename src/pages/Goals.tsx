@@ -81,12 +81,12 @@ export const Goals = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="space-y-8">
+      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Eyebrow>Goals</Eyebrow>
-          <h1 className="mt-1 font-display text-headline-lg text-text">What you’re saving for</h1>
-          <p className="mt-1 text-body-md text-muted">
+          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">What you’re saving for</h1>
+          <p className="mt-3 text-[14px] leading-relaxed text-muted">
             Each goal shows whether your current contributions actually get you there in time.
           </p>
         </div>
@@ -189,7 +189,7 @@ export const Goals = () => {
                   </div>
                 </div>
 
-                <div className="space-y-1 border-t border-border pt-3 text-body-sm">
+                <div className="space-y-1 border-t border-[rgb(var(--hairline)/0.08)] pt-3 text-body-sm">
                   <div className="flex justify-between">
                     <span className="text-muted">Target date</span>
                     <span className="font-medium text-text">{formatMonthYear(goal.targetDate)}</span>

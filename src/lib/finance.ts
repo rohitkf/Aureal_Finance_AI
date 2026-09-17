@@ -180,6 +180,35 @@ export const buildForecast = (state: AppState, today: string, horizonDays: numbe
   };
 };
 
+/**
+ * Reconstructs the recent balance history by walking today's cash backwards
+ * through cleared transactions. Used for the trend on the dashboard, where a
+ * full chart would be more furniture than the space deserves.
+ */
+export const balanceHistory = (state: AppState, today: string, days = 30): number[] => {
+  const cleared = state.transactions.filter((t) => t.status !== 'scheduled' && t.date <= today);
+  const deltaOn = (date: string) =>
+    cleared
+      .filter((t) => t.date === date)
+      .reduce((sum, t) => {
+        // Only depository movements change spendable cash.
+        const from = state.accounts.find((a) => a.id === t.accountId);
+        const to = state.accounts.find((a) => a.id === t.toAccountId);
+        let delta = 0;
+        if (from && isDepository(from)) delta += t.type === 'income' ? t.amount : -t.amount;
+        if (t.type === 'transfer' && to && isDepository(to)) delta += t.amount;
+        return sum + delta;
+      }, 0);
+
+  const series: number[] = [];
+  let balance = availableNow(state.accounts);
+  for (let i = 0; i < days; i += 1) {
+    series.push(round2(balance));
+    balance -= deltaOn(addDays(today, -i));
+  }
+  return series.reverse();
+};
+
 /* ------------------------------------------------------------------ */
 /* Safe to spend — the signature metric                                */
 /* ------------------------------------------------------------------ */

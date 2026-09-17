@@ -17,7 +17,7 @@ export const SkeletonText = ({ lines = 3, className }: { lines?: number; classNa
 );
 
 export const SkeletonCard = ({ className }: { className?: string }) => (
-  <div className={cn('card space-y-4', className)} aria-hidden="true">
+  <div className={cn('plate space-y-4 p-5 sm:p-6', className)} aria-hidden="true">
     <Skeleton className="h-3 w-24" />
     <Skeleton className="h-9 w-40" />
     <SkeletonText lines={2} />
@@ -25,7 +25,7 @@ export const SkeletonCard = ({ className }: { className?: string }) => (
 );
 
 export const SkeletonChart = ({ className }: { className?: string }) => (
-  <div className={cn('card space-y-4', className)} aria-hidden="true">
+  <div className={cn('plate space-y-4 p-5 sm:p-6', className)} aria-hidden="true">
     <div className="flex items-center justify-between">
       <Skeleton className="h-4 w-44" />
       <Skeleton className="h-8 w-52 rounded-xl" />
@@ -42,7 +42,7 @@ export const SkeletonChart = ({ className }: { className?: string }) => (
 export const SkeletonRows = ({ rows = 5 }: { rows?: number }) => (
   <div className="space-y-1.5" aria-hidden="true">
     {Array.from({ length: rows }).map((_, i) => (
-      <div key={i} className="flex items-center gap-4 rounded-xl border border-border bg-surface-low p-4">
+      <div key={i} className="flex items-center gap-4 well p-4">
         <Skeleton className="h-10 w-10 rounded-xl" />
         <div className="flex-1 space-y-2">
           <Skeleton className="h-3.5 w-40" />
@@ -65,7 +65,7 @@ interface EmptyStateProps {
 
 export const EmptyState = ({ icon = 'box', title, description, action, secondary, className }: EmptyStateProps) => (
   <div className={cn('flex flex-col items-center justify-center px-6 py-14 text-center', className)}>
-    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-surface-high text-muted">
+    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[rgb(var(--hairline)/0.06)] shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] text-muted">
       <Icon name={icon} size={24} />
     </div>
     <h3 className="font-display text-headline-sm text-text">{title}</h3>

@@ -192,10 +192,10 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
                     type="button"
                     onClick={() => setCategoryId(id)}
                     aria-pressed={active}
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-body-sm transition-colors ${
+                    className={`flex items-center gap-2.5 rounded-full py-2 pl-2 pr-4 text-[13px] transition-all duration-500 ease-fluid active:scale-[0.97] ${
                       active
-                        ? 'border-primary-strong bg-primary/10 text-text'
-                        : 'border-border bg-surface-low text-muted hover:text-text'
+                        ? 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.3)]'
+                        : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)] hover:text-text'
                     }`}
                   >
                     <CategoryIcon categoryId={id} size="sm" />

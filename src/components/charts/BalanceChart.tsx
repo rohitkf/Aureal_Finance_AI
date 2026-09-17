@@ -226,7 +226,7 @@ export const BalanceChart = ({
 
       {active && (
         <div
-          className="pointer-events-none absolute top-1 z-10 max-w-[180px] -translate-x-1/2 rounded-xl border border-border bg-surface-base px-3 py-2 shadow-lift"
+          className="plate pointer-events-none absolute top-1 z-10 max-w-[190px] -translate-x-1/2 px-3.5 py-2.5"
           style={{ left: `${Math.min(Math.max((active.x / width) * 100, 18), 82)}%` }}
         >
           <p className="text-label-sm uppercase tracking-wider text-faint">{formatMediumDate(active.day.date)}</p>

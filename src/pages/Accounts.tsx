@@ -16,7 +16,7 @@ import { money, percent } from '@/lib/format';
 import { useAppState, useLoading, useSettings, useToday } from '@/lib/store';
 import { Badge, StatusDot } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
-import { Card, Eyebrow } from '@/components/ui/Card';
+import { Card, Eyebrow, Label } from '@/components/ui/Card';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Progress, SegmentedBar } from '@/components/ui/Progress';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
@@ -65,11 +65,11 @@ export const Accounts = () => {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Eyebrow>Accounts</Eyebrow>
-          <h1 className="mt-1 font-display text-headline-lg text-text">Balances & allocation</h1>
-          <p className="mt-1 max-w-2xl text-body-md text-muted">
+          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">Balances & allocation</h1>
+          <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-muted">
             Everything you hold and everything you owe, plus how your money is earmarked.
           </p>
         </div>
@@ -137,7 +137,7 @@ export const Accounts = () => {
               <Link
                 key={account.id}
                 to={`/accounts/${account.id}`}
-                className="card flex min-w-0 flex-col justify-between gap-6 transition-colors hover:border-border-strong"
+                className="plate group flex min-w-0 flex-col justify-between gap-7 p-6 transition-transform duration-500 ease-fluid hover:-translate-y-1"
               >
                 <div>
                   <div className="flex items-start justify-between">
@@ -161,7 +161,7 @@ export const Accounts = () => {
                 </div>
 
                 <div>
-                  <Eyebrow>Balance</Eyebrow>
+                  <Label>Balance</Label>
                   <p className="tnum font-display text-metric-md text-text">
                     {money(account.balance, { masked: maskBalances })}
                   </p>
@@ -226,9 +226,9 @@ export const Accounts = () => {
           </Card>
         ) : (
           <>
-            <Card tone="quiet" className="space-y-3">
+            <Card tone="well" className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Eyebrow>Allocation of your Main Current Account</Eyebrow>
+                <Label>Allocation of your Main Current Account</Label>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   {state.virtualAccounts.map((v, i) => (
                     <span key={v.id} className="flex items-center gap-1.5 text-label-sm text-muted">
@@ -256,7 +256,7 @@ export const Accounts = () => {
               {state.virtualAccounts.map((v) => {
                 const pct = v.target ? (v.allocated / v.target) * 100 : 100;
                 return (
-                  <Card key={v.id} tone="quiet" className="flex flex-col justify-between gap-5">
+                  <Card key={v.id} tone="well" className="flex flex-col justify-between gap-5">
                     <div>
                       <div className="flex items-start justify-between">
                         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-high text-primary">
@@ -306,7 +306,7 @@ export const Accounts = () => {
         )}
       </section>
 
-      <Card tone="quiet" className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+      <Card tone="well" className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-success/12 text-success">
             <Icon name="shield" size={18} />
@@ -340,7 +340,7 @@ const CreditCardCard = ({ account, masked, today }: { account: Account; masked: 
   })();
 
   return (
-    <Link to={`/accounts/${account.id}`} className="card flex min-w-0 flex-col gap-4 transition-colors hover:border-border-strong">
+    <Link to={`/accounts/${account.id}`} className="plate group flex min-w-0 flex-col gap-5 p-6 transition-transform duration-500 ease-fluid hover:-translate-y-1">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-surface-high text-primary">
@@ -361,7 +361,7 @@ const CreditCardCard = ({ account, masked, today }: { account: Account; masked: 
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <Eyebrow>Owed</Eyebrow>
+          <Label>Owed</Label>
           <p className="tnum font-display text-metric-md text-danger">{money(account.balance, { masked })}</p>
         </div>
       </div>
@@ -391,7 +391,7 @@ const CreditCardCard = ({ account, masked, today }: { account: Account; masked: 
         />
       </div>
 
-      <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-surface-low p-3.5 sm:grid-cols-3">
+      <dl className="grid grid-cols-2 gap-3 well p-3.5 sm:grid-cols-3">
         <div>
           <dt className="text-label-sm text-faint">Payment due</dt>
           <dd className="tnum text-body-md font-semibold text-text">{formatMediumDate(dueDate)}</dd>

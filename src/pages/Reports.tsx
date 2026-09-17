@@ -21,7 +21,7 @@ import { IncomeExpenseChart } from '@/components/charts/BarChart';
 import { NetWorthChart } from '@/components/charts/NetWorthChart';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow } from '@/components/ui/Card';
+import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
 import { SegmentedControl } from '@/components/ui/Field';
 import { Progress } from '@/components/ui/Progress';
 import { EmptyState, SkeletonChart } from '@/components/ui/States';
@@ -84,12 +84,12 @@ export const Reports = () => {
   const hasData = state.transactions.length > 0;
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="space-y-8">
+      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Eyebrow>Reports</Eyebrow>
-          <h1 className="mt-1 font-display text-headline-lg text-text">How your money behaves</h1>
-          <p className="mt-1 text-body-md text-muted">Trends, categories and net worth over time.</p>
+          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">How your money behaves</h1>
+          <p className="mt-3 text-[14px] leading-relaxed text-muted">Trends, categories and net worth over time.</p>
         </div>
         <div className="flex items-center gap-2">
           <SegmentedControl
@@ -238,7 +238,7 @@ const Kpi = ({
   note?: string;
 }) => (
   <Card>
-    <Eyebrow>{label}</Eyebrow>
+    <Label>{label}</Label>
     <p
       className={cn(
         'tnum mt-2 font-display text-metric-lg',
@@ -262,7 +262,7 @@ const Line = ({
   note: string;
   tone?: 'text' | 'danger' | 'primary';
 }) => (
-  <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-surface-low p-3.5">
+  <div className="flex items-start justify-between gap-4 well p-3.5">
     <div>
       <dt className="text-body-md font-medium text-text">{label}</dt>
       <dd className="text-body-sm text-muted">{note}</dd>

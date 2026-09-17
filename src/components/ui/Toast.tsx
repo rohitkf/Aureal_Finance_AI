@@ -47,7 +47,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             return (
               <div
                 key={t.id}
-                className="pointer-events-auto flex w-full max-w-sm animate-slide-up items-start gap-3 rounded-xl border border-border bg-surface-base p-3.5 shadow-lift"
+                className="plate pointer-events-auto flex w-full max-w-sm animate-slide-up items-start gap-3.5 p-4"
               >
                 <Icon name={tone.icon} size={18} className={cn('mt-0.5 shrink-0', tone.className)} />
                 <div className="min-w-0">

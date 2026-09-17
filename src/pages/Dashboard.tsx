@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
 import { categoryById } from '@/data/categories';
 import {
   availableNow,
+  balanceHistory,
   buildForecast,
   budgetProgress,
   isDepository,
@@ -15,12 +15,14 @@ import { formatDay, formatMonthYear, greeting, monthKey, relativeDueLabel } from
 import { money, moneyParts } from '@/lib/format';
 import { useAppState, useLoading, useSettings, useToday } from '@/lib/store';
 import { BalanceChart } from '@/components/charts/BalanceChart';
+import { Sparkline } from '@/components/charts/Sparkline';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { MetricCard } from '@/components/MetricCard';
 import { SafeToSpendCard } from '@/components/SafeToSpendCard';
 import { Badge, StatusDot } from '@/components/ui/Badge';
-import { ButtonLink } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow } from '@/components/ui/Card';
+import { ArrowLink, ButtonLink } from '@/components/ui/Button';
+import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
+import { Reveal } from '@/components/ui/Reveal';
 import { SegmentedControl } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { Progress } from '@/components/ui/Progress';
@@ -67,6 +69,7 @@ export const Dashboard = () => {
       : availableNow(filteredAccounts);
 
   const monthToDateIncome = monthIncome(state, month);
+  const trend = useMemo(() => balanceHistory(state, today, 30), [state, today]);
   const spentThisMonth = monthSpend(state, month);
   const balanceParts = moneyParts(filteredTotal, maskBalances);
 
@@ -90,7 +93,7 @@ export const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="space-y-5">
+      <div className="space-y-8">
         <SkeletonCard className="h-32" />
         <div className="grid gap-4 lg:grid-cols-12">
           <SkeletonCard className="lg:col-span-5" />
@@ -106,17 +109,17 @@ export const Dashboard = () => {
   const hasData = state.transactions.length > 0 || state.recurring.length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* ---------- Greeting & context ---------- */}
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <Reveal as="header" className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5">
             <Eyebrow>{formatMonthYear(today)}</Eyebrow>
-            <span className="text-faint" aria-hidden="true">·</span>
             <StatusDot tone="success" label="Synced just now" pulse />
           </div>
-          <h1 className="mt-1 font-display text-headline-lg text-text">
-            {greeting()}, {state.settings.userName.split(' ')[0]}
+          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">
+            {greeting()},{' '}
+            <span className="text-faint">{state.settings.userName.split(' ')[0]}</span>
           </h1>
         </div>
 
@@ -133,7 +136,7 @@ export const Dashboard = () => {
             </button>
           ))}
         </div>
-      </header>
+      </Reveal>
 
       {!hasData ? (
         <Card className="p-0">
@@ -150,89 +153,117 @@ export const Dashboard = () => {
         </Card>
       ) : (
         <>
-          {/* ---------- Hero: balance, safe-to-spend, flows ---------- */}
-          <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-12">
-            <Card tone="raised" className="flex min-w-0 flex-col justify-between xl:col-span-5">
-              <div>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Icon name="wallet" size={17} className="text-primary" />
+          {/* ---------- Hero bento ----------
+              An asymmetrical grid: the balance plate spans two rows beside the
+              Safe-to-Spend hero, with the two flow tiles stacked underneath.
+              Below `lg` every span collapses to a single column. */}
+          <Reveal delay={60}>
+            <section className="grid gap-4 lg:grid-cols-12 lg:grid-rows-[auto_auto]">
+              <Card
+                tone="bezel"
+                className="min-w-0 lg:col-span-7 lg:row-span-2"
+                bodyClassName="flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-3">
                     <Eyebrow>{filter === 'credit' ? 'Total owed' : 'Total balance'}</Eyebrow>
+                    <Badge tone="success" icon="arrow-up">
+                      {money(320.41, { compact: true })} this month
+                    </Badge>
                   </div>
-                  <Badge tone="success" icon="arrow-up">
-                    {money(320.41, { compact: true })} this month
-                  </Badge>
+
+                  <p className="tnum mt-6 font-display text-[clamp(3rem,8vw,4.5rem)] font-bold leading-[0.9] tracking-[-0.05em] text-text">
+                    {balanceParts.main}
+                    <span className="text-[0.42em] font-semibold tracking-[-0.02em] text-faint">
+                      {balanceParts.fraction}
+                    </span>
+                  </p>
+                  <p className="mt-3 text-[13px] text-muted">
+                    Across {filteredAccounts.length} {filter === 'all' ? 'connected ' : ''}account
+                    {filteredAccounts.length === 1 ? '' : 's'}
+                  </p>
+
+                  {/* The tile spans two rows, so it carries a real trend
+                      rather than empty space. */}
+                  <div className="mt-8">
+                    <div className="flex items-baseline justify-between">
+                      <Label>Last 30 days</Label>
+                      <span className="tnum text-[11px] text-muted">
+                        {trend.length > 1 && trend[trend.length - 1]! >= trend[0]!
+                          ? `+${money(trend[trend.length - 1]! - trend[0]!, { compact: true })}`
+                          : `−${money(Math.abs((trend[trend.length - 1] ?? 0) - (trend[0] ?? 0)), { compact: true })}`}
+                      </span>
+                    </div>
+                    <Sparkline
+                      values={trend}
+                      height={72}
+                      tone={trend[trend.length - 1]! >= trend[0]! ? 'success' : 'danger'}
+                      className="mt-2"
+                    />
+                  </div>
+
+                  <dl className="mt-7 grid grid-cols-2 gap-3">
+                    <div className="well p-4">
+                      <dt className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">In this month</dt>
+                      <dd className="tnum mt-1.5 font-display text-[20px] font-semibold tracking-[-0.02em] text-success">
+                        {money(monthToDateIncome, { compact: true, masked: maskBalances })}
+                      </dd>
+                    </div>
+                    <div className="well p-4">
+                      <dt className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">Out this month</dt>
+                      <dd className="tnum mt-1.5 font-display text-[20px] font-semibold tracking-[-0.02em] text-text">
+                        {money(spentThisMonth, { compact: true, masked: maskBalances })}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
 
-                <p className="tnum mt-3 font-display text-hero-mobile text-text sm:text-hero">
-                  {balanceParts.main}
-                  <span className="text-headline-md text-faint">{balanceParts.fraction}</span>
-                </p>
-                <p className="mt-1 text-body-sm text-muted">
-                  Across {filteredAccounts.length} {filter === 'all' ? 'connected' : ''} account
-                  {filteredAccounts.length === 1 ? '' : 's'}
-                </p>
+                {filter === 'all' && (
+                  <div className="mt-8 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Where it sits</Label>
+                      <span className="text-[11px] text-faint">{allocation.length} accounts</span>
+                    </div>
+                    <SegmentedBar segments={allocation} />
+                    <div className="grid grid-cols-2 gap-x-5 gap-y-2 pt-1 sm:grid-cols-4">
+                      {state.accounts.filter(isDepository).map((a) => (
+                        <div key={a.id}>
+                          <span className="block truncate text-[11px] text-faint">{a.name}</span>
+                          <span className="tnum block text-[13px] font-medium text-text">
+                            {money(a.balance, { compact: true, masked: maskBalances })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
 
-                <dl className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-border bg-surface-low p-3">
-                    <dt className="text-label-sm uppercase tracking-wider text-faint">In this month</dt>
-                    <dd className="tnum mt-0.5 text-metric-sm font-semibold text-success">
-                      {money(monthToDateIncome, { compact: true, masked: maskBalances })}
-                    </dd>
-                  </div>
-                  <div className="rounded-xl border border-border bg-surface-low p-3">
-                    <dt className="text-label-sm uppercase tracking-wider text-faint">Out this month</dt>
-                    <dd className="tnum mt-0.5 text-metric-sm font-semibold text-text">
-                      {money(spentThisMonth, { compact: true, masked: maskBalances })}
-                    </dd>
-                  </div>
-                </dl>
+              <SafeToSpendCard data={sts} className="min-w-0 lg:col-span-5" />
+
+              <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:col-span-5 lg:grid-cols-1 xl:grid-cols-2">
+                <MetricCard
+                  label="Expected income"
+                  value={sts.expectedIncome}
+                  icon="arrow-down"
+                  tone="success"
+                  hint={`${money(monthToDateIncome, { compact: true })} received so far`}
+                />
+                <MetricCard
+                  label="Upcoming expenses"
+                  value={sts.committed}
+                  icon="arrow-up"
+                  tone="danger"
+                  hint={upcoming.length > 0 ? `Next: ${upcoming[0]!.label}` : 'Nothing scheduled'}
+                />
               </div>
-
-              {filter === 'all' && (
-                <div className="mt-5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Eyebrow>Where it sits</Eyebrow>
-                    <span className="text-label-sm text-muted">{allocation.length} accounts</span>
-                  </div>
-                  <SegmentedBar segments={allocation} />
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 pt-1 sm:grid-cols-4">
-                    {state.accounts.filter(isDepository).map((a) => (
-                      <div key={a.id}>
-                        <span className="block truncate text-label-sm text-faint">{a.name}</span>
-                        <span className="tnum block text-body-sm font-medium text-text">
-                          {money(a.balance, { compact: true, masked: maskBalances })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </Card>
-
-            <SafeToSpendCard data={sts} className="min-w-0 xl:col-span-4" />
-
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:col-span-2 xl:col-span-3 xl:grid-cols-1">
-              <MetricCard
-                label="Expected income"
-                value={sts.expectedIncome}
-                icon="arrow-down"
-                tone="success"
-                hint={`${money(monthToDateIncome, { compact: true })} already received this month`}
-              />
-              <MetricCard
-                label="Upcoming expenses"
-                value={sts.committed}
-                icon="arrow-up"
-                tone="danger"
-                hint={`${upcoming.length > 0 ? `Next: ${upcoming[0]!.label}` : 'Nothing scheduled'}`}
-              />
-            </div>
-          </section>
+            </section>
+          </Reveal>
 
           {/* ---------- Projected balance ---------- */}
-          <Card tone="raised" className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <Reveal delay={40}>
+          <Card tone="bezel" className="space-y-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <CardHeader
                 title="Projected balance"
                 description="Where your balance is heading, based on scheduled income and commitments."
@@ -269,45 +300,45 @@ export const Dashboard = () => {
 
             <BalanceChart days={forecast.days} minimumBalance={state.settings.minimumBalance} />
 
-            <div className="flex flex-wrap items-center gap-4 border-t border-border pt-3">
-              <span className="flex items-center gap-1.5 text-label-sm text-muted">
-                <span className="h-0.5 w-5 rounded bg-primary" /> Confirmed
+            <div className="flex flex-wrap items-center gap-5 pt-1">
+              <span className="flex items-center gap-2 text-[11px] text-muted">
+                <span className="h-0.5 w-5 rounded-full bg-primary" /> Confirmed
               </span>
-              <span className="flex items-center gap-1.5 text-label-sm text-muted">
-                <span className="h-0.5 w-5 rounded border-t-2 border-dashed border-primary-strong" /> Projected
+              <span className="flex items-center gap-2 text-[11px] text-muted">
+                <span className="h-0 w-5 rounded-full border-t-2 border-dashed border-primary-strong" /> Projected
               </span>
-              <span className="flex items-center gap-1.5 text-label-sm text-muted">
-                <span className="h-0.5 w-5 rounded border-t-2 border-dashed border-warning" /> Minimum balance
+              <span className="flex items-center gap-2 text-[11px] text-muted">
+                <span className="h-0 w-5 rounded-full border-t-2 border-dashed border-warning" /> Minimum balance
               </span>
             </div>
           </Card>
+          </Reveal>
 
           {/* ---------- Cash flow timeline + budgets ---------- */}
-          <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-12">
-            <Card className="min-w-0 space-y-4 lg:col-span-7">
+          <Reveal delay={40} as="section" className="grid gap-4 lg:grid-cols-12">
+            <Card className="min-w-0 space-y-6 lg:col-span-7">
               <CardHeader
                 title="What’s coming up"
                 description="Your next money movements, in order."
-                action={
-                  <Link to="/forecast" className="inline-flex min-h-[24px] items-center text-body-sm font-semibold text-primary hover:underline">
-                    Full forecast
-                  </Link>
-                }
+                action={<ArrowLink to="/forecast">Full forecast</ArrowLink>}
               />
 
-              <ol className="relative space-y-1 pl-6">
-                <span className="absolute left-[9px] top-3 bottom-3 w-px bg-border" aria-hidden="true" />
+              <ol className="relative space-y-1 pl-7">
+                <span
+                  className="absolute bottom-4 left-[10px] top-4 w-px bg-[rgb(var(--hairline)/0.1)]"
+                  aria-hidden="true"
+                />
 
-                <li className="relative flex items-center justify-between gap-3 rounded-xl bg-surface-high/70 p-3">
+                <li className="well relative flex items-center justify-between gap-3 p-4">
                   <span
-                    className="absolute -left-[22px] top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-primary bg-surface"
+                    className="absolute -left-[25px] top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_0_4px_rgb(var(--background)),0_0_12px_rgb(var(--primary)/0.6)]"
                     aria-hidden="true"
                   />
                   <div className="min-w-0">
-                    <p className="text-body-md font-semibold text-text">Today’s balance</p>
-                    <p className="text-body-sm text-muted">Reconciled across your connected accounts</p>
+                    <p className="text-[14px] font-medium tracking-[-0.01em] text-text">Today’s balance</p>
+                    <p className="text-[12.5px] text-muted">Reconciled across your connected accounts</p>
                   </div>
-                  <p className="tnum shrink-0 text-metric-sm font-semibold text-text">
+                  <p className="tnum shrink-0 font-display text-[17px] font-semibold tracking-[-0.02em] text-text">
                     {money(forecast.start, { masked: maskBalances })}
                   </p>
                 </li>
@@ -318,11 +349,16 @@ export const Dashboard = () => {
                   </li>
                 ) : (
                   upcoming.map((event) => (
-                    <li key={event.id} className="relative flex items-center gap-3 rounded-xl p-3 hover:bg-surface-high/60">
+                    <li
+                      key={event.id}
+                      className="relative flex items-center gap-3.5 rounded-2xl p-3.5 transition-colors duration-400 ease-fluid hover:bg-[rgb(var(--hairline)/0.04)]"
+                    >
                       <span
                         className={cn(
-                          'absolute -left-[19px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full',
-                          event.direction === 'in' ? 'bg-success' : 'bg-border-strong',
+                          'absolute -left-[22px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ring-4 ring-[rgb(var(--background))]',
+                          event.direction === 'in'
+                            ? 'bg-success shadow-[0_0_10px_rgb(var(--success)/0.6)]'
+                            : 'bg-[rgb(var(--hairline)/0.3)]',
                         )}
                         aria-hidden="true"
                       />
@@ -353,8 +389,8 @@ export const Dashboard = () => {
               </ol>
             </Card>
 
-            <Card className="flex min-w-0 flex-col justify-between gap-4 lg:col-span-5">
-              <div className="space-y-4">
+            <Card className="flex min-w-0 flex-col justify-between gap-6 lg:col-span-5">
+              <div className="space-y-5">
                 <CardHeader title="Budgets" description={`Where you are for ${formatMonthYear(today)}`} />
 
                 {budgets.length === 0 ? (
@@ -370,7 +406,7 @@ export const Dashboard = () => {
                     // Tailwind needs whole class names, so these are looked up, not built.
                     const toneText = { danger: 'text-danger', warning: 'text-warning', success: 'text-success' }[tone];
                     return (
-                      <div key={b.categoryId} className="rounded-xl border border-border bg-surface-low p-3.5">
+                      <div key={b.categoryId} className="well p-4">
                         <div className="flex items-center justify-between gap-2">
                           <span className="flex min-w-0 items-center gap-2">
                             <CategoryIcon categoryId={b.categoryId} size="sm" />
@@ -401,11 +437,11 @@ export const Dashboard = () => {
                 )}
               </div>
 
-              <ButtonLink to="/budget" fullWidth iconRight="arrow-right">
+              <ButtonLink to="/budget" fullWidth iconRight="arrow-right" className="justify-between">
                 View all budgets
               </ButtonLink>
             </Card>
-          </section>
+          </Reveal>
         </>
       )}
     </div>
@@ -423,16 +459,16 @@ const Stat = ({
   tone: 'text' | 'primary' | 'warning' | 'danger';
   note?: string;
 }) => (
-  <div className="rounded-xl border border-border bg-surface-low p-3.5">
-    <Eyebrow>{label}</Eyebrow>
+  <div className="well p-4">
+    <Label>{label}</Label>
     <p
       className={cn(
-        'tnum mt-1 font-display text-metric-md',
+        'tnum mt-2 font-display text-[24px] font-semibold tracking-[-0.03em]',
         { text: 'text-text', primary: 'text-primary', warning: 'text-warning', danger: 'text-danger' }[tone],
       )}
     >
       {value}
     </p>
-    {note && <p className="text-body-sm text-muted">{note}</p>}
+    {note && <p className="mt-0.5 text-[12px] text-muted">{note}</p>}
   </div>
 );

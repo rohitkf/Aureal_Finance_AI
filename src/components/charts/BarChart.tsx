@@ -26,7 +26,7 @@ export const IncomeExpenseChart = ({ data, className }: { data: BarSeries[]; cla
         <div className="relative min-w-0 flex-1" style={{ height }}>
           <div className="absolute inset-0 flex flex-col justify-between">
             {gridValues.map((v) => (
-              <div key={v} className="border-t border-dashed border-border" />
+              <div key={v} className="border-t border-dashed border-[rgb(var(--hairline)/0.1)]" />
             ))}
           </div>
           <div className="relative flex h-full items-end gap-2">

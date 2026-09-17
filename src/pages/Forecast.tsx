@@ -10,7 +10,7 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { MetricCard } from '@/components/MetricCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow } from '@/components/ui/Card';
+import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
 import { SegmentedControl } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { Progress } from '@/components/ui/Progress';
@@ -81,12 +81,12 @@ export const Forecast = () => {
   const hasEvents = forecast.days.some((d) => d.events.length > 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="max-w-2xl">
           <Eyebrow>Forecast</Eyebrow>
-          <h1 className="mt-1 font-display text-headline-lg text-text">Where your money is heading</h1>
-          <p className="mt-1 text-body-md text-muted">
+          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">Where your money is heading</h1>
+          <p className="mt-3 text-[14px] leading-relaxed text-muted">
             Built from your current balances, scheduled income and every recurring commitment you’ve set up.
           </p>
         </div>
@@ -95,7 +95,7 @@ export const Forecast = () => {
 
       {/* ---------------- Headline diagnosis ---------------- */}
       <section className="grid gap-4 lg:grid-cols-12">
-        <Card tone="raised" className="flex min-w-0 flex-col justify-between gap-5 lg:col-span-7">
+        <Card tone="bezel" className="min-w-0 lg:col-span-7" bodyClassName="flex flex-col justify-between gap-6">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -123,7 +123,7 @@ export const Forecast = () => {
               </Badge>
             </div>
 
-            <div className="mt-4 rounded-xl border border-border bg-surface-low p-4">
+            <div className="mt-4 well p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="text-label-md text-muted">Lowest projected balance</span>
                 <span className="text-label-sm text-secondary">
@@ -150,13 +150,13 @@ export const Forecast = () => {
           </div>
 
           <div className="space-y-3">
-            <Eyebrow>Biggest payments ahead</Eyebrow>
+            <Label>Biggest payments ahead</Label>
             {biggest.length === 0 ? (
               <p className="text-body-sm text-muted">Nothing scheduled in this window.</p>
             ) : (
               <ul className="space-y-1.5">
                 {biggest.map((e) => (
-                  <li key={e.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface-low p-2.5">
+                  <li key={e.id} className="flex items-center gap-3 well p-2.5">
                     <CategoryIcon categoryId={e.categoryId} size="sm" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-body-sm font-medium text-text">{e.label}</span>
@@ -208,7 +208,7 @@ export const Forecast = () => {
       </section>
 
       {/* ---------------- Chart ---------------- */}
-      <Card tone="raised" className="space-y-4">
+      <Card tone="bezel" className="space-y-4">
         <CardHeader
           title={`${horizon}-day balance projection`}
           description="Hover or tap the line to see the exact balance on any day."
@@ -239,7 +239,7 @@ export const Forecast = () => {
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full border-collapse text-left">
                   <thead>
-                    <tr className="border-b border-border text-label-sm uppercase tracking-wider text-faint">
+                    <tr className="border-b border-[rgb(var(--hairline)/0.08)] text-label-sm uppercase tracking-wider text-faint">
                       <th scope="col" className="py-2.5 pr-4">Date</th>
                       <th scope="col" className="py-2.5 pr-4 text-right">In</th>
                       <th scope="col" className="py-2.5 pr-4 text-right">Out</th>
@@ -248,7 +248,7 @@ export const Forecast = () => {
                       <th scope="col" className="py-2.5 text-right">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border text-body-sm">
+                  <tbody className="divide-y divide-[rgb(var(--hairline)/0.07)] text-body-sm">
                     {eventDays.map((day) => (
                       <DayRow key={day.date} day={day} minimumBalance={minimumBalance} masked={maskBalances} />
                     ))}
@@ -262,7 +262,7 @@ export const Forecast = () => {
                   const open = expanded === day.date;
                   const low = day.closing < minimumBalance;
                   return (
-                    <li key={day.date} className="overflow-hidden rounded-xl border border-border bg-surface-low">
+                    <li key={day.date} className="overflow-hidden well">
                       <button
                         type="button"
                         onClick={() => setExpanded(open ? null : day.date)}
@@ -286,7 +286,7 @@ export const Forecast = () => {
                         <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} className="shrink-0 text-faint" />
                       </button>
                       {open && (
-                        <ul className="space-y-1 border-t border-border bg-surface-base p-2">
+                        <ul className="space-y-1 border-t border-[rgb(var(--hairline)/0.08)] bg-surface-base p-2">
                           {day.events.map((e) => (
                             <li key={e.id} className="flex items-center gap-2.5 rounded-lg p-2">
                               <CategoryIcon categoryId={e.categoryId} size="sm" />
@@ -334,7 +334,7 @@ export const Forecast = () => {
               step={50}
               value={oneOff}
               onChange={(e) => setOneOff(Number(e.target.value))}
-              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-surface-highest accent-[rgb(var(--primary-strong))]"
+              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[rgb(var(--hairline)/0.08)] accent-[rgb(var(--primary-strong))]"
             />
             <div className="flex justify-between text-label-sm text-faint">
               <span>£0</span>
@@ -361,7 +361,7 @@ export const Forecast = () => {
               step={25}
               value={monthlyDelta}
               onChange={(e) => setMonthlyDelta(Number(e.target.value))}
-              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-surface-highest accent-[rgb(var(--secondary))]"
+              className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[rgb(var(--hairline)/0.08)] accent-[rgb(var(--secondary))]"
             />
             <div className="flex justify-between text-label-sm text-faint">
               <span>Spend £500 less</span>
@@ -369,9 +369,9 @@ export const Forecast = () => {
             </div>
           </div>
 
-          <div className="space-y-3 rounded-xl border border-border bg-surface-low p-4">
+          <div className="space-y-3 well p-4">
             <div className="flex items-center justify-between">
-              <Eyebrow>Lowest point becomes</Eyebrow>
+              <Label>Lowest point becomes</Label>
               <Badge tone={BUFFER_COPY.tone}>{BUFFER_COPY.label}</Badge>
             </div>
             <p
@@ -415,7 +415,7 @@ export const Forecast = () => {
 const DayRow = ({ day, minimumBalance, masked }: { day: ForecastDay; minimumBalance: number; masked: boolean }) => {
   const low = day.closing < minimumBalance;
   return (
-    <tr className={cn('transition-colors hover:bg-surface-high/50', low && 'bg-danger/5')}>
+    <tr className={cn('transition-colors duration-400 ease-fluid hover:bg-[rgb(var(--hairline)/0.04)]', low && 'bg-danger/5')}>
       <td className="py-3 pr-4 font-medium text-text">{formatMediumDate(day.date)}</td>
       <td className="tnum py-3 pr-4 text-right">
         {day.income > 0 ? <span className="font-semibold text-success">+{money(day.income)}</span> : <span className="text-faint">—</span>}
@@ -445,8 +445,8 @@ const DayRow = ({ day, minimumBalance, masked }: { day: ForecastDay; minimumBala
 };
 
 const Legend = ({ label, value, tone = 'text' }: { label: string; value: string; tone?: 'text' | 'success' | 'warning' | 'primary' }) => (
-  <div className="rounded-xl border border-border bg-surface-low p-3">
-    <Eyebrow>{label}</Eyebrow>
+  <div className="well p-3">
+    <Label>{label}</Label>
     <p
       className={cn(
         'tnum mt-0.5 text-metric-sm font-semibold',

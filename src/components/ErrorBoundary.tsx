@@ -27,7 +27,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6">
-        <div className="w-full max-w-md rounded-2xl border border-border bg-surface-base p-2 shadow-card">
+        <div className="plate w-full max-w-md p-2">
           <ErrorState
             title="Something went wrong"
             description="We couldn’t load this screen. Your data is safe — nothing has been changed."

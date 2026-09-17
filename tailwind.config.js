@@ -44,8 +44,10 @@ export default {
         info: token('info'),
       },
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        display: ['"Plus Jakarta Sans"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        // Geist carries the interface and every figure; Jakarta is reserved
+        // for display type, where its wider geometry earns its place.
+        sans: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Jakarta', 'Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       fontSize: {
         'label-sm': ['11px', { lineHeight: '14px', letterSpacing: '0.05em', fontWeight: '500' }],
@@ -62,26 +64,50 @@ export default {
         hero: ['48px', { lineHeight: '56px', letterSpacing: '-0.03em', fontWeight: '700' }],
         'hero-mobile': ['36px', { lineHeight: '44px', letterSpacing: '-0.025em', fontWeight: '700' }],
       },
-      borderRadius: { xl: '0.75rem', '2xl': '1rem', '3xl': '1.25rem' },
-      boxShadow: {
-        card: '0 1px 2px rgb(var(--shadow) / 0.06), 0 8px 24px -12px rgb(var(--shadow) / 0.18)',
-        lift: '0 2px 4px rgb(var(--shadow) / 0.08), 0 16px 40px -16px rgb(var(--shadow) / 0.28)',
-        sheet: '0 -8px 40px -12px rgb(var(--shadow) / 0.4)',
+      borderRadius: {
+        xl: '0.75rem',
+        '2xl': '1rem',
+        '3xl': '1.25rem',
+        // Concentric pairs for the double-bezel: an inner radius is the
+        // outer radius minus the tray padding.
+        bezel: '2rem',
+        'bezel-core': '1.625rem',
+        plate: '1.375rem',
       },
+      boxShadow: {
+        // Wide, highly diffused ambient light — never a harsh drop shadow.
+        ambient: '0 1px 2px rgb(var(--ambient) / var(--ambient-a)), 0 18px 40px -22px rgb(var(--ambient) / var(--ambient-b))',
+        float: '0 2px 6px rgb(var(--ambient) / var(--ambient-a)), 0 32px 64px -28px rgb(var(--ambient) / var(--ambient-b))',
+        sheet: '0 -12px 60px -18px rgb(var(--ambient) / var(--ambient-b))',
+        'inner-top': 'inset 0 1px 0 0 rgb(255 255 255 / 0.08)',
+      },
+      transitionTimingFunction: {
+        // The house curve: heavy start, long glide out.
+        fluid: 'cubic-bezier(0.32, 0.72, 0, 1)',
+        spring: 'cubic-bezier(0.34, 1.4, 0.64, 1)',
+        exit: 'cubic-bezier(0.4, 0, 1, 1)',
+      },
+      transitionDuration: { 400: '400ms', 600: '600ms', 700: '700ms', 900: '900ms' },
       keyframes: {
         'fade-in': { from: { opacity: '0' }, to: { opacity: '1' } },
         'slide-up': {
-          from: { transform: 'translateY(12px)', opacity: '0' },
-          to: { transform: 'translateY(0)', opacity: '1' },
+          from: { transform: 'translateY(20px) scale(0.98)', opacity: '0' },
+          to: { transform: 'translateY(0) scale(1)', opacity: '1' },
         },
         'sheet-up': { from: { transform: 'translateY(100%)' }, to: { transform: 'translateY(0)' } },
         shimmer: { '100%': { transform: 'translateX(100%)' } },
+        // A very slow drift, so the backdrop is never quite static.
+        drift: {
+          '0%, 100%': { transform: 'translate3d(0, 0, 0) scale(1)' },
+          '50%': { transform: 'translate3d(2%, -3%, 0) scale(1.08)' },
+        },
       },
       animation: {
-        'fade-in': 'fade-in 160ms ease-out',
-        'slide-up': 'slide-up 220ms cubic-bezier(0.22, 1, 0.36, 1)',
-        'sheet-up': 'sheet-up 260ms cubic-bezier(0.22, 1, 0.36, 1)',
-        shimmer: 'shimmer 1.6s infinite',
+        'fade-in': 'fade-in 260ms cubic-bezier(0.32, 0.72, 0, 1)',
+        'slide-up': 'slide-up 420ms cubic-bezier(0.32, 0.72, 0, 1)',
+        'sheet-up': 'sheet-up 480ms cubic-bezier(0.32, 0.72, 0, 1)',
+        shimmer: 'shimmer 1.8s infinite',
+        drift: 'drift 24s ease-in-out infinite',
       },
     },
   },

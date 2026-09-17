@@ -77,7 +77,7 @@ await page.getByRole('button', { name: 'Save budget' }).click();
 await page.waitForTimeout(600);
 const card = page.locator('h3', { hasText: 'Household' }).first();
 report.check(await card.isVisible(), 'the new budget card appears');
-const cardText = await card.locator('xpath=ancestor::div[contains(@class,"rounded-2xl")][1]').innerText();
+const cardText = await card.locator('xpath=ancestor::*[contains(concat(" ",normalize-space(@class)," ")," plate ") or contains(concat(" ",normalize-space(@class)," ")," bezel ")][1]').innerText();
 report.check(/of £60/.test(cardText), 'the budget already counts spending that happened before it existed');
 
 // ---- Global search ------------------------------------------------------

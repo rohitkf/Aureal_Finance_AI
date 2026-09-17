@@ -38,11 +38,14 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
     <Wrapper
       {...(onSelect ? { type: 'button' as const, onClick: () => onSelect(transaction) } : {})}
       className={cn(
-        'flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors sm:gap-4 sm:p-3.5',
+        'flex w-full items-center gap-3.5 rounded-2xl p-3.5 text-left sm:gap-4 sm:p-4',
+        'transition-all duration-400 ease-fluid',
         selected
-          ? 'border-primary-strong/50 bg-surface-high'
-          : 'border-transparent bg-surface-low hover:border-border hover:bg-surface-high',
-        scheduled && 'border-dashed border-border bg-transparent',
+          ? 'bg-[rgb(var(--hairline)/0.07)] shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.3)]'
+          : 'hover:bg-[rgb(var(--hairline)/0.05)]',
+        // Scheduled money is drawn as an outline, never as a solid surface —
+        // it has not happened yet.
+        scheduled && 'bg-transparent shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.09)] hover:bg-[rgb(var(--hairline)/0.03)]',
         className,
       )}
     >

@@ -131,12 +131,12 @@ export const Recurring = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="space-y-8">
+      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <Eyebrow>Recurring</Eyebrow>
-          <h1 className="mt-1 font-display text-headline-lg text-text">Recurring payments</h1>
-          <p className="mt-1 text-body-md text-muted">
+          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">Recurring payments</h1>
+          <p className="mt-3 text-[14px] leading-relaxed text-muted">
             Everything that leaves or arrives on a schedule. These drive your forecast.
           </p>
         </div>
@@ -205,7 +205,7 @@ export const Recurring = () => {
             return (
               <li
                 key={rule.id}
-                className="flex flex-col gap-3 rounded-xl border border-border bg-surface-low p-4 transition-colors hover:border-border-strong sm:flex-row sm:items-center"
+                className="flex flex-col gap-3 well p-4 transition-colors duration-400 ease-fluid hover:shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))] sm:flex-row sm:items-center"
               >
                 <CategoryIcon categoryId={rule.categoryId} size="lg" />
 
@@ -369,7 +369,7 @@ const RecurringForm = ({
         </>
       }
     >
-      <div className="space-y-5">
+      <div className="space-y-8">
         <AmountField
           label="Amount"
           value={draft.amount}
@@ -490,13 +490,13 @@ const RecurringForm = ({
           )}
         </div>
 
-        <label className="flex items-center gap-3 rounded-xl border border-border bg-surface-low p-3.5">
+        <label className="flex items-center gap-3 well p-3.5">
           <input
             type="checkbox"
             checked={draft.isSubscription}
             onChange={(e) => setDraft({ ...draft, isSubscription: e.target.checked })}
             aria-label="This is a subscription"
-            className="h-4 w-4 rounded border-border accent-[rgb(var(--primary-strong))]"
+            className="h-4 w-4 rounded accent-[rgb(var(--primary-strong))]"
           />
           <span>
             <span className="block text-body-md text-text">This is a subscription</span>
@@ -507,7 +507,7 @@ const RecurringForm = ({
         <TextAreaField label="Notes" placeholder="Optional" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
 
         {/* A recurrence rule is abstract, so show the actual dates it produces. */}
-        <div className="rounded-xl border border-border bg-surface-low p-4">
+        <div className="well p-4">
           <p className="flex items-center gap-1.5 text-label-md text-text">
             <Icon name="calendar" size={14} className="text-primary" />
             Next payments
