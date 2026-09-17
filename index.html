@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en-GB" class="dark">
+<html lang="en-GB">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -22,6 +22,26 @@
     />
   </head>
   <body>
+    <script>
+      // Applied before first paint. The signed-in preference lives in the
+      // user's profile, but it is mirrored here so the sign-in screen and the
+      // first frame after a reload are already the right theme.
+      (function () {
+        try {
+          var stored = localStorage.getItem('aureal.theme');
+          var dark =
+            stored === 'dark' ||
+            ((stored === null || stored === 'system') &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.classList.toggle('dark', dark);
+          document
+            .querySelector('meta[name="theme-color"]')
+            .setAttribute('content', dark ? '#060709' : '#f2f3f5');
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

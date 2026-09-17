@@ -25,18 +25,32 @@ Minimum balance held back -£1,000.00
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173
+cp .env.example .env     # then fill in your Supabase project details
+npm run dev              # http://localhost:5173
 ```
 
 ```bash
-npm run build        # typecheck + production bundle + service worker
-npm run preview      # serve the build on http://localhost:4173
+npm run build            # typecheck + production bundle + service worker
+npm run preview          # serve the build on http://localhost:4173
 ```
 
-The app ships with a worked demo dataset so every screen has something real to show. The reference
-date is pinned to **16 September 2026** (`DEMO_TODAY` in `src/data/seed.ts`) so balances, budgets and
-the forecast stay consistent with one another. Settings → Demo data lets you reset it or clear
-everything to see the empty states.
+### Environment
+
+| Variable | What it is |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Your project URL, e.g. `https://xxxx.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | The publishable (`sb_publishable_…`) key |
+
+Both are safe in a browser bundle — the publishable key grants nothing beyond what row-level
+security allows, and every table is protected. Without them the app still builds and the sign-in
+screen explains what is missing rather than failing silently.
+
+### Your account starts empty
+
+There is no demo data. Signing up creates a profile and a starter set of categories, and nothing
+else — the first number you see is one you entered. If you'd like to look around with figures in
+place, **Settings → Your data → Load sample data** writes a sample set into your own account, which
+you can edit or clear like anything else.
 
 ---
 
@@ -55,7 +69,8 @@ everything to see the empty states.
 | **Goals** | Am I actually on track to reach them? |
 | **Debts** | What do I owe, at what rate, and how long to clear it? |
 | **Reports** | How does my money behave over time? |
-| **Settings** | Preferences, connections, security, data export. |
+| **Settings** | Preferences, categories, security, data export. |
+| **Sign in / up / reset** | Email and password, with a proper forgotten-password flow. |
 
 Plus: global search (`⌘K` / `Ctrl+K`) including natural-language questions such as
 *"how much did I spend on food last month"*, a quick-add flow behind the floating **+**, and a
@@ -94,13 +109,18 @@ src/
     format.ts       Money, percentages, axis labels: one source of truth
     recurrence.ts   Recurrence expansion for 9 frequencies + custom intervals
     finance.ts      Balances, forecast, Safe to Spend, budgets, commitments
-    store.tsx       useReducer store with localStorage persistence
+    supabase.ts     The browser client
+    auth.tsx        Session, sign in / up / out, password reset
+    mappers.ts      Postgres rows ↔ the domain model
+    store.tsx       Supabase-backed store, same AppState shape as before
   components/
     ui/             Design system: Button, Card, Badge, Field, Modal, Toast, States, Icon
     charts/         Balance, net worth, income/expense and donut charts
     ...             TransactionRow, MetricCard, SafeToSpendCard, AppShell, CommandPalette
   pages/            One file per screen
-  data/             Categories and the demo dataset
+  pages/auth/       Sign in, sign up, forgot and reset password
+supabase/migrations/  The schema, RLS policies and triggers
+  data/sample.ts    Opt-in sample data, dated relative to today
   hooks/            Theme, media queries, element width, online status
 public/fonts/       Self-hosted variable woff2 (Geist, Plus Jakarta Sans) — 108KB
 ```
@@ -179,11 +199,13 @@ npm run verify        # lint + typecheck + unit tests + build
 npm test              # 31 unit tests covering the recurrence and finance engines
 ```
 
-Browser suites run against a preview build:
+Browser suites run against a preview build. The suites that go inside the app need an account on
+the project under test; without credentials they check the public screens and skip the rest, saying
+so rather than passing silently.
 
 ```bash
-npm run build && npm run preview     # in one terminal
-npm run qa                           # in another
+npm run build && npm run preview                    # in one terminal
+QA_EMAIL=you@example.com QA_PASSWORD=… npm run qa   # in another
 ```
 
 | Suite | What it proves |
@@ -192,13 +214,46 @@ npm run qa                           # in another
 | `qa:a11y` | Names, labels, headings, target sizes, AA contrast in both themes, keyboard operation |
 | `qa:flows` | Sign in → add expense → numbers move; recurring payment → forecast changes; budget → counts existing spend; search; destructive confirmation |
 | `qa:states` | Every empty state, the 404 screen, service-worker registration and offline loading |
+| — | Suites needing sign-in skip cleanly when `QA_EMAIL` / `QA_PASSWORD` are unset |
 | `qa:screenshots` | Captures every screen in both themes at desktop and phone widths |
 
 ---
 
-## Data & privacy
+## Backend
 
-All state lives in `localStorage` in this build — nothing leaves the browser. The UI is written for
-a real backend: bank connections are presented as read-only, account numbers are masked to the last
-four digits, balances can be hidden with one tap, and Settings offers a full data export and account
-deletion.
+Supabase Postgres, with the schema, policies and triggers in `supabase/migrations/`.
+
+| Table | Holds |
+| --- | --- |
+| `profiles` | Display name, minimum balance, theme, locale |
+| `categories` | The user's own categories; a starter set is created on sign-up |
+| `accounts` | Current, savings, cash, credit and investment accounts |
+| `virtual_accounts` | Allocations of money inside a real account |
+| `transactions` + `transaction_splits` | The ledger, with multi-category splits |
+| `recurring_payments` | Rules the forecast is built from |
+| `budgets`, `goals`, `net_worth_snapshots` | Planning and history |
+
+**Row-level security is on for every table**, with policies keyed to `auth.uid()`. `user_id`
+defaults to the caller, and the `WITH CHECK` clauses stop anyone writing a row owned by someone
+else. Verified directly against the database: a signed-in user sees none of another user's rows,
+cannot insert one on their behalf (`42501`), and cannot reassign one of their own.
+
+**Balances are maintained by the database, not the client.** A trigger on `transactions` applies
+each change to the affected accounts, so a balance is correct no matter which device wrote the
+transaction — and a credit account's balance rises with an expense and falls with a payment, which
+is the opposite of a depository account. Scheduled transactions move nothing until they clear.
+
+The trigger helpers are `SECURITY DEFINER`, so `EXECUTE` is revoked from `anon` and `authenticated`
+— otherwise PostgREST would expose them as RPC endpoints that take an arbitrary account id.
+
+## Bank connections
+
+Not built yet, and the interface says so rather than simulating one. Every account and transaction
+is entered by hand, which means every figure on screen traces back to something the user recorded.
+When connections do arrive they will be read-only.
+
+## Privacy
+
+Account numbers are stored as the last four digits only. Balances can be masked with one tap.
+Settings offers a full JSON export. Fonts are self-hosted, so loading the app makes no third-party
+request at all.

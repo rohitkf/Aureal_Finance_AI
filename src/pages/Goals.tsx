@@ -58,7 +58,7 @@ export const Goals = () => {
     const target = Number.parseFloat(draft.target);
     if (!Number.isFinite(target) || target <= 0) return;
     const goal: Goal = {
-      id: draft.id ?? newId('goal'),
+      id: draft.id ?? newId(),
       name: draft.name.trim() || 'New goal',
       target,
       saved: Number.parseFloat(draft.saved) || 0,

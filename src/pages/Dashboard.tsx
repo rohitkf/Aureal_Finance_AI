@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { cn, pillClass } from '@/lib/cn';
-import { categoryById } from '@/data/categories';
 import {
   availableNow,
   balanceHistory,
@@ -13,7 +12,7 @@ import {
 } from '@/lib/finance';
 import { formatDay, formatMonthYear, greeting, monthKey, relativeDueLabel } from '@/lib/date';
 import { money, moneyParts } from '@/lib/format';
-import { useAppState, useLoading, useSettings, useToday } from '@/lib/store';
+import { useAppState, useCategoryLookup, useLoading, useSettings, useToday } from '@/lib/store';
 import { BalanceChart } from '@/components/charts/BalanceChart';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { CategoryIcon } from '@/components/CategoryIcon';
@@ -53,6 +52,7 @@ export const Dashboard = () => {
   const today = useToday();
   const { maskBalances } = useSettings();
   const loading = useLoading();
+  const lookupCategory = useCategoryLookup();
   const [horizon, setHorizon] = useState<Horizon>('30');
   const [filter, setFilter] = useState<AccountType | 'all'>('all');
 
@@ -70,6 +70,8 @@ export const Dashboard = () => {
 
   const monthToDateIncome = monthIncome(state, month);
   const trend = useMemo(() => balanceHistory(state, today, 30), [state, today]);
+  // What actually moved this month, rather than a figure baked into the design.
+  const monthChange = useMemo(() => monthIncome(state, month) - monthSpend(state, month), [state, month]);
   const spentThisMonth = monthSpend(state, month);
   const balanceParts = moneyParts(filteredTotal, maskBalances);
 
@@ -115,7 +117,10 @@ export const Dashboard = () => {
         <div>
           <div className="flex flex-wrap items-center gap-2.5">
             <Eyebrow>{formatMonthYear(today)}</Eyebrow>
-            <StatusDot tone="success" label="Synced just now" pulse />
+            <StatusDot
+              tone={state.accounts.length > 0 ? 'success' : 'neutral'}
+              label={`${state.accounts.length} account${state.accounts.length === 1 ? '' : 's'}`}
+            />
           </div>
           <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">
             {greeting()},{' '}
@@ -167,9 +172,14 @@ export const Dashboard = () => {
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <Eyebrow>{filter === 'credit' ? 'Total owed' : 'Total balance'}</Eyebrow>
-                    <Badge tone="success" icon="arrow-up">
-                      {money(320.41, { compact: true })} this month
-                    </Badge>
+                    {monthChange !== 0 && (
+                      <Badge
+                        tone={monthChange >= 0 ? 'success' : 'danger'}
+                        icon={monthChange >= 0 ? 'arrow-up' : 'arrow-down'}
+                      >
+                        {money(Math.abs(monthChange), { compact: true })} this month
+                      </Badge>
+                    )}
                   </div>
 
                   <p className="tnum mt-6 font-display text-[clamp(3rem,8vw,4.5rem)] font-bold leading-[0.9] tracking-[-0.05em] text-text">
@@ -401,7 +411,7 @@ export const Dashboard = () => {
                   />
                 ) : (
                   budgets.slice(0, 4).map((b) => {
-                    const category = categoryById(b.categoryId);
+                    const category = lookupCategory(b.categoryId);
                     const tone = b.state === 'over' ? 'danger' : b.state === 'close' ? 'warning' : 'success';
                     // Tailwind needs whole class names, so these are looked up, not built.
                     const toneText = { danger: 'text-danger', warning: 'text-warning', success: 'text-success' }[tone];

@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { CATEGORIES, categoryById } from '@/data/categories';
 import { budgetProgress, monthIncome, safeToSpend, spendByCategory } from '@/lib/finance';
 import { daysBetween, endOfMonth, formatMonthYear, monthKey } from '@/lib/date';
 import { money, percent } from '@/lib/format';
-import { useAppState, useLoading, useSettings, useStore, useToday } from '@/lib/store';
+import { useAppState, useCategories, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { SafeToSpendCard } from '@/components/SafeToSpendCard';
 import { Badge } from '@/components/ui/Badge';
@@ -29,6 +28,8 @@ export const Budget = () => {
   const today = useToday();
   const { maskBalances } = useSettings();
   const loading = useLoading();
+  const lookupCategory = useCategoryLookup();
+  const expenseCategories = useCategories('expense');
   const toast = useToast();
 
   const month = monthKey(today);
@@ -53,7 +54,7 @@ export const Budget = () => {
     [spend, progress],
   );
 
-  const available = CATEGORIES.filter(
+  const available = expenseCategories.filter(
     (c) => c.kind === 'expense' && !state.budgets.some((b) => b.month === month && b.categoryId === c.id),
   );
 
@@ -65,7 +66,7 @@ export const Budget = () => {
     toast({
       tone: 'success',
       title: 'Budget saved',
-      description: `${categoryById(editing.categoryId).name} · ${money(limit, { compact: true })} for ${formatMonthYear(today)}`,
+      description: `${lookupCategory(editing.categoryId).name} · ${money(limit, { compact: true })} for ${formatMonthYear(today)}`,
     });
     setEditing(null);
   };
@@ -155,7 +156,7 @@ export const Budget = () => {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {progress.map((b) => {
-              const category = categoryById(b.categoryId);
+              const category = lookupCategory(b.categoryId);
               const tone = TONE[b.state];
               return (
                 <Card key={b.categoryId} className="space-y-3">
@@ -230,7 +231,7 @@ export const Budget = () => {
               >
                 <span className="flex min-w-0 items-center gap-2.5">
                   <CategoryIcon categoryId={id} size="sm" />
-                  <span className="truncate text-body-md text-text">{categoryById(id).name}</span>
+                  <span className="truncate text-body-md text-text">{lookupCategory(id).name}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="tnum text-body-sm font-semibold text-text">{money(amount, { compact: true })}</span>
@@ -270,7 +271,7 @@ export const Budget = () => {
               value={editing.categoryId}
               onChange={(e) => setEditing({ ...editing, categoryId: e.target.value })}
             >
-              {CATEGORIES.filter((c) => c.kind === 'expense').map((c) => (
+              {expenseCategories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -294,14 +295,14 @@ export const Budget = () => {
         onConfirm={() => {
           if (!deleting) return;
           dispatch({ type: 'delete-budget', month, categoryId: deleting });
-          toast({ tone: 'info', title: 'Budget removed', description: categoryById(deleting).name });
+          toast({ tone: 'info', title: 'Budget removed', description: lookupCategory(deleting).name });
         }}
         title="Remove this budget?"
         subject={
           deleting && (
             <div className="flex items-center gap-3">
               <CategoryIcon categoryId={deleting} />
-              <p className="text-body-md font-semibold text-text">{categoryById(deleting).name}</p>
+              <p className="text-body-md font-semibold text-text">{lookupCategory(deleting).name}</p>
             </div>
           )
         }

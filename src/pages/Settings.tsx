@@ -1,15 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { money } from '@/lib/format';
-import { useAppState, useStore } from '@/lib/store';
+import { useAppState, useCategories, useStore } from '@/lib/store';
+import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/hooks/useTheme';
-import { Badge, StatusDot } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow } from '@/components/ui/Card';
+import { CategoryIcon } from '@/components/CategoryIcon';
+import { NewCategoryDialog } from '@/components/NewCategoryDialog';
+import { Badge } from '@/components/ui/Badge';
+import { Button, IconButton } from '@/components/ui/Button';
+import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
 import { TextField, Toggle } from '@/components/ui/Field';
 import { Icon, type IconName } from '@/components/ui/Icon';
-import { ConfirmDialog, Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/Modal';
+import { EmptyState } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
+import type { Category } from '@/lib/types';
 
 const THEMES: Array<{ value: 'light' | 'dark' | 'system'; label: string; icon: IconName }> = [
   { value: 'light', label: 'Light', icon: 'sun' },
@@ -19,16 +25,33 @@ const THEMES: Array<{ value: 'light' | 'dark' | 'system'; label: string; icon: I
 
 export const Settings = () => {
   const state = useAppState();
-  const { dispatch, resetToDemo, clearAll } = useStore();
+  const { dispatch, clearAll, loadSampleData } = useStore();
+  const { user, signOut } = useAuth();
   const { preference, setTheme } = useTheme();
+  const categories = useCategories();
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [minimum, setMinimum] = useState(String(state.settings.minimumBalance));
   const [name, setName] = useState(state.settings.userName);
-  const [connectOpen, setConnectOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [categoryDialog, setCategoryDialog] = useState<{ open: boolean; editing: Category | null }>({
+    open: false,
+    editing: null,
+  });
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const [busy, setBusy] = useState<'sample' | 'clear' | null>(null);
 
-  const connected = state.accounts.filter((a) => a.syncStatus === 'live');
+  const grouped = useMemo(
+    () => ({
+      expense: categories.filter((c) => c.kind === 'expense'),
+      income: categories.filter((c) => c.kind === 'income'),
+    }),
+    [categories],
+  );
+
+  const hasData =
+    state.transactions.length + state.accounts.length + state.recurring.length + state.goals.length > 0;
 
   const exportData = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -45,30 +68,44 @@ export const Settings = () => {
     <div className="max-w-4xl space-y-8">
       <header>
         <Eyebrow>Settings</Eyebrow>
-        <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">Preferences & security</h1>
+        <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">
+          Preferences & security
+        </h1>
       </header>
 
-      {/* ---------------- Profile ---------------- */}
-      <Card className="space-y-4">
-        <CardHeader title="Profile" description="How Aureal addresses you and formats your money." />
-        <div className="grid gap-4 sm:grid-cols-2">
+      {/* ---------------- Account ---------------- */}
+      <Card className="space-y-6">
+        <CardHeader title="Your account" description="How Aureal addresses you, and who is signed in." />
+        <div className="grid gap-5 sm:grid-cols-2">
           <TextField
             label="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onBlur={() => dispatch({ type: 'update-settings', settings: { userName: name.trim() || 'You' } })}
           />
-          <TextField label="Currency" value="GBP (£)" readOnly hint="More currencies are coming." />
+          <TextField label="Email" value={user?.email ?? ''} readOnly hint="Contact support to change this." />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[rgb(var(--hairline)/0.08)] pt-5">
+          <p className="text-[13px] text-muted">Signed in as {user?.email}</p>
+          <Button
+            icon="logout"
+            onClick={async () => {
+              await signOut();
+              navigate('/login', { replace: true });
+            }}
+          >
+            Sign out
+          </Button>
         </div>
       </Card>
 
       {/* ---------------- Safe to spend ---------------- */}
-      <Card className="space-y-4">
+      <Card className="space-y-6">
         <CardHeader
           title="Safe to Spend"
           description="The balance you never want to dip below. Everything above it is treated as spendable."
         />
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2">
           <TextField
             label="Minimum balance"
             inputMode="decimal"
@@ -86,18 +123,86 @@ export const Settings = () => {
             hint="Held back from Safe to Spend and drawn on your forecast."
           />
           <div className="flex items-end">
-            <p className="text-body-sm text-muted">
-              Right now Aureal holds back{' '}
-              <strong className="tnum text-text">{money(state.settings.minimumBalance)}</strong> before telling you
-              what’s free to spend.
+            <p className="text-[13px] leading-relaxed text-muted">
+              Aureal holds back{' '}
+              <strong className="tnum font-medium text-text">{money(state.settings.minimumBalance)}</strong> before
+              telling you what’s free to spend.
             </p>
           </div>
         </div>
       </Card>
 
+      {/* ---------------- Categories ---------------- */}
+      <Card className="space-y-6" id="categories">
+        <CardHeader
+          title="Categories"
+          description="Your own headings for filing transactions. Add, rename or retire them at any time."
+          action={
+            <Button
+              variant="primary"
+              icon="plus"
+              size="sm"
+              onClick={() => setCategoryDialog({ open: true, editing: null })}
+            >
+              New category
+            </Button>
+          }
+        />
+
+        {categories.length === 0 ? (
+          <EmptyState
+            icon="box"
+            title="No categories yet"
+            description="Add one and it will be offered whenever you record a transaction."
+            action={{ label: 'Add a category', onClick: () => setCategoryDialog({ open: true, editing: null }) }}
+          />
+        ) : (
+          (['expense', 'income'] as const).map((kind) =>
+            grouped[kind].length === 0 ? null : (
+              <div key={kind} className="space-y-2">
+                <Label>{kind === 'expense' ? 'Money out' : 'Money in'}</Label>
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {grouped[kind].map((category) => {
+                    const inUse = state.transactions.some((t) => t.categoryId === category.id);
+                    return (
+                      <li key={category.id} className="well flex items-center gap-3 p-3">
+                        <CategoryIcon categoryId={category.id} size="sm" />
+                        <span className="min-w-0 flex-1 truncate text-[13.5px] text-text">{category.name}</span>
+                        {inUse && (
+                          <span className="shrink-0 text-[11px] text-faint">
+                            {state.transactions.filter((t) => t.categoryId === category.id).length}
+                          </span>
+                        )}
+                        <IconButton
+                          icon="edit"
+                          label={`Edit ${category.name}`}
+                          size={14}
+                          className="h-8 w-8"
+                          onClick={() => setCategoryDialog({ open: true, editing: category })}
+                        />
+                        <IconButton
+                          icon="trash"
+                          label={`Remove ${category.name}`}
+                          size={14}
+                          className="h-8 w-8"
+                          onClick={() => setDeletingCategory(category)}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ),
+          )
+        )}
+      </Card>
+
       {/* ---------------- Appearance ---------------- */}
-      <Card className="space-y-4">
-        <CardHeader title="Appearance" description="Light and dark are designed separately — pick whichever reads better." />
+      <Card className="space-y-6">
+        <CardHeader
+          title="Appearance"
+          description="Light and dark are designed separately — pick whichever reads better."
+        />
         <div className="grid gap-3 sm:grid-cols-3">
           {THEMES.map((t) => (
             <button
@@ -114,13 +219,15 @@ export const Settings = () => {
             >
               <span
                 className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-lg',
-                  preference === t.value ? 'bg-primary/15 text-primary' : 'bg-surface-high text-muted',
+                  'flex h-9 w-9 items-center justify-center rounded-full',
+                  preference === t.value
+                    ? 'bg-primary/15 text-primary'
+                    : 'bg-[rgb(var(--hairline)/0.06)] text-muted',
                 )}
               >
                 <Icon name={t.icon} size={17} />
               </span>
-              <span className="text-body-md font-medium text-text">{t.label}</span>
+              <span className="text-[14px] font-medium text-text">{t.label}</span>
               {preference === t.value && <Icon name="check" size={16} className="ml-auto text-primary" />}
             </button>
           ))}
@@ -133,62 +240,37 @@ export const Settings = () => {
         />
       </Card>
 
-      {/* ---------------- Connections ---------------- */}
-      <Card className="space-y-4" id="connections">
-        <CardHeader
-          title="Connected accounts"
-          description="Aureal connects read-only. It can see transactions; it can never move money."
-          action={
-            <Button variant="primary" icon="plus" size="sm" onClick={() => setConnectOpen(true)}>
-              Connect a bank
-            </Button>
-          }
-        />
-        <ul className="space-y-1.5">
-          {state.accounts.map((account) => (
-            <li
-              key={account.id}
-              className="flex items-center gap-3 well p-3.5"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-high text-primary">
-                <Icon name={account.type === 'credit' ? 'card' : 'bank'} size={18} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-body-md font-medium text-text">{account.name}</p>
-                <p className="tnum truncate text-body-sm text-muted">
-                  {account.institution} · {account.maskedNumber}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <StatusDot
-                  tone={account.syncStatus === 'live' ? 'success' : 'neutral'}
-                  label={
-                    account.syncStatus === 'live'
-                      ? `Synced ${account.lastSyncedAt ? new Date(account.lastSyncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}`
-                      : 'Manual account'
-                  }
-                  pulse={account.syncStatus === 'live'}
-                />
-              </div>
-            </li>
-          ))}
-        </ul>
-        <p className="text-body-sm text-faint">
-          {connected.length} of {state.accounts.length} accounts sync automatically.
-        </p>
+      {/* ---------------- Bank connections ---------------- */}
+      <Card className="space-y-6" id="connections">
+        <CardHeader title="Bank connections" description="Where automatic transaction syncing will live." />
+        <BankConnectionsUpcoming />
       </Card>
 
       {/* ---------------- Security ---------------- */}
-      <Card className="space-y-4" id="security">
+      <Card className="space-y-6" id="security">
         <CardHeader title="Security & privacy" description="What Aureal stores, and how you stay in control." />
         <div className="space-y-2">
-          <SecurityRow icon="lock" title="Biometric unlock" description="Require Face ID or a passcode each time the app opens." action={<Badge tone="success">On</Badge>} />
-          <SecurityRow icon="shield" title="Two-factor authentication" description="A second step when signing in on a new device." action={<Badge tone="success">On</Badge>} />
           <SecurityRow
-            icon="eye-off"
-            title="Masked account numbers"
-            description="Only the last four digits are ever displayed or stored."
-            action={<Badge tone="success">Always on</Badge>}
+            icon="lock"
+            title="Row-level security"
+            description="Every table is filtered by your user id in the database itself, not just in the app."
+            action={<Badge tone="success">Enforced</Badge>}
+          />
+          <SecurityRow
+            icon="shield"
+            title="Password sign-in"
+            description="Passwords are hashed by Supabase Auth and never stored by this app."
+            action={<Badge tone="success">On</Badge>}
+          />
+          <SecurityRow
+            icon="sync"
+            title="Change your password"
+            description="We’ll email you a link to set a new one."
+            action={
+              <Button size="sm" onClick={() => navigate('/forgot-password')}>
+                Send link
+              </Button>
+            }
           />
           <SecurityRow
             icon="download"
@@ -203,62 +285,155 @@ export const Settings = () => {
         </div>
       </Card>
 
-      {/* ---------------- Demo data ---------------- */}
-      <Card className="space-y-4">
-        <CardHeader title="Demo data" description="This build ships with a worked example so every screen has something to show." />
-        <div className="flex flex-wrap gap-2">
+      {/* ---------------- Data ---------------- */}
+      <Card className="space-y-6">
+        <CardHeader
+          title="Your data"
+          description="Your account starts empty. Load a sample set if you'd like to see the app with numbers in it."
+        />
+        <div className="flex flex-wrap gap-2.5">
           <Button
-            icon="sync"
-            onClick={() => {
-              resetToDemo();
-              toast({ tone: 'success', title: 'Demo data restored' });
+            icon="sparkles"
+            disabled={busy !== null}
+            onClick={async () => {
+              setBusy('sample');
+              try {
+                await loadSampleData();
+                toast({
+                  tone: 'success',
+                  title: 'Sample data loaded',
+                  description: 'Clearly marked as samples — clear it whenever you like.',
+                });
+              } catch (e) {
+                toast({
+                  tone: 'danger',
+                  title: 'Couldn’t load the sample data',
+                  description: e instanceof Error ? e.message : 'Please try again.',
+                });
+              } finally {
+                setBusy(null);
+              }
             }}
           >
-            Reset to demo data
+            {busy === 'sample' ? 'Loading…' : 'Load sample data'}
           </Button>
-          <Button icon="trash" onClick={() => setConfirmClear(true)}>
+          <Button icon="trash" disabled={!hasData || busy !== null} onClick={() => setConfirmClear(true)}>
             Clear everything
           </Button>
         </div>
-        <p className="text-body-sm text-faint">
-          Clearing empties every screen, which is a good way to see the empty states.
+        <p className="text-[12.5px] leading-relaxed text-faint">
+          Sample data is written to your account like anything else, so you can edit or delete it. It is never added
+          on its own.
         </p>
       </Card>
 
       {/* ---------------- Danger zone ---------------- */}
-      <Card className="space-y-4 border-danger/30">
-        <CardHeader title="Delete your account" description="This removes your profile and every record Aureal holds." />
-        <Button variant="danger" icon="trash">
+      <Card className="space-y-5 shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.3)]">
+        <CardHeader
+          title="Delete your account"
+          description="Account deletion is handled by support while the app is in early access — email us and we'll remove everything within 30 days."
+        />
+        <Button variant="danger" icon="trash" disabled>
           Delete account
         </Button>
       </Card>
 
-      <ConnectBankModal open={connectOpen} onClose={() => setConnectOpen(false)} />
+      <NewCategoryDialog
+        open={categoryDialog.open}
+        editing={categoryDialog.editing}
+        onClose={() => setCategoryDialog({ open: false, editing: null })}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deletingCategory)}
+        onClose={() => setDeletingCategory(null)}
+        onConfirm={() => {
+          if (!deletingCategory) return;
+          dispatch({ type: 'delete-category', id: deletingCategory.id });
+          toast({ tone: 'info', title: 'Category removed', description: deletingCategory.name });
+        }}
+        title="Remove this category?"
+        subject={
+          deletingCategory && (
+            <div className="flex items-center gap-3">
+              <CategoryIcon categoryId={deletingCategory.id} />
+              <p className="text-[14px] font-medium text-text">{deletingCategory.name}</p>
+            </div>
+          )
+        }
+        consequence="It will stop being offered when you record a transaction or set a budget."
+        preserved="Transactions already filed under it keep their history — nothing is recategorised or deleted."
+        confirmLabel="Remove category"
+      />
 
       <ConfirmDialog
         open={confirmClear}
         onClose={() => setConfirmClear(false)}
-        onConfirm={() => {
-          clearAll();
-          toast({ tone: 'info', title: 'All data cleared', description: 'Every screen is now in its empty state.' });
+        onConfirm={async () => {
+          setBusy('clear');
+          try {
+            await clearAll();
+            toast({ tone: 'info', title: 'All data cleared', description: 'Your account is empty again.' });
+          } catch (e) {
+            toast({
+              tone: 'danger',
+              title: 'Couldn’t clear your data',
+              description: e instanceof Error ? e.message : 'Please try again.',
+            });
+          } finally {
+            setBusy(null);
+          }
         }}
         title="Clear all data?"
         subject={
           <div>
-            <p className="text-body-md font-semibold text-text">Everything in this browser</p>
-            <p className="text-body-sm text-muted">
-              {state.transactions.length} transactions, {state.recurring.length} recurring payments,{' '}
-              {state.goals.length} goals
+            <p className="text-[14px] font-medium text-text">Everything in your account</p>
+            <p className="text-[12.5px] text-muted">
+              {state.transactions.length} transactions, {state.accounts.length} accounts,{' '}
+              {state.recurring.length} recurring payments, {state.goals.length} goals
             </p>
           </div>
         }
-        consequence="Every transaction, budget, goal and recurring payment will be removed and your balances set to zero."
-        preserved="You can restore the demo dataset at any time from this screen."
+        consequence="Every account, transaction, budget, goal and recurring payment will be permanently deleted."
+        preserved="Your sign-in and your categories are kept, so you can start again straight away."
         confirmLabel="Clear everything"
       />
     </div>
   );
 };
+
+/**
+ * Bank connections are not built yet. Rather than a flow that mimics one, this
+ * says so plainly and points at what does work today.
+ */
+const BankConnectionsUpcoming = () => (
+  <div className="well flex flex-col gap-5 p-6">
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex items-center gap-3.5">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--hairline)/0.06)] text-faint shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]">
+          <Icon name="bank" size={19} />
+        </span>
+        <div>
+          <p className="text-[14.5px] font-medium tracking-[-0.01em] text-text">Open Banking sync</p>
+          <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">
+            Connect an account so transactions arrive on their own.
+          </p>
+        </div>
+      </div>
+      <Badge tone="neutral">Coming soon</Badge>
+    </div>
+
+    <p className="text-[13px] leading-relaxed text-muted">
+      This isn’t built yet, so Aureal doesn’t pretend otherwise: every account and transaction is entered by you, and
+      every figure on screen comes from something you recorded. When bank connections arrive they’ll be read-only —
+      Aureal will be able to see your transactions and never to move your money.
+    </p>
+
+    <Button disabled icon="bank" className="self-start">
+      Connect a bank
+    </Button>
+  </div>
+);
 
 const SecurityRow = ({
   icon,
@@ -271,116 +446,14 @@ const SecurityRow = ({
   description: string;
   action: React.ReactNode;
 }) => (
-  <div className="flex items-center gap-3 well p-3.5">
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success">
-      <Icon name={icon} size={18} />
+  <div className="well flex items-center gap-3.5 p-4">
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success/10 text-success shadow-[inset_0_0_0_1px_rgb(var(--success)/0.2)]">
+      <Icon name={icon} size={17} />
     </span>
     <div className="min-w-0 flex-1">
-      <p className="text-body-md font-medium text-text">{title}</p>
-      <p className="text-body-sm text-muted">{description}</p>
+      <p className="text-[14px] font-medium tracking-[-0.01em] text-text">{title}</p>
+      <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{description}</p>
     </div>
     <div className="shrink-0">{action}</div>
   </div>
 );
-
-const BANKS = ['Monzo', 'Barclays', 'HSBC', 'Lloyds', 'NatWest', 'Starling', 'Santander', 'Nationwide'];
-
-/** The bank-connection flow: choose, authorise, confirm. */
-const ConnectBankModal = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
-  const [step, setStep] = useState<'choose' | 'connecting' | 'done'>('choose');
-  const [bank, setBank] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const toast = useToast();
-
-  const reset = () => {
-    setStep('choose');
-    setBank(null);
-    setQuery('');
-    onClose();
-  };
-
-  const connect = (name: string) => {
-    setBank(name);
-    setStep('connecting');
-    window.setTimeout(() => setStep('done'), 1400);
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={reset}
-      title={step === 'choose' ? 'Connect an account' : bank ? `${bank}` : 'Connect'}
-      description={step === 'choose' ? 'Choose your bank to begin.' : undefined}
-      size="sm"
-      footer={
-        step === 'done' ? (
-          <Button
-            variant="primary"
-            onClick={() => {
-              toast({ tone: 'success', title: `${bank} connected`, description: 'Transactions will sync every few hours.' });
-              reset();
-            }}
-          >
-            Continue
-          </Button>
-        ) : undefined
-      }
-    >
-      {step === 'choose' && (
-        <div className="space-y-3">
-          <TextField
-            label="Search banks"
-            hideLabel
-            placeholder="Search banks…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <ul className="space-y-1.5">
-            {BANKS.filter((b) => b.toLowerCase().includes(query.toLowerCase())).map((b) => (
-              <li key={b}>
-                <button
-                  type="button"
-                  onClick={() => connect(b)}
-                  className="flex w-full items-center gap-3 well p-3.5 text-left transition-colors duration-400 ease-fluid hover:bg-surface-high"
-                >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-high text-body-sm font-bold text-primary">
-                    {b[0]}
-                  </span>
-                  <span className="text-body-md text-text">{b}</span>
-                  <Icon name="chevron-right" size={16} className="ml-auto text-faint" />
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="flex items-start gap-2 text-body-sm text-faint">
-            <Icon name="shield" size={14} className="mt-0.5 shrink-0" />
-            You’ll authorise the connection on your bank’s own site. Aureal never sees your login details.
-          </p>
-        </div>
-      )}
-
-      {step === 'connecting' && (
-        <div className="flex flex-col items-center gap-4 py-10 text-center">
-          <span className="flex h-14 w-14 animate-pulse items-center justify-center rounded-2xl bg-primary/12 text-primary">
-            <Icon name="sync" size={26} />
-          </span>
-          <div>
-            <p className="font-display text-headline-sm text-text">Connecting to {bank}…</p>
-            <p className="text-body-sm text-muted">Securely checking which accounts are available.</p>
-          </div>
-        </div>
-      )}
-
-      {step === 'done' && (
-        <div className="space-y-3 py-4">
-          {['Account found', 'Transaction history available', 'Read-only access granted'].map((line) => (
-            <p key={line} className="flex items-center gap-2 text-body-md text-text">
-              <Icon name="check-circle" size={18} className="shrink-0 text-success" />
-              {line}
-            </p>
-          ))}
-        </div>
-      )}
-    </Modal>
-  );
-};

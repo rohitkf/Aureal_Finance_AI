@@ -1,5 +1,5 @@
 import { mkdir } from 'node:fs/promises';
-import { BASE_URL, ROUTES, launch, setTheme } from './lib.mjs';
+import { APP_ROUTES, BASE_URL, PUBLIC_ROUTES, hasCredentials, launch, signIn, setTheme } from './lib.mjs';
 
 /** Captures every screen in both themes at desktop and phone widths. */
 const outDir = process.env.QA_SHOTS ?? 'screenshots';
@@ -19,10 +19,13 @@ for (const theme of ['dark', 'light']) {
       deviceScaleFactor: mobile ? 2 : 1,
     });
     const page = await ctx.newPage();
-    await setTheme(page, theme);
-    for (const route of ROUTES) {
+    let routes = PUBLIC_ROUTES;
+    if (hasCredentials && (await signIn(page))) routes = [...PUBLIC_ROUTES, ...APP_ROUTES];
+    for (const route of routes) {
       const name = route === '/' ? 'dashboard' : route.replace(/^\//, '').replace(/\//g, '-');
-      await page.goto(`${BASE_URL}${route}`, { waitUntil: 'networkidle' });
+      await page.goto(`${BASE_URL}${route}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2000);
+      await setTheme(page, theme);
       await page.waitForTimeout(900);
       await page.screenshot({ path: `${outDir}/${theme}-${label}-${name}.png`, fullPage: true });
     }

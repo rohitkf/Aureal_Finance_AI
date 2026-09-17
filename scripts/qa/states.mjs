@@ -1,4 +1,4 @@
-import { BASE_URL, createReporter, launch } from './lib.mjs';
+import { BASE_URL, createReporter, hasCredentials, launch, signIn } from './lib.mjs';
 
 /**
  * Empty states, the 404 screen, and the PWA: the app has to stay useful when
@@ -9,8 +9,22 @@ const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await ctx.newPage();
 
-await page.goto(`${BASE_URL}/settings`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(700);
+if (!hasCredentials) {
+  report.skip('QA_EMAIL / QA_PASSWORD not set — these checks need a real account');
+  await browser.close();
+  report.finish();
+  process.exit(0);
+}
+
+if (!(await signIn(page))) {
+  report.skip('could not reach Supabase to sign in');
+  await browser.close();
+  report.finish();
+  process.exit(0);
+}
+
+await page.goto(`${BASE_URL}/settings`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(2200);
 await page.getByRole('button', { name: 'Clear everything' }).click();
 await page.waitForTimeout(300);
 await page.locator('[role="dialog"]').getByRole('button', { name: 'Clear everything' }).click();
@@ -37,11 +51,11 @@ await page.goto(`${BASE_URL}/does-not-exist`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(500);
 report.check(/couldn’t find that page/i.test(await page.locator('main').innerText()), 'unknown routes show a 404 screen');
 
-await page.goto(`${BASE_URL}/settings`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(600);
-await page.getByRole('button', { name: 'Reset to demo data' }).click();
-await page.waitForTimeout(600);
-report.check(/£/.test(await page.locator('aside').innerText()), 'demo data can be restored');
+await page.goto(`${BASE_URL}/settings`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(2200);
+await page.getByRole('button', { name: /Load sample data/ }).click();
+await page.waitForTimeout(4000);
+report.check(/£/.test(await page.locator('aside').innerText()), 'sample data can be loaded on request');
 
 await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2500);

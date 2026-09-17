@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import {
   accountUtilisation,
@@ -20,6 +20,7 @@ import { Card, Eyebrow, Label } from '@/components/ui/Card';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Progress, SegmentedBar } from '@/components/ui/Progress';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
+import { AccountDialog } from '@/components/AccountDialog';
 import type { Account } from '@/lib/types';
 
 const TYPE_ICON: Record<Account['type'], IconName> = {
@@ -30,8 +31,10 @@ const TYPE_ICON: Record<Account['type'], IconName> = {
   investment: 'trending-up',
 };
 
+// Until bank connections exist every account is maintained by hand, and the
+// interface says so rather than implying a live feed.
 const SYNC_TONE = {
-  live: { tone: 'success' as const, label: 'Live' },
+  live: { tone: 'success' as const, label: 'Synced' },
   manual: { tone: 'neutral' as const, label: 'Manual' },
   error: { tone: 'danger' as const, label: 'Sync failed' },
   reconnect: { tone: 'warning' as const, label: 'Reconnect needed' },
@@ -42,6 +45,16 @@ export const Accounts = () => {
   const today = useToday();
   const { maskBalances } = useSettings();
   const loading = useLoading();
+  const [params, setParams] = useSearchParams();
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (params.get('new') !== null) {
+      setDialogOpen(true);
+      params.delete('new');
+      setParams(params, { replace: true });
+    }
+  }, [params, setParams]);
 
   const depository = state.accounts.filter(isDepository);
   const credit = state.accounts.filter((a) => a.type === 'credit');
@@ -73,12 +86,13 @@ export const Accounts = () => {
             Everything you hold and everything you owe, plus how your money is earmarked.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button icon="layers">Manage allocations</Button>
-          <Button icon="plus">Add manual account</Button>
-          <ButtonLink to="/settings#connections" variant="primary" icon="sync">
-            Connect a bank
+        <div className="flex flex-wrap gap-2.5">
+          <ButtonLink to="/settings#connections" icon="bank">
+            Bank sync — coming soon
           </ButtonLink>
+          <Button variant="primary" icon="plus" onClick={() => setDialogOpen(true)}>
+            Add account
+          </Button>
         </div>
       </header>
 
@@ -129,7 +143,12 @@ export const Accounts = () => {
 
         {depository.length === 0 ? (
           <Card className="p-0">
-            <EmptyState icon="bank" title="No accounts yet" description="Connect a bank or add an account manually to get started." />
+            <EmptyState
+              icon="bank"
+              title="No accounts yet"
+              description="Add your current account, a savings pot or a credit card, and the rest of Aureal comes to life."
+              action={{ label: 'Add your first account', onClick: () => setDialogOpen(true) }}
+            />
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -306,22 +325,27 @@ export const Accounts = () => {
         )}
       </section>
 
-      <Card tone="well" className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-success/12 text-success">
-            <Icon name="shield" size={18} />
+      <Card tone="well" className="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-3.5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--hairline)/0.06)] text-faint shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]">
+            <Icon name="bank" size={18} />
           </span>
           <div>
-            <h3 className="font-display text-headline-sm text-text">Read-only bank connections</h3>
-            <p className="text-body-sm text-muted">
-              Aureal can see your transactions. It can never move your money. Revoke access at any time.
+            <h3 className="font-display text-[16px] font-semibold tracking-[-0.015em] text-text">
+              Automatic bank sync is coming
+            </h3>
+            <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">
+              For now every balance here is one you entered, so nothing on screen is guesswork.
             </p>
           </div>
         </div>
-        <ButtonLink to="/settings#security" size="sm">
-          Security settings
+        <ButtonLink to="/settings#connections" size="sm">
+          Read more
         </ButtonLink>
       </Card>
+
+      <AccountDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
+
     </div>
   );
 };

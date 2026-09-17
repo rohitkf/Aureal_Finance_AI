@@ -12,15 +12,25 @@ import {
   subscriptionTotals,
   totalDebt,
 } from '../finance';
-import type { AppState, Transaction } from '../types';
-import { DEMO_TODAY, seedState } from '@/data/seed';
+import type { AppState, Category, Transaction } from '../types';
 
-const TODAY = DEMO_TODAY; // 2026-09-16
+/** Fixed reference date, so every expectation below is deterministic. */
+const TODAY = '2026-09-16';
 
-const base = (): AppState => seedState();
+const CATEGORIES: Category[] = [
+  { id: 'groceries', name: 'Groceries', kind: 'expense', icon: 'shopping-basket', accent: 'success' },
+  { id: 'household', name: 'Household', kind: 'expense', icon: 'box', accent: 'neutral' },
+  { id: 'dining', name: 'Dining', kind: 'expense', icon: 'coffee', accent: 'secondary' },
+  { id: 'transport', name: 'Transport', kind: 'expense', icon: 'train', accent: 'primary' },
+  { id: 'housing', name: 'Housing', kind: 'expense', icon: 'home', accent: 'danger' },
+  { id: 'shopping', name: 'Shopping', kind: 'expense', icon: 'bag', accent: 'neutral' },
+  { id: 'subscriptions', name: 'Subscriptions', kind: 'expense', icon: 'repeat', accent: 'secondary' },
+  { id: 'salary', name: 'Salary', kind: 'income', icon: 'bank', accent: 'success' },
+  { id: 'transfer', name: 'Transfer', kind: 'transfer', icon: 'swap', accent: 'primary' },
+];
 
+/** Two accounts and nothing else — the starting point for most cases. */
 const minimal = (): AppState => ({
-  ...base(),
   accounts: [
     {
       id: 'a1',
@@ -29,7 +39,7 @@ const minimal = (): AppState => ({
       institution: 'Bank',
       balance: 1000,
       maskedNumber: '••••1111',
-      syncStatus: 'live',
+      syncStatus: 'manual',
     },
     {
       id: 'c1',
@@ -39,15 +49,78 @@ const minimal = (): AppState => ({
       balance: 400,
       creditLimit: 1000,
       maskedNumber: '••••2222',
-      syncStatus: 'live',
+      syncStatus: 'manual',
     },
   ],
+  virtualAccounts: [],
+  categories: CATEGORIES,
   transactions: [],
   recurring: [],
   budgets: [],
-  virtualAccounts: [],
   goals: [],
+  netWorthHistory: [],
+  settings: {
+    currency: 'GBP',
+    locale: 'en-GB',
+    minimumBalance: 1000,
+    userName: 'Test',
+    maskBalances: false,
+    theme: 'dark',
+  },
 });
+
+/** A fuller picture, for the aggregate cases. */
+const base = (): AppState => ({
+  ...minimal(),
+  transactions: [
+    tx('b1', '2026-09-02', 'Tesco', 275, 'expense', 'a1', 'groceries'),
+    tx('b2', '2026-09-03', 'TfL', 180, 'expense', 'a1', 'transport'),
+    tx('b3', '2026-09-04', 'Cafe', 195, 'expense', 'a1', 'dining'),
+    tx('b4', '2026-08-18', 'Salary', 2500, 'income', 'a1', 'salary'),
+    tx('b5', '2026-08-20', 'Rent', 1500, 'expense', 'a1', 'housing'),
+  ],
+  budgets: [
+    { month: '2026-09', categoryId: 'groceries', limit: 400 },
+    { month: '2026-09', categoryId: 'transport', limit: 250 },
+    { month: '2026-09', categoryId: 'dining', limit: 220 },
+  ],
+  recurring: [
+    sub('s1', 'Netflix', 17.99, 18),
+    sub('s2', 'Spotify', 11.99, 15),
+    sub('s3', 'Gym', 26.99, 3),
+    sub('s4', 'iCloud', 8.99, 8),
+    sub('s5', 'Prime', 4.49, 30),
+    { ...sub('s6', 'Disney+', 7.99, 11), status: 'paused' as const },
+  ],
+});
+
+function tx(
+  id: string,
+  date: string,
+  merchant: string,
+  amount: number,
+  type: Transaction['type'],
+  accountId: string,
+  categoryId: string,
+): Transaction {
+  return { id, date, merchant, amount, type, accountId, categoryId, status: 'cleared' };
+}
+
+function sub(id: string, name: string, amount: number, anchorDay: number) {
+  return {
+    id,
+    name,
+    amount,
+    direction: 'out' as const,
+    categoryId: 'subscriptions',
+    accountId: 'a1',
+    frequency: 'monthly' as const,
+    anchorDay,
+    startDate: '2026-01-01',
+    status: 'active' as const,
+    isSubscription: true,
+  };
+}
 
 describe('balances', () => {
   it('counts only depository accounts as available cash', () => {

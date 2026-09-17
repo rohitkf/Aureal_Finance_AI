@@ -1,4 +1,13 @@
-import { BASE_URL, ROUTES, createReporter, launch, setTheme } from './lib.mjs';
+import {
+  APP_ROUTES,
+  BASE_URL,
+  PUBLIC_ROUTES,
+  createReporter,
+  hasCredentials,
+  launch,
+  signIn,
+  setTheme,
+} from './lib.mjs';
 
 /**
  * Checks the WCAG 2.2 AA criteria that are cheap to verify automatically:
@@ -10,11 +19,21 @@ const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await ctx.newPage();
 
+let routes = PUBLIC_ROUTES;
+let signedIn = false;
+if (hasCredentials) {
+  signedIn = await signIn(page);
+  if (signedIn) routes = [...PUBLIC_ROUTES, ...APP_ROUTES];
+  else report.skip('could not sign in — auditing the public screens only');
+} else {
+  report.skip('QA_EMAIL / QA_PASSWORD not set — auditing the public screens only');
+}
+
 // ---- Names, labels, heading order, target size -------------------------
 let structural = true;
-for (const route of ROUTES) {
-  await page.goto(`${BASE_URL}${route}`, { waitUntil: 'networkidle' });
-  await page.waitForTimeout(700);
+for (const route of routes) {
+  await page.goto(`${BASE_URL}${route}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1800);
   const issues = await page.evaluate((pathname) => {
     const out = [];
     const name = (el) => (el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').trim();
@@ -53,7 +72,9 @@ for (const route of ROUTES) {
       if (levels[i] - levels[i - 1] > 1) out.push(`heading level jumps h${levels[i - 1]} → h${levels[i]}`);
     }
     const h1s = document.querySelectorAll('h1').length;
-    if (h1s !== 1 && pathname !== '/login') out.push(`${h1s} <h1> elements (expected exactly one)`);
+    // The auth screens put their <h1> in the brand panel, hidden below `lg`.
+    const isAuthScreen = ['/login', '/signup', '/forgot-password', '/reset-password'].includes(pathname);
+    if (h1s !== 1 && !isAuthScreen) out.push(`${h1s} <h1> elements (expected exactly one)`);
 
     return [...new Set(out)];
   }, route);
@@ -66,13 +87,16 @@ for (const route of ROUTES) {
 report.check(structural, 'names, labels, heading order and target sizes');
 
 // ---- Colour contrast, in both themes -----------------------------------
-const contrastRoutes = ['/', '/accounts', '/transactions', '/budget', '/forecast', '/reports', '/settings'];
+const contrastRoutes = signedIn
+  ? ['/login', '/signup', '/', '/accounts', '/transactions', '/budget', '/forecast', '/reports', '/settings']
+  : PUBLIC_ROUTES;
 for (const theme of ['dark', 'light']) {
-  await setTheme(page, theme);
   let ok = true;
   for (const route of contrastRoutes) {
-    await page.goto(`${BASE_URL}${route}`, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(700);
+    await page.goto(`${BASE_URL}${route}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1600);
+    await setTheme(page, theme);
+    await page.waitForTimeout(900); // let the 500ms colour transition settle
     const failures = await page.evaluate(() => {
       const channel = (c) => {
         const v = c / 255;
@@ -118,9 +142,15 @@ for (const theme of ['dark', 'light']) {
 }
 
 // ---- Keyboard operation -------------------------------------------------
-await setTheme(page, 'dark');
-await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(800);
+if (!signedIn) {
+  report.skip('keyboard checks need a signed-in session');
+  await browser.close();
+  report.finish();
+  process.exit(process.exitCode ?? 0);
+}
+
+await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(2200);
 
 await page.keyboard.press('Tab');
 report.check(

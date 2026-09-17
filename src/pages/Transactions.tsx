@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
-import { CATEGORIES, categoryById } from '@/data/categories';
 import { formatFullDate, monthKey, relativeDayLabel } from '@/lib/date';
 import { money } from '@/lib/format';
-import { useAppState, useLoading, useSettings, useStore, useToday } from '@/lib/store';
+import { useAppState, useCategories, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { TransactionRow } from '@/components/TransactionRow';
@@ -34,6 +33,7 @@ export const Transactions = () => {
   const today = useToday();
   const { maskBalances } = useSettings();
   const loading = useLoading();
+  const lookupCategory = useCategoryLookup();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
 
@@ -45,6 +45,7 @@ export const Transactions = () => {
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [addOpen, setAddOpen] = useState(params.get('new') !== null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const categories = useCategories();
 
   useEffect(() => {
     if (params.get('new') !== null) {
@@ -71,13 +72,13 @@ export const Transactions = () => {
         if (!q) return true;
         return (
           t.merchant.toLowerCase().includes(q) ||
-          categoryById(t.categoryId).name.toLowerCase().includes(q) ||
+          lookupCategory(t.categoryId).name.toLowerCase().includes(q) ||
           t.amount.toFixed(2).includes(q) ||
           (t.notes ?? '').toLowerCase().includes(q)
         );
       })
       .sort((a, b) => (a.date === b.date ? (b.time ?? '').localeCompare(a.time ?? '') : b.date.localeCompare(a.date)));
-  }, [state.transactions, query, typeFilter, accountFilter, categoryFilter, monthFilter]);
+  }, [state.transactions, query, typeFilter, accountFilter, categoryFilter, monthFilter, lookupCategory]);
 
   const groups = useMemo(() => {
     const map = new Map<string, Transaction[]>();
@@ -183,7 +184,7 @@ export const Transactions = () => {
           </SelectField>
           <SelectField label="Category" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
             <option value="all">All categories</option>
-            {CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -336,7 +337,8 @@ const TransactionDetail = ({
 }) => {
   const state = useAppState();
   const { maskBalances } = useSettings();
-  const category = categoryById(transaction.categoryId);
+  const lookupCategory = useCategoryLookup();
+  const category = lookupCategory(transaction.categoryId);
   const account = state.accounts.find((a) => a.id === transaction.accountId);
 
   const merchantHistory = state.transactions.filter(
@@ -394,7 +396,7 @@ const TransactionDetail = ({
             <div key={s.categoryId} className="flex items-center justify-between py-0.5 text-body-sm">
               <span className="flex items-center gap-2 text-text">
                 <span className={cn('h-2 w-2 rounded-full', i === 0 ? 'bg-primary-strong' : 'bg-secondary')} />
-                {categoryById(s.categoryId).name}
+                {lookupCategory(s.categoryId).name}
               </span>
               <span className="tnum font-medium text-text">{money(s.amount)}</span>
             </div>

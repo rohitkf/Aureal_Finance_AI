@@ -1,22 +1,59 @@
+/* eslint-disable react-refresh/only-export-components -- the store provider and its hooks belong together. */
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
-  useReducer,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
-import type { AppState, Budget, Goal, RecurringPayment, Settings, Transaction, VirtualAccount } from './types';
-import { DEMO_TODAY, seedState } from '@/data/seed';
-import { round2 } from './format';
+import type {
+  Account,
+  AppState,
+  Budget,
+  Category,
+  Goal,
+  RecurringPayment,
+  Settings,
+  Transaction,
+  VirtualAccount,
+} from './types';
+import { supabase } from './supabase';
+import { useAuth } from './auth';
+import { useToast } from '@/components/ui/Toast';
+import { ISO } from './date';
+import {
+  accountToRow,
+  emptyAppState,
+  goalToRow,
+  recurringToRow,
+  toAccount,
+  toBudget,
+  toCategory,
+  toGoal,
+  toNetWorthPoint,
+  toRecurring,
+  toSettings,
+  toTransaction,
+  toVirtualAccount,
+  transactionToRow,
+} from './mappers';
 
-/* eslint-disable react-refresh/only-export-components -- the store provider and its hooks belong together. */
+/** Slices that can be refetched independently after a write. */
+type Slice =
+  | 'profile'
+  | 'categories'
+  | 'accounts'
+  | 'virtualAccounts'
+  | 'recurring'
+  | 'transactions'
+  | 'budgets'
+  | 'goals'
+  | 'netWorth';
 
-const STORAGE_KEY = 'aureal.state.v1';
-
-type Action =
+export type Action =
   | { type: 'add-transaction'; transaction: Transaction }
   | { type: 'update-transaction'; transaction: Transaction }
   | { type: 'delete-transaction'; id: string }
@@ -29,200 +66,570 @@ type Action =
   | { type: 'upsert-goal'; goal: Goal }
   | { type: 'delete-goal'; id: string }
   | { type: 'contribute-goal'; id: string; amount: number }
+  | { type: 'upsert-account'; account: Account }
+  | { type: 'delete-account'; id: string }
   | { type: 'upsert-virtual'; virtual: VirtualAccount }
   | { type: 'delete-virtual'; id: string }
-  | { type: 'update-settings'; settings: Partial<Settings> }
-  | { type: 'reset'; state: AppState };
+  | { type: 'add-category'; category: Category }
+  | { type: 'update-category'; category: Category }
+  | { type: 'delete-category'; id: string }
+  | { type: 'update-settings'; settings: Partial<Settings> };
 
-/**
- * Applies a transaction to account balances. Cleared money moves immediately;
- * scheduled money does not — it only shows up in the forecast.
- */
-const applyToBalances = (state: AppState, t: Transaction, direction: 1 | -1): AppState => {
-  if (t.status === 'scheduled') return state;
-  const accounts = state.accounts.map((account) => {
-    if (account.id === t.accountId) {
-      // On a credit card, an expense increases the balance owed.
-      const isCredit = account.type === 'credit';
-      let delta = 0;
-      if (t.type === 'expense') delta = isCredit ? t.amount : -t.amount;
-      else if (t.type === 'income') delta = isCredit ? -t.amount : t.amount;
-      else delta = -t.amount; // transfer out
-      return { ...account, balance: round2(account.balance + delta * direction) };
-    }
-    if (t.type === 'transfer' && account.id === t.toAccountId) {
-      const delta = account.type === 'credit' ? -t.amount : t.amount;
-      return { ...account, balance: round2(account.balance + delta * direction) };
-    }
-    return account;
-  });
-  return { ...state, accounts };
-};
-
-const reducer = (state: AppState, action: Action): AppState => {
-  switch (action.type) {
-    case 'add-transaction': {
-      const next = applyToBalances(state, action.transaction, 1);
-      return { ...next, transactions: [action.transaction, ...next.transactions] };
-    }
-    case 'update-transaction': {
-      const previous = state.transactions.find((t) => t.id === action.transaction.id);
-      let next = state;
-      if (previous) next = applyToBalances(next, previous, -1);
-      next = applyToBalances(next, action.transaction, 1);
-      return {
-        ...next,
-        transactions: next.transactions.map((t) =>
-          t.id === action.transaction.id ? action.transaction : t,
-        ),
-      };
-    }
-    case 'delete-transaction': {
-      const previous = state.transactions.find((t) => t.id === action.id);
-      const next = previous ? applyToBalances(state, previous, -1) : state;
-      return { ...next, transactions: next.transactions.filter((t) => t.id !== action.id) };
-    }
-    case 'add-recurring':
-      return { ...state, recurring: [action.recurring, ...state.recurring] };
-    case 'update-recurring':
-      return {
-        ...state,
-        recurring: state.recurring.map((r) => (r.id === action.recurring.id ? action.recurring : r)),
-      };
-    case 'delete-recurring':
-      return {
-        ...state,
-        recurring: state.recurring.filter((r) => r.id !== action.id),
-        // Deleting a rule must not delete history: past transactions stay, they
-        // simply stop being linked to a schedule.
-        transactions: state.transactions
-          .filter((t) => !(t.recurringId === action.id && t.status === 'scheduled'))
-          .map((t) => (t.recurringId === action.id ? { ...t, recurringId: undefined } : t)),
-      };
-    case 'set-recurring-status':
-      return {
-        ...state,
-        recurring: state.recurring.map((r) => (r.id === action.id ? { ...r, status: action.status } : r)),
-      };
-    case 'upsert-budget': {
-      const exists = state.budgets.some(
-        (b) => b.month === action.budget.month && b.categoryId === action.budget.categoryId,
-      );
-      return {
-        ...state,
-        budgets: exists
-          ? state.budgets.map((b) =>
-              b.month === action.budget.month && b.categoryId === action.budget.categoryId
-                ? action.budget
-                : b,
-            )
-          : [...state.budgets, action.budget],
-      };
-    }
-    case 'delete-budget':
-      return {
-        ...state,
-        budgets: state.budgets.filter(
-          (b) => !(b.month === action.month && b.categoryId === action.categoryId),
-        ),
-      };
-    case 'upsert-goal': {
-      const exists = state.goals.some((g) => g.id === action.goal.id);
-      return {
-        ...state,
-        goals: exists ? state.goals.map((g) => (g.id === action.goal.id ? action.goal : g)) : [...state.goals, action.goal],
-      };
-    }
-    case 'delete-goal':
-      return { ...state, goals: state.goals.filter((g) => g.id !== action.id) };
-    case 'contribute-goal':
-      return {
-        ...state,
-        goals: state.goals.map((g) =>
-          g.id === action.id ? { ...g, saved: round2(Math.min(g.target, g.saved + action.amount)) } : g,
-        ),
-      };
-    case 'upsert-virtual': {
-      const exists = state.virtualAccounts.some((v) => v.id === action.virtual.id);
-      return {
-        ...state,
-        virtualAccounts: exists
-          ? state.virtualAccounts.map((v) => (v.id === action.virtual.id ? action.virtual : v))
-          : [...state.virtualAccounts, action.virtual],
-      };
-    }
-    case 'delete-virtual':
-      return { ...state, virtualAccounts: state.virtualAccounts.filter((v) => v.id !== action.id) };
-    case 'update-settings':
-      return { ...state, settings: { ...state.settings, ...action.settings } };
-    case 'reset':
-      return action.state;
-    default:
-      return state;
-  }
-};
-
-const load = (): AppState => {
-  if (typeof window === 'undefined') return seedState();
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seedState();
-    const parsed = JSON.parse(raw) as AppState;
-    // Guard against a stale or partial payload from an older build.
-    if (!parsed.accounts || !parsed.settings) return seedState();
-    return parsed;
-  } catch {
-    return seedState();
-  }
+const DEFAULT_SETTINGS: Settings = {
+  currency: 'GBP',
+  locale: 'en-GB',
+  minimumBalance: 0,
+  userName: 'You',
+  maskBalances: false,
+  theme: 'system',
 };
 
 interface StoreValue {
   state: AppState;
+  /** Fire-and-forget. Failures surface as a toast; the UI stays truthful. */
   dispatch: (action: Action) => void;
-  /** The app's reference "today". Pinned for the demo dataset. */
+  /** Today, as a plain YYYY-MM-DD string. */
   today: string;
-  resetToDemo: () => void;
-  clearAll: () => void;
+  loading: boolean;
+  error: string | null;
+  reload: () => Promise<void>;
+  clearAll: () => Promise<void>;
+  loadSampleData: () => Promise<void>;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
 
 export const StoreProvider = ({ children }: { children: ReactNode }) => {
-  const [state, dispatch] = useReducer(reducer, undefined, load);
+  const { user } = useAuth();
+  const toast = useToast();
+  const [state, setState] = useState<AppState>(() => emptyAppState(DEFAULT_SETTINGS));
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  // Guards against a slow response from a previous user landing in state.
+  const userRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // Storage can be full or blocked (private mode) — the app still works.
-    }
-  }, [state]);
+  /* ---------------------------------------------------------------- */
+  /* Reading                                                           */
+  /* ---------------------------------------------------------------- */
 
-  const resetToDemo = useCallback(() => dispatch({ type: 'reset', state: seedState() }), []);
-  const clearAll = useCallback(
-    () =>
-      dispatch({
-        type: 'reset',
-        state: {
-          ...seedState(),
-          transactions: [],
-          recurring: [],
-          budgets: [],
-          goals: [],
-          virtualAccounts: [],
-          accounts: seedState().accounts.map((a) => ({ ...a, balance: 0 })),
-        },
-      }),
+  const fetchSlices = useCallback(
+    async (slices: Slice[]): Promise<Partial<AppState>> => {
+      const uid = userRef.current;
+      if (!uid) return {};
+
+      const wanted = new Set(slices);
+      const jobs: Array<PromiseLike<void>> = [];
+      const next: Partial<AppState> = {};
+
+      if (wanted.has('profile')) {
+        jobs.push(
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', uid)
+            .maybeSingle()
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              if (data) next.settings = toSettings(data);
+            }),
+        );
+      }
+      if (wanted.has('categories')) {
+        jobs.push(
+          supabase
+            .from('categories')
+            .select('*')
+            .eq('archived', false)
+            .order('sort_order')
+            .order('name')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.categories = (data ?? []).map(toCategory);
+            }),
+        );
+      }
+      if (wanted.has('accounts')) {
+        jobs.push(
+          supabase
+            .from('accounts')
+            .select('*')
+            .order('sort_order')
+            .order('created_at')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.accounts = (data ?? []).map(toAccount);
+            }),
+        );
+      }
+      if (wanted.has('virtualAccounts')) {
+        jobs.push(
+          supabase
+            .from('virtual_accounts')
+            .select('*')
+            .order('sort_order')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.virtualAccounts = (data ?? []).map(toVirtualAccount);
+            }),
+        );
+      }
+      if (wanted.has('recurring')) {
+        jobs.push(
+          supabase
+            .from('recurring_payments')
+            .select('*')
+            .order('amount', { ascending: false })
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.recurring = (data ?? []).map(toRecurring);
+            }),
+        );
+      }
+      if (wanted.has('transactions')) {
+        jobs.push(
+          supabase
+            .from('transactions')
+            .select('*, transaction_splits(*)')
+            .order('occurred_on', { ascending: false })
+            .order('occurred_at', { ascending: false, nullsFirst: false })
+            .limit(2000)
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.transactions = (data ?? []).map(toTransaction);
+            }),
+        );
+      }
+      if (wanted.has('budgets')) {
+        jobs.push(
+          supabase
+            .from('budgets')
+            .select('*')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.budgets = (data ?? []).map(toBudget);
+            }),
+        );
+      }
+      if (wanted.has('goals')) {
+        jobs.push(
+          supabase
+            .from('goals')
+            .select('*')
+            .order('created_at')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.goals = (data ?? []).map(toGoal);
+            }),
+        );
+      }
+      if (wanted.has('netWorth')) {
+        jobs.push(
+          supabase
+            .from('net_worth_snapshots')
+            .select('*')
+            .order('month')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.netWorthHistory = (data ?? []).map(toNetWorthPoint);
+            }),
+        );
+      }
+
+      await Promise.all(jobs);
+      return next;
+    },
     [],
   );
 
+  const ALL: Slice[] = useMemo(
+    () => [
+      'profile',
+      'categories',
+      'accounts',
+      'virtualAccounts',
+      'recurring',
+      'transactions',
+      'budgets',
+      'goals',
+      'netWorth',
+    ],
+    [],
+  );
+
+  const reload = useCallback(async () => {
+    if (!userRef.current) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await fetchSlices(ALL);
+      if (!userRef.current) return;
+      setState((prev) => ({ ...prev, ...next }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load your data.');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchSlices, ALL]);
+
+  // Load on sign-in; clear completely on sign-out so nothing leaks between users.
+  useEffect(() => {
+    userRef.current = user?.id ?? null;
+    if (!user) {
+      setState(emptyAppState(DEFAULT_SETTINGS));
+      setLoading(false);
+      return;
+    }
+    void reload();
+  }, [user, reload]);
+
+  const refresh = useCallback(
+    async (slices: Slice[]) => {
+      const next = await fetchSlices(slices);
+      if (!userRef.current) return;
+      setState((prev) => ({ ...prev, ...next }));
+    },
+    [fetchSlices],
+  );
+
+  /* ---------------------------------------------------------------- */
+  /* Writing                                                           */
+  /* ---------------------------------------------------------------- */
+
+  const run = useCallback(
+    (label: string, work: () => Promise<Slice[]>) => {
+      void (async () => {
+        try {
+          const slices = await work();
+          await refresh(slices);
+        } catch (e) {
+          const message = e instanceof Error ? e.message : 'Something went wrong.';
+          toast({ tone: 'danger', title: `Couldn’t ${label}`, description: message });
+          // Pull the server's version back so the screen never shows a change
+          // that did not actually happen.
+          void refresh(ALL);
+        }
+      })();
+    },
+    [refresh, toast, ALL],
+  );
+
+  const dispatch = useCallback(
+    (action: Action) => {
+      const check = <T,>({ error: e, data }: { error: unknown; data?: T }): T | undefined => {
+        if (e) throw e instanceof Error ? e : new Error(String((e as { message?: string }).message ?? e));
+        return data;
+      };
+
+      switch (action.type) {
+        case 'add-transaction':
+          run('save that transaction', async () => {
+            const t = action.transaction;
+            check(
+              await supabase.from('transactions').insert({ id: t.id, ...transactionToRow(t) }),
+            );
+            if (t.splits?.length) {
+              check(
+                await supabase.from('transaction_splits').insert(
+                  t.splits.map((s) => ({
+                    transaction_id: t.id,
+                    category_id: s.categoryId || null,
+                    amount: s.amount,
+                  })),
+                ),
+              );
+            }
+            return ['transactions', 'accounts'];
+          });
+          break;
+
+        case 'update-transaction':
+          run('update that transaction', async () => {
+            const t = action.transaction;
+            check(await supabase.from('transactions').update(transactionToRow(t)).eq('id', t.id));
+            check(await supabase.from('transaction_splits').delete().eq('transaction_id', t.id));
+            if (t.splits?.length) {
+              check(
+                await supabase.from('transaction_splits').insert(
+                  t.splits.map((s) => ({
+                    transaction_id: t.id,
+                    category_id: s.categoryId || null,
+                    amount: s.amount,
+                  })),
+                ),
+              );
+            }
+            return ['transactions', 'accounts'];
+          });
+          break;
+
+        case 'delete-transaction':
+          run('delete that transaction', async () => {
+            check(await supabase.from('transactions').delete().eq('id', action.id));
+            return ['transactions', 'accounts'];
+          });
+          break;
+
+        case 'add-recurring':
+          run('save that recurring payment', async () => {
+            const r = action.recurring;
+            check(
+              await supabase.from('recurring_payments').insert({ id: r.id, ...recurringToRow(r) }),
+            );
+            return ['recurring'];
+          });
+          break;
+
+        case 'update-recurring':
+          run('update that recurring payment', async () => {
+            const r = action.recurring;
+            check(await supabase.from('recurring_payments').update(recurringToRow(r)).eq('id', r.id));
+            return ['recurring'];
+          });
+          break;
+
+        case 'delete-recurring':
+          run('delete that recurring payment', async () => {
+            // Scheduled instances go with the rule; history stays, simply
+            // unlinked (the foreign key is ON DELETE SET NULL).
+            check(
+              await supabase
+                .from('transactions')
+                .delete()
+                .eq('recurring_id', action.id)
+                .eq('status', 'scheduled'),
+            );
+            check(await supabase.from('recurring_payments').delete().eq('id', action.id));
+            return ['recurring', 'transactions', 'accounts'];
+          });
+          break;
+
+        case 'set-recurring-status':
+          run('update that recurring payment', async () => {
+            check(
+              await supabase
+                .from('recurring_payments')
+                .update({ status: action.status })
+                .eq('id', action.id),
+            );
+            return ['recurring'];
+          });
+          break;
+
+        case 'upsert-budget':
+          run('save that budget', async () => {
+            const b = action.budget;
+            check(
+              await supabase.from('budgets').upsert(
+                { month: b.month, category_id: b.categoryId, limit_amount: b.limit },
+                { onConflict: 'user_id,month,category_id' },
+              ),
+            );
+            return ['budgets'];
+          });
+          break;
+
+        case 'delete-budget':
+          run('remove that budget', async () => {
+            check(
+              await supabase
+                .from('budgets')
+                .delete()
+                .eq('month', action.month)
+                .eq('category_id', action.categoryId),
+            );
+            return ['budgets'];
+          });
+          break;
+
+        case 'upsert-goal':
+          run('save that goal', async () => {
+            const g = action.goal;
+            check(await supabase.from('goals').upsert({ id: g.id, ...goalToRow(g) }));
+            return ['goals'];
+          });
+          break;
+
+        case 'delete-goal':
+          run('delete that goal', async () => {
+            check(await supabase.from('goals').delete().eq('id', action.id));
+            return ['goals'];
+          });
+          break;
+
+        case 'contribute-goal':
+          run('add that contribution', async () => {
+            const goal = state.goals.find((g) => g.id === action.id);
+            if (!goal) return ['goals'];
+            const saved = Math.min(goal.target, goal.saved + action.amount);
+            check(await supabase.from('goals').update({ saved }).eq('id', action.id));
+            return ['goals'];
+          });
+          break;
+
+        case 'upsert-account':
+          run('save that account', async () => {
+            const a = action.account;
+            const exists = state.accounts.some((x) => x.id === a.id);
+            if (exists) {
+              // Balance is maintained by the database from transactions, so an
+              // edit must not overwrite it.
+              const row = accountToRow(a);
+              delete (row as Partial<typeof row>).balance;
+              check(await supabase.from('accounts').update(row).eq('id', a.id));
+            } else {
+              check(await supabase.from('accounts').insert({ id: a.id, ...accountToRow(a) }));
+            }
+            return ['accounts'];
+          });
+          break;
+
+        case 'delete-account':
+          run('delete that account', async () => {
+            check(await supabase.from('accounts').delete().eq('id', action.id));
+            return ['accounts', 'transactions', 'virtualAccounts'];
+          });
+          break;
+
+        case 'upsert-virtual':
+          run('save that allocation', async () => {
+            const v = action.virtual;
+            check(
+              await supabase.from('virtual_accounts').upsert({
+                id: v.id,
+                parent_account_id: v.parentAccountId,
+                name: v.name,
+                description: v.description,
+                allocated: v.allocated,
+                target: v.target ?? null,
+                target_date: v.targetDate ?? null,
+                icon: v.icon,
+                locked: v.locked ?? false,
+              }),
+            );
+            return ['virtualAccounts'];
+          });
+          break;
+
+        case 'delete-virtual':
+          run('remove that allocation', async () => {
+            check(await supabase.from('virtual_accounts').delete().eq('id', action.id));
+            return ['virtualAccounts'];
+          });
+          break;
+
+        case 'add-category':
+          run('add that category', async () => {
+            const c = action.category;
+            check(
+              await supabase.from('categories').insert({
+                id: c.id,
+                name: c.name,
+                kind: c.kind,
+                icon: c.icon,
+                accent: c.accent,
+                sort_order: 500,
+              }),
+            );
+            return ['categories'];
+          });
+          break;
+
+        case 'update-category':
+          run('update that category', async () => {
+            const c = action.category;
+            check(
+              await supabase
+                .from('categories')
+                .update({ name: c.name, icon: c.icon, accent: c.accent })
+                .eq('id', c.id),
+            );
+            return ['categories'];
+          });
+          break;
+
+        case 'delete-category':
+          run('delete that category', async () => {
+            // Archive rather than delete: transactions filed against it keep
+            // their history, they simply stop offering it for new entries.
+            check(await supabase.from('categories').update({ archived: true }).eq('id', action.id));
+            return ['categories'];
+          });
+          break;
+
+        case 'update-settings':
+          run('save that setting', async () => {
+            const s = action.settings;
+            const patch: Record<string, unknown> = {};
+            if (s.userName !== undefined) patch.display_name = s.userName;
+            if (s.minimumBalance !== undefined) patch.minimum_balance = s.minimumBalance;
+            if (s.maskBalances !== undefined) patch.mask_balances = s.maskBalances;
+            if (s.theme !== undefined) patch.theme = s.theme;
+            if (s.locale !== undefined) patch.locale = s.locale;
+            // Reflect it immediately — these are preferences, not money.
+            setState((prev) => ({ ...prev, settings: { ...prev.settings, ...s } }));
+            if (Object.keys(patch).length > 0) {
+              check(await supabase.from('profiles').update(patch).eq('id', userRef.current!));
+            }
+            return [];
+          });
+          break;
+
+        default:
+          break;
+      }
+    },
+    [run, state.goals, state.accounts],
+  );
+
+  /* ---------------------------------------------------------------- */
+  /* Bulk operations                                                   */
+  /* ---------------------------------------------------------------- */
+
+  const clearAll = useCallback(async () => {
+    const uid = userRef.current;
+    if (!uid) return;
+    // Order matters only where there is no cascade to rely on.
+    for (const table of [
+      'transactions',
+      'recurring_payments',
+      'budgets',
+      'goals',
+      'virtual_accounts',
+      'net_worth_snapshots',
+      'accounts',
+    ] as const) {
+      const { error: e } = await supabase.from(table).delete().eq('user_id', uid);
+      if (e) throw new Error(e.message);
+    }
+    await reload();
+  }, [reload]);
+
+  const loadSampleData = useCallback(async () => {
+    const { seedSampleData } = await import('@/data/sample');
+    await seedSampleData();
+    await reload();
+  }, [reload]);
+
   const value = useMemo<StoreValue>(
-    () => ({ state, dispatch, today: DEMO_TODAY, resetToDemo, clearAll }),
-    [state, resetToDemo, clearAll],
+    () => ({
+      state,
+      dispatch,
+      today: ISO(new Date()),
+      loading,
+      error,
+      reload,
+      clearAll,
+      loadSampleData,
+    }),
+    [state, dispatch, loading, error, reload, clearAll, loadSampleData],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 };
+
+/* ------------------------------------------------------------------ */
+/* Accessors used across the UI                                        */
+/* ------------------------------------------------------------------ */
 
 export const useStore = (): StoreValue => {
   const ctx = useContext(StoreContext);
@@ -230,7 +637,6 @@ export const useStore = (): StoreValue => {
   return ctx;
 };
 
-/** Convenience accessors used all over the UI. */
 export const useAppState = (): AppState => useStore().state;
 export const useToday = (): string => useStore().today;
 export const useSettings = (): Settings => useStore().state.settings;
@@ -240,15 +646,39 @@ export const useAccount = (id: string | undefined) => {
   return state.accounts.find((a) => a.id === id);
 };
 
-/** Simulates a network fetch so skeleton states are real, not decorative. */
-export const useLoading = (ms = 420): boolean => {
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const id = window.setTimeout(() => setLoading(false), ms);
-    return () => window.clearTimeout(id);
-  }, [ms]);
-  return loading;
+/** True while the first load for this user is in flight. Drives the skeletons. */
+export const useLoading = (): boolean => useStore().loading;
+
+/**
+ * A lookup for categories, safe to call inside `useMemo` and `map` where a
+ * hook could not go. Falls back to a readable placeholder for a category that
+ * has since been archived or removed.
+ */
+export const useCategoryLookup = (): ((id: string) => Category) => {
+  const { categories } = useAppState();
+  return useMemo(() => {
+    const byId = new Map(categories.map((c) => [c.id, c]));
+    return (id: string): Category =>
+      byId.get(id) ?? { id, name: 'Uncategorised', kind: 'expense', icon: 'box', accent: 'neutral' };
+  }, [categories]);
 };
 
-export const newId = (prefix: string): string =>
-  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+/** Categories of a given kind, in display order. */
+export const useCategories = (kind?: Category['kind']): Category[] => {
+  const { categories } = useAppState();
+  return useMemo(
+    () => (kind ? categories.filter((c) => c.kind === kind) : categories),
+    [categories, kind],
+  );
+};
+
+export const newId = (): string =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : // Fallback for older browsers; still a valid v4 shape.
+      '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) =>
+        (
+          Number(c) ^
+          (crypto.getRandomValues(new Uint8Array(1))[0]! & (15 >> (Number(c) / 4)))
+        ).toString(16),
+      );

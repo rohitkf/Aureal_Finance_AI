@@ -238,7 +238,9 @@ export const AppShell = () => {
                   online ? 'bg-success shadow-[0_0_8px_rgb(var(--success)/0.6)]' : 'bg-warning',
                 )}
               />
-              {online ? '3 banks synced' : 'Offline — last sync'}
+              {online
+                ? `${state.accounts.length} account${state.accounts.length === 1 ? '' : 's'}`
+                : 'Offline — showing saved data'}
             </p>
           </div>
 

@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { categoryById } from '@/data/categories';
 import { formatMediumDate } from '@/lib/date';
 import { money } from '@/lib/format';
 import { monthlyEquivalent } from '@/lib/recurrence';
-import { useAppState } from '@/lib/store';
+import { useAppState, useCategoryLookup } from '@/lib/store';
 import { cn } from '@/lib/cn';
 import { MORE_NAV, PRIMARY_NAV } from './nav';
 import { CategoryIcon } from './CategoryIcon';
@@ -27,6 +26,7 @@ interface Result {
  */
 export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   const state = useAppState();
+  const lookupCategory = useCategoryLookup();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -69,12 +69,12 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
 
     for (const t of state.transactions) {
       if (out.length > 40) break;
-      if (!t.merchant.toLowerCase().includes(q) && !categoryById(t.categoryId).name.toLowerCase().includes(q)) continue;
+      if (!t.merchant.toLowerCase().includes(q) && !lookupCategory(t.categoryId).name.toLowerCase().includes(q)) continue;
       out.push({
         id: `t-${t.id}`,
         group: 'Transactions',
         title: t.merchant,
-        subtitle: `${categoryById(t.categoryId).name} · ${formatMediumDate(t.date)}`,
+        subtitle: `${lookupCategory(t.categoryId).name} · ${formatMediumDate(t.date)}`,
         amount: t.type === 'income' ? t.amount : -t.amount,
         to: `/transactions?q=${encodeURIComponent(t.merchant)}`,
         categoryId: t.categoryId,
@@ -130,7 +130,7 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
       seen.add(key);
       return true;
     });
-  }, [query, state]);
+  }, [query, state, lookupCategory]);
 
   useEffect(() => setCursor(0), [query]);
 

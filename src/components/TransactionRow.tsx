@@ -1,8 +1,7 @@
 import { cn } from '@/lib/cn';
-import { categoryById } from '@/data/categories';
 import { relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
-import { useAppState, useSettings, useToday } from '@/lib/store';
+import { useAppState, useCategoryLookup, useSettings, useToday } from '@/lib/store';
 import type { Transaction } from '@/lib/types';
 import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './ui/Icon';
@@ -24,7 +23,8 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
   const { accounts } = useAppState();
   const { maskBalances } = useSettings();
   const today = useToday();
-  const category = categoryById(transaction.categoryId);
+  const lookupCategory = useCategoryLookup();
+  const category = lookupCategory(transaction.categoryId);
   const account = accounts.find((a) => a.id === transaction.accountId);
   const scheduled = transaction.status === 'scheduled';
 

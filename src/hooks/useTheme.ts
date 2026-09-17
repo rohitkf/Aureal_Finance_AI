@@ -20,8 +20,15 @@ export const useTheme = () => {
     root.classList.toggle('dark', resolved === 'dark');
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', resolved === 'dark' ? '#051424' : '#f4f7fc');
-  }, [resolved]);
+      ?.setAttribute('content', resolved === 'dark' ? '#060709' : '#f2f3f5');
+    try {
+      // Mirrored so the boot script in index.html can apply it before paint,
+      // including on the signed-out screens where no profile is loaded.
+      window.localStorage.setItem('aureal.theme', preference);
+    } catch {
+      // Storage can be blocked; the theme still applies for this session.
+    }
+  }, [resolved, preference]);
 
   useEffect(() => {
     if (preference !== 'system') return;

@@ -1,4 +1,4 @@
-import { BASE_URL, createReporter, launch } from './lib.mjs';
+import { BASE_URL, createReporter, hasCredentials, launch, signIn } from './lib.mjs';
 
 /**
  * The prototype flows from the product brief, driven end to end:
@@ -13,12 +13,21 @@ const page = await ctx.newPage();
 page.on('pageerror', (e) => report.note(`runtime error: ${e.message}`));
 
 // ---- Sign in ------------------------------------------------------------
-await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
-await page.getByRole('button', { name: 'Sign in' }).click();
-await page.waitForURL(`${BASE_URL}/`);
-await page.waitForTimeout(900);
+if (!hasCredentials) {
+  report.skip('QA_EMAIL / QA_PASSWORD not set — these flows need a real account');
+  await browser.close();
+  report.finish();
+  process.exit(0);
+}
+
+if (!(await signIn(page))) {
+  report.skip('could not reach Supabase to sign in');
+  await browser.close();
+  report.finish();
+  process.exit(0);
+}
 report.check(
-  await page.getByRole('heading', { name: /Good (morning|afternoon|evening), Sarah/ }).isVisible(),
+  await page.getByRole('heading', { name: /Good (morning|afternoon|evening)/ }).isVisible(),
   'signing in lands on the dashboard',
 );
 

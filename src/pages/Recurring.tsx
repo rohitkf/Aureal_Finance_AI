@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
-import { CATEGORIES } from '@/data/categories';
 import { formatMediumDate, relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
 import { FREQUENCY_LABELS, monthlyEquivalent, previewOccurrences } from '@/lib/recurrence';
 import { monthlyCommitments } from '@/lib/finance';
-import { newId, useAppState, useLoading, useSettings, useStore, useToday } from '@/lib/store';
+import { newId, useAppState, useCategories, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
@@ -49,7 +48,7 @@ const emptyDraft = (today: string, accountId: string): DraftRule => ({
   name: '',
   amount: '',
   direction: 'out',
-  categoryId: 'utilities',
+  categoryId: '',
   accountId,
   frequency: 'monthly',
   customIntervalDays: '30',
@@ -63,7 +62,7 @@ const emptyDraft = (today: string, accountId: string): DraftRule => ({
 });
 
 const toRule = (draft: DraftRule): RecurringPayment => ({
-  id: draft.id ?? newId('rec'),
+  id: draft.id ?? newId(),
   name: draft.name.trim() || 'Recurring payment',
   amount: Math.round((Number.parseFloat(draft.amount) || 0) * 100) / 100,
   direction: draft.direction,
@@ -342,6 +341,7 @@ const RecurringForm = ({
   today: string;
   accounts: ReturnType<typeof useAppState>['accounts'];
 }) => {
+  const categories = useCategories();
   const preview = useMemo(() => {
     if (!draft) return [];
     const rule = toRule(draft);
@@ -380,7 +380,13 @@ const RecurringForm = ({
         <SegmentedControl
           label="Direction"
           value={draft.direction}
-          onChange={(direction) => setDraft({ ...draft, direction, categoryId: direction === 'in' ? 'salary' : 'utilities' })}
+          onChange={(direction) =>
+            setDraft({
+              ...draft,
+              direction,
+              categoryId: categories.find((c) => c.kind === (direction === 'in' ? 'income' : 'expense'))?.id ?? '',
+            })
+          }
           options={[
             { value: 'out', label: 'Money out' },
             { value: 'in', label: 'Money in' },
@@ -400,7 +406,7 @@ const RecurringForm = ({
             value={draft.categoryId}
             onChange={(e) => setDraft({ ...draft, categoryId: e.target.value })}
           >
-            {CATEGORIES.filter((c) => (draft.direction === 'in' ? c.kind === 'income' : c.kind === 'expense')).map((c) => (
+            {categories.filter((c) => (draft.direction === 'in' ? c.kind === 'income' : c.kind === 'expense')).map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>

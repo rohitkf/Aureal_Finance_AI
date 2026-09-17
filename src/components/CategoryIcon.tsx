@@ -1,5 +1,5 @@
 import { cn } from '@/lib/cn';
-import { categoryById } from '@/data/categories';
+import { useCategoryLookup } from '@/lib/store';
 import { Icon, type IconName } from './ui/Icon';
 
 const ACCENTS: Record<string, string> = {
@@ -25,7 +25,8 @@ export const CategoryIcon = ({
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }) => {
-  const category = categoryById(categoryId);
+  const lookupCategory = useCategoryLookup();
+  const category = lookupCategory(categoryId);
   const box = { sm: 'h-8 w-8 rounded-lg', md: 'h-10 w-10 rounded-xl', lg: 'h-12 w-12 rounded-xl' }[size];
   const icon = { sm: 15, md: 18, lg: 22 }[size];
 

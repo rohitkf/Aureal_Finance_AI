@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { categoryById } from '@/data/categories';
 import {
   budgetProgress,
   monthIncome,
@@ -15,7 +14,7 @@ import {
 import { formatMonthYear, formatShortMonth, monthKey } from '@/lib/date';
 import { money, percent } from '@/lib/format';
 import { monthlyEquivalent } from '@/lib/recurrence';
-import { useAppState, useLoading, useSettings, useToday } from '@/lib/store';
+import { useAppState, useCategoryLookup, useLoading, useSettings, useToday } from '@/lib/store';
 import { DonutChart } from '@/components/charts/DonutChart';
 import { IncomeExpenseChart } from '@/components/charts/BarChart';
 import { NetWorthChart } from '@/components/charts/NetWorthChart';
@@ -33,6 +32,7 @@ export const Reports = () => {
   const today = useToday();
   const { maskBalances } = useSettings();
   const loading = useLoading();
+  const lookupCategory = useCategoryLookup();
   const [range, setRange] = useState<Range>('6');
 
   const month = monthKey(today);
@@ -69,12 +69,12 @@ export const Reports = () => {
 
   const categorySlices = useMemo(() => {
     const spend = [...spendByCategory(state, month).entries()].sort((a, b) => b[1] - a[1]);
-    const top = spend.slice(0, 5).map(([id, value]) => ({ id, label: categoryById(id).name, value }));
+    const top = spend.slice(0, 5).map(([id, value]) => ({ id, label: lookupCategory(id).name, value }));
     // Everything past the top five becomes one "Other" slice, so the ring
     // always sums to the total in its centre.
     const rest = spend.slice(5).reduce((sum, [, value]) => sum + value, 0);
     return rest > 0 ? [...top, { id: 'other', label: 'Everything else', value: rest }] : top;
-  }, [state, month]);
+  }, [state, month, lookupCategory]);
 
   const budgets = useMemo(() => budgetProgress(state, month), [state, month]);
   const netWorthSeries = useMemo(() => state.netWorthHistory.slice(-Number(range)), [state.netWorthHistory, range]);
@@ -186,7 +186,7 @@ export const Reports = () => {
                   {budgets.map((b) => (
                     <li key={b.categoryId}>
                       <div className="flex items-baseline justify-between text-body-sm">
-                        <span className="text-text">{categoryById(b.categoryId).name}</span>
+                        <span className="text-text">{lookupCategory(b.categoryId).name}</span>
                         <span className="tnum text-muted">
                           {money(b.spent, { compact: true })} / {money(b.limit, { compact: true })}
                         </span>
@@ -197,7 +197,7 @@ export const Reports = () => {
                         max={b.limit}
                         size="sm"
                         tone={b.state === 'over' ? 'danger' : b.state === 'close' ? 'warning' : 'success'}
-                        label={`${categoryById(b.categoryId).name}: ${money(b.spent)} of ${money(b.limit)}`}
+                        label={`${lookupCategory(b.categoryId).name}: ${money(b.spent)} of ${money(b.limit)}`}
                       />
                     </li>
                   ))}
