@@ -1,11 +1,13 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { UpdateGate } from '@/components/UpdateGate';
 import { ToastProvider } from '@/components/ui/Toast';
+import { Button } from '@/components/ui/Button';
+import { ErrorState } from '@/components/ui/States';
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { StoreProvider } from '@/lib/store';
+import { StoreProvider, useStore } from '@/lib/store';
 import { useTheme } from '@/hooks/useTheme';
 import { Logo } from '@/components/Logo';
 import { AccountDetail } from '@/pages/AccountDetail';
@@ -43,6 +45,48 @@ const RequireAuth = ({ children }: { children: ReactNode }) => {
   return <>{children}</>;
 };
 
+/**
+ * Stands between a failed load and the screens.
+ *
+ * Without it, a load that failed left the store holding its empty starting
+ * state, and every screen read that as fact — telling somebody with a full
+ * account that they had nothing, and inviting them to add their first
+ * transaction. Refreshing appeared to "fix" it because the second attempt
+ * succeeded.
+ *
+ * A failure is now a failure: it says so, and offers to try again.
+ */
+export const StoreGate = ({ children }: { children: ReactNode }) => {
+  const { error, loaded, reload } = useStore();
+  const [retrying, setRetrying] = useState(false);
+
+  if (loaded || !error) return <>{children}</>;
+
+  return (
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-6 bg-background p-6">
+      <div className="plate w-full max-w-md p-2">
+        <ErrorState
+          title="We couldn’t load your data"
+          description={`${error} Your account is untouched — nothing has been changed or lost.`}
+        />
+        <div className="flex justify-center pb-6">
+          <Button
+            variant="primary"
+            icon="sync"
+            disabled={retrying}
+            onClick={() => {
+              setRetrying(true);
+              void reload().finally(() => setRetrying(false));
+            }}
+          >
+            {retrying ? 'Trying again…' : 'Try again'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /** Applies the stored theme. Must sit inside the store. */
 const ThemeGate = ({ children }: { children: ReactNode }) => {
   useTheme();
@@ -52,7 +96,8 @@ const ThemeGate = ({ children }: { children: ReactNode }) => {
 /** Everything behind the sign-in wall. */
 const ProtectedApp = () => (
   <StoreProvider>
-    <ThemeGate>
+    <StoreGate>
+      <ThemeGate>
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<Dashboard />} />
@@ -70,7 +115,8 @@ const ProtectedApp = () => (
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
-    </ThemeGate>
+      </ThemeGate>
+    </StoreGate>
   </StoreProvider>
 );
 

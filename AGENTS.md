@@ -240,6 +240,17 @@ Each of these has already cost real time here.
   SPA fallback, so without it every route except `/` returns 404 — including
   `/login` and `/reset-password`, where the auth emails land. `nginx.conf`
   carries the same rule for the container.
+- **An empty screen must never be the app's way of saying "that failed".**
+  The store starts on `emptyAppState`, so until a load has *succeeded* its
+  state is indistinguishable from an account with nothing in it. Screens decide
+  between a skeleton and an empty state on `loading` alone, so `loading` means
+  **"too early to draw conclusions"**, not "a request is in flight" — it stays
+  true while nothing has loaded and nothing has failed. A failed load is shown
+  by `StoreGate`, with a retry. A signed-in caller always has a profile row
+  (`handle_new_user` creates it in the same transaction as the auth user), so
+  getting none back is row-level security returning an empty set to an
+  unauthenticated request, and is treated as the failure it is rather than as
+  an empty account.
 - **Supabase's built-in email sender delivers only to project members** and
   is rate-limited to a couple an hour. It looks like it works because it
   works for you. Real sign-ups need custom SMTP — SETUP.md §5.
