@@ -155,8 +155,16 @@ holding.
   and set `search_path = ''`.
 - After applying a migration by hand, run `notify pgrst, 'reload schema';` so
   PostgREST sees it at once rather than whenever its cache turns over.
-- Add assertions to `supabase/tests/` for anything a trigger does. CI applies
-  the migrations to a bare Postgres and runs them.
+- Add assertions to `supabase/tests/` for anything a trigger or a policy does.
+  CI applies the migrations to a bare Postgres and runs every file there.
+  `row_level_security.sql` becomes a real signed-in user — `set local role
+  authenticated` plus `set local request.jwt.claims` — because the stubbed
+  `auth.uid()` reads the claim exactly as Supabase's does. **A policy test run
+  as the table owner passes vacuously**, since RLS does not apply to the owner;
+  the same is true if the grants are missing, where it fails on "permission
+  denied" instead and reads like the policy working. Both are guarded, and
+  every assertion there has been checked by deliberately breaking the policy it
+  covers and watching it fail.
 
 ## 7. Deploying is not merging
 

@@ -230,7 +230,7 @@ npm test              # 112 tests
 | --- | --- |
 | `src/lib/__tests__/` | The finance engine, the nine recurrence frequencies, date arithmetic across both British Summer Time transitions, formatting, and the Postgres↔domain mappers — including numerics arriving as strings, the case that makes every total quietly wrong rather than visibly broken |
 | `src/components/**/__tests__/` | The dialog's focus behaviour, and Add-transaction driven end to end through the real component |
-| `supabase/tests/` | What only the database can answer: the balance trigger across insert, edit, delete, transfers and credit inversion; scheduled rows moving nothing until they clear; the check constraints; and the cascade when a user is deleted |
+| `supabase/tests/` | What only the database can answer. **Balances**: the trigger across insert, edit, delete, transfers and credit inversion; scheduled rows moving nothing until they clear; the check constraints; the cascade when a user is deleted. **Row-level security**: two users, impersonated for real, each proving they can see and touch only their own rows — and that the `SECURITY DEFINER` balance function stays un-callable over RPC |
 
 The database tests run in CI against a bare Postgres 17, with
 `supabase/_local_test/` standing in for the `auth` schema and the PostgREST
