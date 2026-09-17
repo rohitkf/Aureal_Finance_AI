@@ -91,12 +91,22 @@ interface StoreValue {
   dispatch: (action: Action) => void;
   /** Today, as a plain YYYY-MM-DD string. */
   today: string;
+  /** Too early to draw conclusions from `state` — not merely "fetching". */
   loading: boolean;
+  /** A load has succeeded at least once, so `state` reflects the account. */
+  loaded: boolean;
   error: string | null;
   reload: () => Promise<void>;
   clearAll: () => Promise<void>;
   loadSampleData: () => Promise<void>;
 }
+
+/**
+ * Waits between load attempts. The first load happens moments after signing
+ * in, which is exactly when a token can still be settling, so one blip should
+ * not cost the person a manual refresh.
+ */
+const BACKOFF_MS = [400, 1200];
 
 const StoreContext = createContext<StoreValue | null>(null);
 
@@ -105,6 +115,11 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   const toast = useToast();
   const [state, setState] = useState<AppState>(() => emptyAppState(DEFAULT_SETTINGS));
   const [loading, setLoading] = useState(true);
+  // Distinct from `loading`. `loading` says a request is in flight; this says
+  // a request has succeeded at least once. Without it there is no way to tell
+  // "your data has not arrived" from "you have no data", and the app told
+  // people the second when it meant the first.
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Guards against a slow response from a previous user landing in state.
   const userRef = useRef<string | null>(null);
@@ -131,7 +146,13 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             .maybeSingle()
             .then(({ data, error: e }) => {
               if (e) throw e;
-              if (data) next.settings = toSettings(data);
+              // `handle_new_user` creates this row in the same transaction as
+              // the auth user, so a signed-in caller always has one. Getting
+              // nothing back means the request was not authenticated as them —
+              // row-level security returning an empty set, not an empty
+              // account. Treat it as the failure it is.
+              if (!data) throw new Error('Signed in, but your profile did not come back.');
+              next.settings = toSettings(data);
             }),
         );
       }
@@ -261,15 +282,35 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     if (!userRef.current) return;
     setLoading(true);
     setError(null);
-    try {
-      const next = await fetchSlices(ALL);
-      if (!userRef.current) return;
-      setState((prev) => ({ ...prev, ...next }));
-    } catch (e) {
-      setError(errorMessage(e, 'Could not load your data.'));
-    } finally {
-      setLoading(false);
+
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt += 1) {
+      // Signed out mid-flight: drop everything rather than writing one user's
+      // data into another's session.
+      if (!userRef.current) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const next = await fetchSlices(ALL);
+        if (!userRef.current) {
+          setLoading(false);
+          return;
+        }
+        setState((prev) => ({ ...prev, ...next }));
+        setLoaded(true);
+        setError(null);
+        setLoading(false);
+        return;
+      } catch (e) {
+        lastError = e;
+        const wait = BACKOFF_MS[attempt];
+        if (wait !== undefined) await new Promise((r) => setTimeout(r, wait));
+      }
     }
+
+    setError(errorMessage(lastError, 'Could not load your data.'));
+    setLoading(false);
   }, [fetchSlices, ALL]);
 
   // Load on sign-in; clear completely on sign-out so nothing leaks between users.
@@ -277,6 +318,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     userRef.current = user?.id ?? null;
     if (!user) {
       setState(emptyAppState(DEFAULT_SETTINGS));
+      setLoaded(false);
       setLoading(false);
       return;
     }
@@ -620,18 +662,34 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     await reload();
   }, [reload]);
 
+  /**
+   * What every screen means when it asks "am I loading?": not "is a request in
+   * flight" but "is it too early to draw conclusions from this state".
+   *
+   * Until a load has succeeded, the state is the empty one the provider starts
+   * with — so a screen that only checks `loading` would read that emptiness as
+   * fact and tell somebody with a full account that they have nothing. That is
+   * the bug this exists to make impossible: no screen can reach its empty state
+   * before a successful load, and none of them had to change for that to hold.
+   *
+   * A load that has failed is not "still loading" — the gate in App.tsx shows
+   * the failure and offers a retry, which is the one honest thing to show.
+   */
+  const notReady = loading || (!loaded && error === null);
+
   const value = useMemo<StoreValue>(
     () => ({
       state,
       dispatch,
       today: ISO(new Date()),
-      loading,
+      loading: notReady,
+      loaded,
       error,
       reload,
       clearAll,
       loadSampleData,
     }),
-    [state, dispatch, loading, error, reload, clearAll, loadSampleData],
+    [state, dispatch, notReady, loaded, error, reload, clearAll, loadSampleData],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
@@ -649,6 +707,7 @@ export const useStore = (): StoreValue => {
 
 export const useAppState = (): AppState => useStore().state;
 export const useToday = (): string => useStore().today;
+export const useLoaded = (): boolean => useStore().loaded;
 export const useSettings = (): Settings => useStore().state.settings;
 
 export const useAccount = (id: string | undefined) => {
