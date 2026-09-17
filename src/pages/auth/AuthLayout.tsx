@@ -127,12 +127,20 @@ export const AuthLayout = ({
   </div>
 );
 
-/** A form-level error or confirmation, announced to screen readers. */
+/**
+ * A form-level error or confirmation, announced to screen readers.
+ *
+ * `detail` is the underlying error and is only ever passed when development
+ * mode is on — `describeError` withholds it otherwise, so this component
+ * cannot leak it by accident.
+ */
 export const FormNotice = ({
   tone,
+  detail,
   children,
 }: {
   tone: 'error' | 'success' | 'info';
+  detail?: string;
   children: ReactNode;
 }) => {
   const styles = {
@@ -141,17 +149,24 @@ export const FormNotice = ({
     info: 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.25)]',
   }[tone];
   return (
-    <p
+    <div
       role={tone === 'error' ? 'alert' : 'status'}
-      className={`flex items-start gap-2.5 rounded-2xl px-4 py-3 text-[13px] leading-relaxed ${styles}`}
+      className={`rounded-2xl px-4 py-3 text-[13px] leading-relaxed ${styles}`}
     >
-      <Icon
-        name={tone === 'error' ? 'alert' : tone === 'success' ? 'check-circle' : 'info'}
-        size={15}
-        className="mt-0.5 shrink-0"
-      />
-      <span>{children}</span>
-    </p>
+      <p className="flex items-start gap-2.5">
+        <Icon
+          name={tone === 'error' ? 'alert' : tone === 'success' ? 'check-circle' : 'info'}
+          size={15}
+          className="mt-0.5 shrink-0"
+        />
+        <span>{children}</span>
+      </p>
+      {detail && (
+        <pre className="mt-2.5 overflow-x-auto whitespace-pre-wrap break-words rounded-xl bg-[rgb(var(--hairline)/0.08)] px-3 py-2 text-[11.5px] leading-relaxed opacity-80">
+          {detail}
+        </pre>
+      )}
+    </div>
   );
 };
 

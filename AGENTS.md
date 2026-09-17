@@ -144,6 +144,32 @@ Routes are in `src/App.tsx`. `/login`, `/signup`, `/forgot-password` and
 - Tests sit in `__tests__/` beside what they test and are named for the
   behaviour a person would notice. Reach for `getByRole`.
 
+## 5a. Errors
+
+**A user never sees a sentence written for a developer.** `duplicate key value
+violates unique constraint "categories_user_name_kind_key"` tells somebody
+adding a category nothing they can use, and tells an attacker the shape of the
+schema.
+
+- Everything that can fail goes through `describeError` in `lib/errors.ts`. It
+  maps Postgres codes and the auth messages people actually hit, and **falls
+  back to plain English for anything it does not recognise**. The helper it
+  replaced returned the raw message in that case — precisely when the raw
+  message is least likely to mean anything.
+- It also decides whether the underlying error may be shown, by reading
+  development mode. **Never read `devMode` at a call site to choose what to
+  render**: pass `described.detail` through and let it be `undefined`. One
+  place decides, so there is one place to get it wrong.
+- **Do not flatten an error to a string at the throw site.** `auth.tsx` used
+  to, which threw away the code and left the caller with prose it could not
+  classify. Rethrow the error; describe it where it is shown.
+- Development mode is a switch in Settings, kept in `localStorage` — a
+  property of the machine you are debugging on, not of who you are. It is
+  deliberately available on the live site, because that is where the problem
+  happened.
+
+---
+
 ## 6. Database rules
 
 Permissions are Postgres row-level security policies. There is no

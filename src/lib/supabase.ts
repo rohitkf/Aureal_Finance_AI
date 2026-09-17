@@ -30,21 +30,3 @@ export const supabase = createClient(url ?? 'http://localhost', publishableKey ?
     flowType: 'pkce',
   },
 });
-
-/** Turns a Supabase error into something worth showing a person. */
-export const friendlyAuthError = (message: string): string => {
-  const m = message.toLowerCase();
-  if (m.includes('invalid login credentials')) return 'That email and password don’t match an account.';
-  if (m.includes('email not confirmed')) return 'Check your inbox and confirm your email address first.';
-  if (m.includes('user already registered') || m.includes('already been registered')) {
-    return 'An account with that email already exists. Try signing in instead.';
-  }
-  if (m.includes('password should be at least')) return 'Passwords need to be at least 8 characters.';
-  if (m.includes('rate limit') || m.includes('too many')) {
-    return 'Too many attempts. Wait a minute and try again.';
-  }
-  if (m.includes('failed to fetch') || m.includes('network')) {
-    return 'Couldn’t reach the server. Check your connection and try again.';
-  }
-  return message;
-};

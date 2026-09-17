@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- the provider and its hook belong together. */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { friendlyAuthError, supabase } from './supabase';
+import { supabase } from './supabase';
 
 interface AuthValue {
   session: Session | null;
@@ -17,9 +17,16 @@ interface AuthValue {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
-/** Anything thrown from here is already safe to show a person. */
-const raise = (message: string): never => {
-  throw new Error(friendlyAuthError(message));
+/**
+ * Rethrows the error as it came, rather than flattening it to a string.
+ *
+ * It used to be converted here, which threw away the error code and left the
+ * caller with prose it could not classify. Describing it is the screen's job —
+ * `describeError` — because only the screen knows what the person was trying
+ * to do, and only it can decide whether to show the underlying detail.
+ */
+const raise = (error: unknown): never => {
+  throw error instanceof Error ? error : new Error(String(error));
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -48,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    if (error) raise(error.message);
+    if (error) raise(error);
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, displayName: string) => {
@@ -61,26 +68,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         emailRedirectTo: `${window.location.origin}/login`,
       },
     });
-    if (error) raise(error.message);
+    if (error) raise(error);
     // With email confirmation on, Supabase returns a user but no session.
     return { needsConfirmation: Boolean(data.user) && !data.session };
   }, []);
 
   const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) raise(error.message);
+    if (error) raise(error);
   }, []);
 
   const requestPasswordReset = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/reset-password`,
     });
-    if (error) raise(error.message);
+    if (error) raise(error);
   }, []);
 
   const updatePassword = useCallback(async (password: string) => {
     const { error } = await supabase.auth.updateUser({ password });
-    if (error) raise(error.message);
+    if (error) raise(error);
   }, []);
 
   const value = useMemo<AuthValue>(
