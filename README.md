@@ -257,6 +257,22 @@ QA_EMAIL=you@example.com QA_PASSWORD=… npm run qa   # in another
 
 ---
 
+## Staying on one version
+
+A financial app running two builds at once — last week's on the phone, this
+morning's on the laptop — is how figures start disagreeing with each other. So
+the service worker is registered in `prompt` mode: a new build installs and
+waits rather than activating under someone mid-entry, and `UpdateGate` puts a
+dialog in front of everything until they reload. It has no close button,
+Escape does nothing, and Tab cannot leave it.
+
+It checks on a timer and whenever a backgrounded tab is brought back, so a tab
+left open overnight does not keep running yesterday's build. If the new worker
+somehow never takes over, it reloads anyway after three seconds — being stuck
+behind a modal you cannot dismiss is the one outcome worse than reloading.
+
+---
+
 ## Branches and CI
 
 - **`develop`** is where work lands.

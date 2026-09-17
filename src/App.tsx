@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { UpdateGate } from '@/components/UpdateGate';
 import { ToastProvider } from '@/components/ui/Toast';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { StoreProvider } from '@/lib/store';
@@ -75,6 +76,10 @@ const ProtectedApp = () => (
 
 export const App = () => (
   <ErrorBoundary>
+    {/* Outside the auth boundary and outside the router: a new build matters
+        on the sign-in screen as much as anywhere else, and the gate should
+        survive any navigation. */}
+    <UpdateGate />
     <ToastProvider>
       <AuthProvider>
         <Routes>

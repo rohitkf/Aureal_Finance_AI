@@ -1,0 +1,206 @@
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { UpdateGate } from '../UpdateGate';
+
+/* ------------------------------------------------------------------ */
+/* A service worker, small enough to reason about                      */
+/* ------------------------------------------------------------------ */
+
+class FakeWorker extends EventTarget {
+  state: ServiceWorkerState = 'installed';
+  postMessage = vi.fn();
+  setState(state: ServiceWorkerState) {
+    this.state = state;
+    this.dispatchEvent(new Event('statechange'));
+  }
+}
+
+class FakeRegistration extends EventTarget {
+  waiting: FakeWorker | null = null;
+  installing: FakeWorker | null = null;
+  update = vi.fn(async () => undefined);
+}
+
+class FakeContainer extends EventTarget {
+  controller: unknown = {};
+  registration = new FakeRegistration();
+  getRegistration = vi.fn(async () => this.registration as unknown as ServiceWorkerRegistration);
+}
+
+let container: FakeContainer;
+let reload: ReturnType<typeof vi.fn>;
+let originalLocation: Location;
+
+beforeEach(() => {
+  container = new FakeContainer();
+  Object.defineProperty(navigator, 'serviceWorker', {
+    value: container,
+    configurable: true,
+    writable: true,
+  });
+
+  reload = vi.fn();
+  originalLocation = window.location;
+  Object.defineProperty(window, 'location', {
+    value: { ...originalLocation, reload },
+    configurable: true,
+    writable: true,
+  });
+});
+
+afterEach(() => {
+  Object.defineProperty(window, 'location', { value: originalLocation, configurable: true });
+});
+
+const gateShown = () => screen.queryByRole('alertdialog');
+
+describe('UpdateGate', () => {
+  it('stays out of the way when there is no newer build', async () => {
+    render(<UpdateGate />);
+    await waitFor(() => expect(container.getRegistration).toHaveBeenCalled());
+    expect(gateShown()).not.toBeInTheDocument();
+  });
+
+  it('does not tell a first-time visitor their brand new app is out of date', async () => {
+    // A worker installs and waits on a first visit too, but there is no
+    // controller for it to replace. Without this guard every first load would
+    // be interrupted by a modal demanding a reload.
+    container.controller = null;
+    container.registration.waiting = new FakeWorker();
+
+    render(<UpdateGate />);
+    await waitFor(() => expect(container.getRegistration).toHaveBeenCalled());
+    expect(gateShown()).not.toBeInTheDocument();
+  });
+
+  it('blocks the screen when a newer build is already waiting', async () => {
+    container.registration.waiting = new FakeWorker();
+    render(<UpdateGate />);
+
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    expect(screen.getByText(/a new version is ready/i)).toBeInTheDocument();
+  });
+
+  it('appears when a new build finishes installing while the app is open', async () => {
+    render(<UpdateGate />);
+    await waitFor(() => expect(container.getRegistration).toHaveBeenCalled());
+    expect(gateShown()).not.toBeInTheDocument();
+
+    const installing = new FakeWorker();
+    installing.state = 'installing';
+    container.registration.installing = installing;
+    container.registration.dispatchEvent(new Event('updatefound'));
+    container.registration.waiting = installing;
+    installing.setState('installed');
+
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+  });
+
+  it('cannot be dismissed with Escape', async () => {
+    const user = userEvent.setup();
+    container.registration.waiting = new FakeWorker();
+    render(<UpdateGate />);
+    await screen.findByRole('alertdialog');
+
+    await user.keyboard('{Escape}');
+
+    expect(gateShown()).toBeInTheDocument();
+  });
+
+  it('keeps focus on the reload button, so Tab cannot get behind it', async () => {
+    const user = userEvent.setup();
+    container.registration.waiting = new FakeWorker();
+    render(<UpdateGate />);
+    await screen.findByRole('alertdialog');
+
+    const button = screen.getByRole('button', { name: /reload now/i });
+    expect(button).toHaveFocus();
+
+    await user.tab();
+    expect(button).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(button).toHaveFocus();
+  });
+
+  it('locks the page behind it from scrolling', async () => {
+    container.registration.waiting = new FakeWorker();
+    render(<UpdateGate />);
+    await screen.findByRole('alertdialog');
+    expect(document.body.style.overflow).toBe('hidden');
+  });
+
+  it('asks the waiting worker to take over, then reloads onto it', async () => {
+    const user = userEvent.setup();
+    const waiting = new FakeWorker();
+    container.registration.waiting = waiting;
+    render(<UpdateGate />);
+    await screen.findByRole('alertdialog');
+
+    await user.click(screen.getByRole('button', { name: /reload now/i }));
+
+    // The exact message the worker generated by vite-plugin-pwa listens for.
+    expect(waiting.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    // Not yet — the new worker has not taken over.
+    expect(reload).not.toHaveBeenCalled();
+
+    container.dispatchEvent(new Event('controllerchange'));
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('reloads only once even if the controller changes again', async () => {
+    const user = userEvent.setup();
+    container.registration.waiting = new FakeWorker();
+    render(<UpdateGate />);
+    await screen.findByRole('alertdialog');
+
+    await user.click(screen.getByRole('button', { name: /reload now/i }));
+    container.dispatchEvent(new Event('controllerchange'));
+    container.dispatchEvent(new Event('controllerchange'));
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('reloads anyway if the worker never takes over', async () => {
+    // `shouldAdvanceTime` keeps findByRole's polling alive; without it the
+    // query waits on a clock that never moves.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      container.registration.waiting = new FakeWorker();
+      render(<UpdateGate />);
+      await screen.findByRole('alertdialog');
+
+      await user.click(screen.getByRole('button', { name: /reload now/i }));
+      expect(reload).not.toHaveBeenCalled();
+
+      // Nothing dispatches controllerchange: an old browser, or a worker that
+      // failed to activate. Being stuck behind a modal you cannot dismiss is
+      // the one outcome worse than reloading.
+      vi.advanceTimersByTime(3_000);
+      expect(reload).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows it is working and refuses a second press', async () => {
+    const user = userEvent.setup();
+    const waiting = new FakeWorker();
+    container.registration.waiting = waiting;
+    render(<UpdateGate />);
+    await screen.findByRole('alertdialog');
+
+    const button = screen.getByRole('button', { name: /reload now/i });
+    await user.click(button);
+
+    expect(screen.getByRole('button', { name: /reloading/i })).toBeDisabled();
+    expect(waiting.postMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing at all where service workers are unavailable', async () => {
+    Object.defineProperty(navigator, 'serviceWorker', { value: undefined, configurable: true });
+    render(<UpdateGate />);
+    expect(gateShown()).not.toBeInTheDocument();
+  });
+});
