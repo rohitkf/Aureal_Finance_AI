@@ -212,6 +212,20 @@ Each of these has already cost real time here.
 - **Supabase's built-in email sender delivers only to project members** and
   is rate-limited to a couple an hour. It looks like it works because it
   works for you. Real sign-ups need custom SMTP — SETUP.md §5.
+- **`registerType: 'prompt'` is load-bearing.** On `autoUpdate` a new service
+  worker activates on its own and the running code is swapped out mid-session,
+  which for a financial app means two versions disagreeing across someone's
+  phone and laptop. On `prompt` the new worker installs and *waits*, and
+  `UpdateGate` blocks the screen until the person reloads. Switching it back
+  silently disables the gate: nothing ever waits, so nothing ever prompts.
+- **`'serviceWorker' in navigator` is true when the value is `undefined`.** In
+  a non-secure context the property exists and holds nothing, so the `in`
+  check passes and the next line throws. Test the value. This shipped as a
+  crash in the first draft of `useAppUpdate` and a test caught it.
+- **A waiting worker is not always an update.** On a first visit one installs
+  and waits with no controller to replace. Without the
+  `navigator.serviceWorker.controller` guard, every first-time visitor is told
+  their brand new app is out of date.
 
 ## 9. How to report what you did
 

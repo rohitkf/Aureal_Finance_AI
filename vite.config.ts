@@ -7,7 +7,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt', not 'autoUpdate': the app must not swap itself out from
+      // under someone mid-entry. The new worker waits, UpdateGate blocks the
+      // screen, and the reload happens when the person says so.
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'icons/icon.svg', 'icons/maskable.svg'],
       manifest: {
         name: 'Aureal Finance AI',
