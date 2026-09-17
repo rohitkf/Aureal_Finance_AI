@@ -132,8 +132,15 @@ their balance.
 
 ## Performance guardrails
 
-- Animation is **transform, opacity and filter only**. Nothing animates `width`, `height`, `top` or
-  `left`. `will-change` is set while animating and released after.
+- Animation is **transform and opacity only**. Nothing animates `width`, `height`, `top` or `left`,
+  and nothing animates `filter`. `will-change` is set while animating and released after.
+- **Never animate a blur.** `filter: blur()` is re-rasterised on every frame, and the cost scales
+  with the area under it — the opposite of a compositor-only property. Scroll reveals used to
+  resolve a `blur(6px)` alongside their fade, which on a long ledger was the entire scroll budget.
+- **A large soft colour field is a radial gradient, not a blurred shape.** A Gaussian blur of a
+  filled circle *is* a radial falloff; painting one and blurring it buys the same picture for the
+  price of re-rasterising it forever. The three backdrop fields were `blur(120px)` circles and are
+  now gradients.
 - **`backdrop-blur` only on fixed elements** — the header, the floating island nav, dialog
   overlays. Never on a scrolling card, which would force a GPU repaint every frame.
 - The **mesh and film grain are one `fixed`, `pointer-events-none` layer**, never attached to
@@ -168,3 +175,11 @@ labels on every field · 24×24px minimum targets (SC 2.5.8, honouring the inlin
 skip link first in the tab order · visible focus on every stop · focus trapped in dialogs and
 returned to the trigger · charts exposed as screen-reader tables · status never conveyed by colour
 alone · `prefers-reduced-motion` disables all of the above motion.
+
+**Where a dialog puts the caret.** `Modal` focuses, in order: an element marked `data-autofocus`,
+then the first form field, then the dialog panel. Never the close button — it is first in the DOM,
+so "focus the first focusable element" lands on X, where the next keypress dismisses the dialog the
+person just opened. A dialog with no fields of its own focuses its panel rather than its
+destructive button. `onClose` is held in a ref so that a caller writing it inline — which every
+caller does — cannot re-run the focus effect on each render and pull the caret out of the field
+being typed into.

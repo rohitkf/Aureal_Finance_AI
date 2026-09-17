@@ -282,23 +282,22 @@
    * fires — the rule simply never applies and the content is visible, so an
    * animation can never be the reason someone cannot read their balance.
    *
-   * Motion is transform, opacity and filter only, so it stays on the
-   * compositor and never triggers layout.
+   * Motion is transform and opacity only, so it stays on the compositor. A
+   * blur used to resolve alongside them, which looked lovely and re-rasterised
+   * every revealed element on every frame; on a long ledger that was the whole
+   * scroll budget. Opacity and travel carry the same idea for free.
    */
   html[data-reveal='on'] .reveal {
     opacity: 0;
     transform: translate3d(0, 2.5rem, 0);
-    filter: blur(6px);
     transition:
       opacity 900ms cubic-bezier(0.32, 0.72, 0, 1),
-      transform 900ms cubic-bezier(0.32, 0.72, 0, 1),
-      filter 900ms cubic-bezier(0.32, 0.72, 0, 1);
+      transform 900ms cubic-bezier(0.32, 0.72, 0, 1);
     will-change: transform, opacity;
   }
   html[data-reveal='on'] .reveal[data-visible='true'] {
     opacity: 1;
     transform: translate3d(0, 0, 0);
-    filter: blur(0);
     will-change: auto;
   }
 }

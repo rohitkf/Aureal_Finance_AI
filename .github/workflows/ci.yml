@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    # develop is where work lands; main is production and is reached only by a
+    # pull request. Nothing else is long-lived.
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  frontend:
+    name: Lint, types, tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      # The build is not redundant: it type-checks the project references and
+      # generates the service worker, both of which can fail on their own.
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://placeholder.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
+
+  database:
+    name: Migrations and database behaviour
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      PGPASSWORD: postgres
+      PGHOST: localhost
+      PGUSER: postgres
+    steps:
+      # Full history: the migration check below diffs against the merge base,
+      # which a shallow clone does not have.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Applying the migrations to a bare Postgres catches a SQL error before
+      # it reaches a real project. `_local_test/` stubs the parts Supabase
+      # provides — the auth schema and the PostgREST roles — and is never
+      # applied to a real database.
+      - name: Apply the migrations to a bare Postgres
+        run: |
+          set -euo pipefail
+          psql -c 'create database aureal_ci;'
+          for f in supabase/_local_test/*.sql supabase/migrations/*.sql; do
+            echo "Applying $f"
+            psql -d aureal_ci -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+
+      # Balances are maintained by a trigger, so they are only ever as correct
+      # as the trigger is. These assertions run in a transaction and roll back.
+      - name: Assert the balance trigger and sign-up provisioning
+        run: |
+          set -euo pipefail
+          psql -d aureal_ci -v ON_ERROR_STOP=1 -f supabase/tests/balances_and_provisioning.sql
+
+      # A migration that has shipped is immutable; editing one leaves every
+      # existing database on a schema no file describes any more.
+      - name: Check that no shipped migration was edited
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          changed=$(git diff --diff-filter=MD --name-only \
+            "origin/${{ github.base_ref }}"...HEAD -- supabase/migrations/ || true)
+          if [ -n "$changed" ]; then
+            echo "These migrations already exist on ${{ github.base_ref }} and were changed:"
+            echo "$changed"
+            echo "Add a new migration instead — see AGENTS.md."
+            exit 1
+          fi
+
+  docker:
+    name: Container image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: aureal-finance-ai:ci
+          build-args: |
+            VITE_SUPABASE_URL=https://placeholder.supabase.co
+            VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_placeholder
+      - name: Validate docker-compose.yml
+        run: |
+          cp .env.example .env
+          docker compose config >/dev/null
+          rm .env

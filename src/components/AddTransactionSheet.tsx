@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { formatMediumDate } from '@/lib/date';
+import { formatMediumDate, isValidISO } from '@/lib/date';
 import { money } from '@/lib/format';
 import { newId, useAppState, useCategories, useStore, useToday } from '@/lib/store';
 import type { Category, Transaction, TransactionType } from '@/lib/types';
@@ -74,7 +74,9 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
   }, [accounts, accountId, toAccountId]);
 
   const parsed = Number.parseFloat(amount);
-  const valid = Number.isFinite(parsed) && parsed > 0 && Boolean(accountId);
+  // A date input can be cleared, and an empty date is not something the
+  // ledger can record against a day.
+  const valid = Number.isFinite(parsed) && parsed > 0 && Boolean(accountId) && isValidISO(date);
 
   const submit = () => {
     if (accounts.length === 0) {

@@ -32,23 +32,12 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Fonts are self-hosted from public/fonts, so they are picked up by
+        // globPatterns above and need no runtime caching rule. There were
+        // rules here for fonts.googleapis.com and fonts.gstatic.com, kept
+        // after the app stopped loading anything from either.
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
         navigateFallback: '/index.html',
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) => url.origin === 'https://fonts.googleapis.com',
-            handler: 'StaleWhileRevalidate',
-            options: { cacheName: 'google-fonts-stylesheets' },
-          },
-          {
-            urlPattern: ({ url }) => url.origin === 'https://fonts.gstatic.com',
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-webfonts',
-              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
-        ],
       },
       devOptions: { enabled: false },
     }),

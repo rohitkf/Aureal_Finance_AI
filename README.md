@@ -21,7 +21,20 @@ Minimum balance held back -£1,000.00
 
 ---
 
+## Documentation
+
+| | |
+| --- | --- |
+| **[SETUP.md](./SETUP.md)** | Standing up your own instance from a fork: Supabase, email that actually sends, deployment. **Start here.** |
+| **[AGENTS.md](./AGENTS.md)** | House rules for anyone changing the code — branches, the commands that must pass, what the domain words mean, and what fails silently. |
+| **[DESIGN.md](./DESIGN.md)** | The design system: colour, type, surfaces, motion, performance guardrails. |
+
+---
+
 ## Running it
+
+Forking it? Read **[SETUP.md](./SETUP.md)** — it covers the Supabase project
+and the email configuration this needs to be usable by anyone but you.
 
 ```bash
 npm install
@@ -33,6 +46,20 @@ npm run dev              # http://localhost:5173
 npm run build            # typecheck + production bundle + service worker
 npm run preview          # serve the build on http://localhost:4173
 ```
+
+### Or in Docker
+
+```bash
+cp .env.example .env     # fill in, as above
+docker compose up --build
+```
+
+→ http://localhost:8080. A two-stage build: node compiles, nginx serves.
+There is no backend container — Supabase is the backend and the browser
+talks to it directly.
+
+The values are **build arguments**, not runtime environment: Vite compiles
+them into the bundle. After changing `.env`, `docker compose build` again.
 
 ### Environment
 
@@ -195,9 +222,20 @@ Built to WCAG 2.2 AA and verified automatically on every screen in both themes:
 ## Quality checks
 
 ```bash
-npm run verify        # lint + typecheck + unit tests + build
-npm test              # 31 unit tests covering the recurrence and finance engines
+npm run verify        # lint + typecheck + tests + build
+npm test              # 112 tests
 ```
+
+| Where | What it covers |
+| --- | --- |
+| `src/lib/__tests__/` | The finance engine, the nine recurrence frequencies, date arithmetic across both British Summer Time transitions, formatting, and the Postgres↔domain mappers — including numerics arriving as strings, the case that makes every total quietly wrong rather than visibly broken |
+| `src/components/**/__tests__/` | The dialog's focus behaviour, and Add-transaction driven end to end through the real component |
+| `supabase/tests/` | What only the database can answer: the balance trigger across insert, edit, delete, transfers and credit inversion; scheduled rows moving nothing until they clear; the check constraints; and the cascade when a user is deleted |
+
+The database tests run in CI against a bare Postgres 17, with
+`supabase/_local_test/` standing in for the `auth` schema and the PostgREST
+roles that Supabase would otherwise provide. To run them locally you need a
+Postgres to point at; see `.github/workflows/ci.yml` for the exact sequence.
 
 Browser suites run against a preview build. The suites that go inside the app need an account on
 the project under test; without credentials they check the public screens and skip the rest, saying
@@ -216,6 +254,23 @@ QA_EMAIL=you@example.com QA_PASSWORD=… npm run qa   # in another
 | `qa:states` | Every empty state, the 404 screen, service-worker registration and offline loading |
 | — | Suites needing sign-in skip cleanly when `QA_EMAIL` / `QA_PASSWORD` are unset |
 | `qa:screenshots` | Captures every screen in both themes at desktop and phone widths |
+
+---
+
+## Branches and CI
+
+- **`develop`** is where work lands.
+- **`main`** is production. It moves only by a pull request from `develop`,
+  which merges itself once every check is green
+  (`.github/workflows/auto-merge.yml`). Label a pull request `do-not-merge`
+  to hold it back.
+
+CI runs on every push to either branch and on every pull request: lint,
+types, tests and a build; the migrations applied to a bare Postgres followed
+by the database assertions; and the container image built and
+`docker-compose.yml` validated. It also fails a pull request that edits a
+migration already on the base branch — a shipped migration is immutable,
+because every existing database is already on that schema.
 
 ---
 
