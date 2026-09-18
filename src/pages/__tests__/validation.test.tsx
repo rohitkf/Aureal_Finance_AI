@@ -74,6 +74,7 @@ beforeEach(() => {
     budgets: [],
     goals: [GOAL],
     netWorthHistory: [],
+  recurringSkips: [],
     settings: SETTINGS,
   };
 });

@@ -73,6 +73,7 @@ beforeEach(() => {
     goals: [],
     // Deliberately empty: this is the state every real account is in.
     netWorthHistory: [],
+  recurringSkips: [],
     settings: SETTINGS,
   };
 });

@@ -111,6 +111,15 @@ export const spendByCategory = (state: AppState, month: string): Map<string, num
 /* ------------------------------------------------------------------ */
 
 /**
+ * Occurrences the person has struck out one at a time.
+ *
+ * Keyed on the date the rule *would* have produced, not on anything that
+ * happened, because nothing did.
+ */
+export const skippedOccurrences = (state: AppState): Set<string> =>
+  new Set(state.recurringSkips.map((s) => `${s.recurringId}|${s.occurrenceDate}`));
+
+/**
  * Money that is still owed although its date has passed.
  *
  * A scheduled transaction moves nothing — the database trigger skips it, and
@@ -164,7 +173,10 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
     // Anything on or before today has already moved the balance, unless it is
     // still only scheduled — in which case it has not, and still counts.
     if (!overdue && (t.date <= today || t.date > to)) continue;
-    if (t.recurringId) claimed.add(`${t.recurringId}|${t.date}`);
+    // Claimed by the occurrence it stands in for, which is not always the day
+    // it landed on: a salary moved from the 30th to the 28th still accounts
+    // for the 30th, and without this the rule would project it again.
+    if (t.recurringId) claimed.add(`${t.recurringId}|${t.recurringDate ?? t.date}`);
 
     const effect =
       t.type === 'transfer' ? transferEffect(state.accounts, t.accountId, t.toAccountId) : null;
@@ -184,6 +196,8 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
     });
   }
 
+  const skipped = skippedOccurrences(state);
+
   for (const rule of state.recurring) {
     const effect =
       rule.direction === 'transfer'
@@ -192,6 +206,7 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
 
     for (const date of expandRecurrence(rule, addDays(today, 1), to)) {
       if (claimed.has(`${rule.id}|${date}`)) continue;
+      if (skipped.has(`${rule.id}|${date}`)) continue;
       events.push({
         id: `${rule.id}-${date}`,
         date,

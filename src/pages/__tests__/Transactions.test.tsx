@@ -85,6 +85,7 @@ beforeEach(() => {
     budgets: [],
     goals: [],
     netWorthHistory: [],
+  recurringSkips: [],
     settings: SETTINGS,
   };
 });
@@ -115,8 +116,14 @@ const captureDownload = () => {
   return files;
 };
 
-/** Opens a transaction in the detail panel. */
+/** The page opens on the register; the filtered list is the other view. */
+const showList = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole('radio', { name: 'List' }));
+};
+
+/** Opens a transaction in the detail panel of the list view. */
 const select = async (user: ReturnType<typeof userEvent.setup>, merchant: string) => {
+  await showList(user);
   await user.click(screen.getAllByRole('button', { name: new RegExp(merchant.slice(0, 6), 'i') })[0]!);
 };
 
@@ -224,9 +231,27 @@ describe('the detail panel', () => {
 });
 
 describe('an overdue payment on the ledger', () => {
-  it('is called overdue rather than just scheduled', () => {
+  it('is called overdue rather than just scheduled', async () => {
+    const user = userEvent.setup();
     render();
+    await showList(user);
     expect(screen.getAllByText(/Overdue/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Not cleared').length).toBeGreaterThan(0);
+  });
+});
+
+describe('the two views', () => {
+  it('opens on the register, which is the one with a balance column', () => {
+    render();
+    expect(screen.getByRole('radio', { name: 'Register' })).toHaveAttribute('aria-checked', 'true');
+    // The filters belong to the list, and are not in the way until asked for.
+    expect(screen.queryByLabelText('Search transactions')).not.toBeInTheDocument();
+  });
+
+  it('keeps the list a tap away', async () => {
+    const user = userEvent.setup();
+    render();
+    await showList(user);
+    expect(screen.getByLabelText('Search transactions')).toBeInTheDocument();
   });
 });

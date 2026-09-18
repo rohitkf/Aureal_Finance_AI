@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
-import { formatFullDate, monthKey, relativeDayLabel } from '@/lib/date';
+import { formatFullDate, formatMediumDate, monthKey, relativeDayLabel } from '@/lib/date';
 import { downloadCsv } from '@/lib/csv';
+import { Register } from '@/components/Register';
+import type { LedgerRow } from '@/lib/ledger';
 import { money } from '@/lib/format';
 import { newId, useAppState, useCategories, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
@@ -11,7 +13,7 @@ import { TransactionRow } from '@/components/TransactionRow';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, CardHeader, Eyebrow } from '@/components/ui/Card';
-import { SelectField, TextField } from '@/components/ui/Field';
+import { SegmentedControl, SelectField, TextField } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { EmptyState, SkeletonRows } from '@/components/ui/States';
@@ -46,6 +48,17 @@ export const Transactions = () => {
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [addOpen, setAddOpen] = useState(params.get('new') !== null);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  /**
+   * How the page is being read.
+   *
+   * The register answers "what did I have after that" and runs into the
+   * future; the list answers "find me the thing I am thinking of". They are
+   * two questions, not two pages — one destination, and a toggle.
+   */
+  const [view, setView] = useState<'register' | 'list'>('register');
+  /** A line drawn from a rule, opened for editing before any row exists. */
+  const [occurrence, setOccurrence] = useState<Transaction | null>(null);
+  const [skipping, setSkipping] = useState<LedgerRow | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const categories = useCategories();
 
@@ -171,6 +184,33 @@ export const Transactions = () => {
     });
   };
 
+  /**
+   * Turns a line of the register into something the sheet can edit.
+   *
+   * A projected line has no transaction behind it, so one is invented here and
+   * saved on the way out — carrying `recurringDate` so the rule knows that
+   * occurrence is spoken for and stops drawing its own.
+   */
+  const openLine = (row: LedgerRow) => {
+    if (row.transaction) {
+      setEditing(row.transaction);
+      return;
+    }
+    setOccurrence({
+      id: newId(),
+      date: row.date,
+      merchant: row.name,
+      amount: row.amount,
+      type: row.direction === 'in' ? 'income' : 'expense',
+      accountId: row.accountId,
+      toAccountId: row.toAccountId,
+      categoryId: row.categoryId,
+      status: row.date > today ? 'scheduled' : 'cleared',
+      recurringId: row.recurringId,
+      recurringDate: row.recurringDate,
+    });
+  };
+
   const resetFilters = () => {
     setQuery('');
     setTypeFilter('all');
@@ -195,7 +235,17 @@ export const Transactions = () => {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <SegmentedControl
+            label="How to read this page"
+            size="sm"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'register', label: 'Register' },
+              { value: 'list', label: 'List' },
+            ]}
+          />
           <Button icon="download" className="hidden sm:inline-flex" onClick={exportCsv}>
             Export CSV
           </Button>
@@ -205,6 +255,12 @@ export const Transactions = () => {
         </div>
       </header>
 
+      {view === 'register' ? (
+        <Card className="p-2 sm:p-3">
+          <Register onOpen={openLine} onSkip={setSkipping} />
+        </Card>
+      ) : (
+        <>
       {/* ---------------- Filters ---------------- */}
       <Card tone="well" className="space-y-3 p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
@@ -364,12 +420,58 @@ export const Transactions = () => {
           )}
         </Modal>
       </div>
+        </>
+      )}
 
       <AddTransactionSheet open={addOpen} onClose={() => setAddOpen(false)} />
       <AddTransactionSheet
         open={Boolean(editing)}
         onClose={() => setEditing(null)}
         editing={editing}
+      />
+      {/* A line the register drew from a rule: prefilled like an edit, but
+          saving writes the first row rather than changing one. */}
+      <AddTransactionSheet
+        open={Boolean(occurrence)}
+        onClose={() => setOccurrence(null)}
+        editing={occurrence}
+        mode="create"
+      />
+
+      <ConfirmDialog
+        open={Boolean(skipping)}
+        onClose={() => setSkipping(null)}
+        onConfirm={() => {
+          if (!skipping?.recurringId || !skipping.recurringDate) return;
+          dispatch({
+            type: 'skip-occurrence',
+            recurringId: skipping.recurringId,
+            occurrenceDate: skipping.recurringDate,
+          });
+          toast({
+            tone: 'info',
+            title: 'Payment skipped',
+            description: `${skipping.name} on ${formatMediumDate(skipping.date)}. The schedule carries on.`,
+          });
+          setSkipping(null);
+        }}
+        title="Skip this one payment?"
+        subject={
+          skipping && (
+            <div className="flex items-center gap-3">
+              <CategoryIcon categoryId={skipping.categoryId} />
+              <div className="min-w-0">
+                <p className="text-body-md font-semibold text-text">{skipping.name}</p>
+                <p className="tnum text-body-sm text-muted">
+                  {money(skipping.amount)} · {formatMediumDate(skipping.date)}
+                </p>
+              </div>
+            </div>
+          )
+        }
+        consequence="This one stops appearing, and your forecast is recalculated without it."
+        preserved="The schedule itself is untouched — every other payment happens as set up."
+        confirmLabel="Skip it"
       />
 
       <ConfirmDialog

@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 406 tests
+npm run test         # vitest — 436 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -73,6 +73,8 @@ Vocabulary that is easy to get wrong:
 | **A virtual account** | An allocation of money that already exists in a real account. It never adds to net worth. |
 | **A commitment** | A recurring payment that has not yet fallen due this month. A transfer is not one: the money is still yours. |
 | **A transfer rule** | A standing order between two of your own accounts. `account_id` is the source, `to_account_id` the destination. |
+| **An occurrence** | One date a recurring rule produces. `transactions.recurring_date` says which one a row stands in for; `recurring_skips` says one does not happen. |
+| **The register** | The transactions page's default view: every line with the balance of its account afterwards, history behind and projections ahead. |
 
 Other things that are true and not guessable:
 
@@ -303,6 +305,17 @@ Each of these has already cost real time here.
   a transfer pointing at its own source). A rule left pointing nowhere is still
   treated as money leaving — Aureal is a record of accounts, not the bank, and
   deleting one here does not cancel a real standing order.
+- **A check constraint cannot demand what `on delete set null` will take away.**
+  This has now bitten twice, both times caught only by a test that deleted the
+  parent. A constraint requiring `to_account_id` on a transfer made deleting the
+  far account fail; one requiring `recurring_id` beside `recurring_date` made
+  deleting a rule fail once an occurrence had been edited. Constrain the
+  *incoherent* (a destination on a non-transfer, a transfer pointing at itself),
+  never the merely orphaned — and write the delete-the-parent test.
+- **A rule is never projected into the past.** `ledgerRows` starts projections at
+  today. A prediction about a period we already have facts for invents history,
+  and worse, the register's balance column would then count money that is not in
+  the account. Scrolling back shows what happened, not what was expected.
 - **A transaction created alongside a rule must name it.** `forecastEvents`
   suppresses a rule's occurrence only where a transaction already claims
   `recurringId|date` — so a scheduled payment created beside its own rule and
