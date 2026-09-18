@@ -173,3 +173,62 @@ describe('seedSampleData, against the real schema', () => {
     psql(`delete from auth.users where id = '${UID}'`, false);
   });
 });
+
+/**
+ * `positionAsOf` reconstructs past balances by undoing every transaction since
+ * a date. Its arithmetic is a copy of `apply_transaction_to_balances`, which
+ * lives in SQL — including the sign inversion on a credit account and the rule
+ * that a scheduled row moves nothing. Two copies of one rule drift apart, so
+ * this asserts they agree by rebuilding the past in the database and comparing.
+ */
+describe('positionAsOf against the trigger that owns the arithmetic', () => {
+  it('reaches the same figures the database would have held', async () => {
+    signUp();
+    const { seedSampleData } = await import('@/data/sample');
+    await seedSampleData();
+
+    const { positionAsOf } = await import('@/lib/finance');
+    const { toAccount, toTransaction, emptyAppState } = await import('@/lib/mappers');
+
+    const accounts = rows('select * from public.accounts').map((r) =>
+      toAccount(r as never),
+    );
+    const transactions = rows(
+      'select *, null::json as transaction_splits from public.transactions',
+    ).map((r) => toTransaction(r as never));
+
+    const state = {
+      ...emptyAppState({
+        currency: 'GBP' as const,
+        locale: 'en-GB',
+        minimumBalance: 0,
+        userName: 'Seed',
+        maskBalances: false,
+        theme: 'system' as const,
+      }),
+      accounts,
+      transactions,
+    };
+
+    // The database's own answer: delete everything after the cutoff inside a
+    // transaction, read the balances the trigger leaves behind, roll back.
+    const cutoff = rows(`select (current_date - 30) as d`, false)[0]!.d!;
+    const [, ...actual] = psql(
+      `delete from public.transactions where occurred_on > '${cutoff}';
+       select coalesce(sum(balance) filter (where type <> 'credit'), 0) as assets,
+              coalesce(sum(balance) filter (where type = 'credit'), 0) as liabilities
+         from public.accounts;
+       rollback`,
+      false,
+    );
+
+    const fromDatabase = {
+      assets: Number(actual[0]![0]),
+      liabilities: Number(actual[0]![1]),
+    };
+
+    expect(positionAsOf(state, cutoff)).toEqual(fromDatabase);
+
+    psql(`delete from auth.users where id = '${UID}'`, false);
+  });
+});

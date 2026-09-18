@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 314 tests
+npm run test         # vitest — 350 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -257,6 +257,23 @@ Each of these has already cost real time here.
   getting none back is row-level security returning an empty set to an
   unauthenticated request, and is treated as the failure it is rather than as
   an empty account.
+- **A scheduled transaction is invisible to every total the app has.** The
+  balance trigger skips it, and every "what happened" figure filters it out.
+  That is correct while its date is still ahead; the day the date passes it
+  becomes money that is owed and that nothing is counting. `forecastEvents`
+  therefore carries backwards as well as forwards — anything still scheduled
+  on or before today is `overdue` and stays committed until somebody clears
+  it. A "what is still to come" filter written as `date > today` reopens this.
+- **`isDepository` is not "spendable".** It means "not a credit facility", so
+  it includes investments. Safe-to-Spend and the forecast start from
+  `isSpendable` (current, savings, cash); net worth uses `totalAssets`, which
+  is everything owned. Using the wrong one offers somebody their pension.
+- **`net_worth_snapshots` is written by nothing but the sample seed.** Any
+  chart that reads it directly is empty for every real account. `netWorthSeries`
+  prefers stored rows and otherwise reconstructs the series from the ledger,
+  by undoing every transaction since each month end — arithmetic that mirrors
+  `apply_transaction_to_balances` and is checked against it in `npm run test:db`.
+  Change one and the other has to follow.
 - **Supabase's built-in email sender delivers only to project members** and
   is rate-limited to a couple an hour. It looks like it works because it
   works for you. Real sign-ups need custom SMTP — SETUP.md §5.

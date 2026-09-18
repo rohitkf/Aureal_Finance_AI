@@ -223,7 +223,7 @@ Built to WCAG 2.2 AA and verified automatically on every screen in both themes:
 
 ```bash
 npm run verify        # lint + typecheck + tests + build
-npm test              # 314 tests
+npm test              # 350 tests
 npm run test:db       # the sample seed, against a real Postgres
 ```
 

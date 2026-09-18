@@ -113,6 +113,29 @@ describe('income and expenses, with no net-worth snapshots', () => {
   });
 });
 
+describe('net worth, with no snapshots either', () => {
+  it('draws a line reconstructed from the ledger', () => {
+    state = {
+      ...state,
+      accounts: [
+        { id: 'acc-1', name: 'Current', type: 'current', institution: 'B', balance: 1000, maskedNumber: '', syncStatus: 'manual' },
+      ],
+    };
+    render(<Reports />);
+    const chart = screen.getByRole('img', { name: /net worth/i });
+    // A chart that drew nothing, or drew NaN, is the failure being guarded.
+    const drawn = [...chart.querySelectorAll('path')].map((n) => n.getAttribute('d') ?? '');
+    expect(drawn.length).toBeGreaterThan(0);
+    expect(drawn.some((d) => d.includes('NaN'))).toBe(false);
+  });
+
+  it('has nothing to draw when there are no accounts', () => {
+    state = { ...state, accounts: [] };
+    render(<Reports />);
+    expect(screen.queryByRole('img', { name: /net worth/i })).not.toBeInTheDocument();
+  });
+});
+
 describe('the export button', () => {
   it('is offered once there is anything to export', () => {
     render(<Reports />);
