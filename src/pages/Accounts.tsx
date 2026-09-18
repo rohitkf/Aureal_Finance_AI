@@ -22,7 +22,12 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { Progress, SegmentedBar } from '@/components/ui/Progress';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
 import { AccountDialog } from '@/components/AccountDialog';
-import type { Account } from '@/lib/types';
+import { VirtualAccountDialog } from '@/components/VirtualAccountDialog';
+import { ConfirmDialog } from '@/components/ui/Modal';
+import { IconButton } from '@/components/ui/Button';
+import { useToast } from '@/components/ui/Toast';
+import { useStore } from '@/lib/store';
+import type { Account, VirtualAccount } from '@/lib/types';
 
 const TYPE_ICON: Record<Account['type'], IconName> = {
   current: 'bank',
@@ -46,8 +51,15 @@ export const Accounts = () => {
   const today = useToday();
   const { maskBalances } = useSettings();
   const loading = useLoading();
+  const { dispatch } = useStore();
+  const toast = useToast();
   const [params, setParams] = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [allocationDialog, setAllocationDialog] = useState<{ open: boolean; editing: VirtualAccount | null }>({
+    open: false,
+    editing: null,
+  });
+  const [deletingAllocation, setDeletingAllocation] = useState<VirtualAccount | null>(null);
 
   useEffect(() => {
     if (params.get('new') !== null) {
@@ -69,6 +81,27 @@ export const Accounts = () => {
     () => state.virtualAccounts.reduce((s, v) => s + v.allocated, 0),
     [state.virtualAccounts],
   );
+
+  /**
+   * The accounts allocations are actually drawn from, named.
+   *
+   * This screen used to say "your Main Current Account" in fixed text, which
+   * was true of the sample data and of nobody else. An allocation carries the
+   * account it belongs to, so the copy can simply read it.
+   */
+  const parentNames = useMemo(() => {
+    const names = [
+      ...new Set(
+        state.virtualAccounts.map(
+          (v) => state.accounts.find((a) => a.id === v.parentAccountId)?.name ?? 'an account',
+        ),
+      ),
+    ];
+    if (names.length === 0) return 'your accounts';
+    if (names.length === 1) return names[0]!;
+    if (names.length === 2) return `${names[0]} and ${names[1]}`;
+    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  }, [state.virtualAccounts, state.accounts]);
 
   if (loading) {
     return (
@@ -224,6 +257,14 @@ export const Accounts = () => {
           <span className="h-4 w-1.5 rounded-full bg-primary-strong" aria-hidden="true" />
           <h2 className="font-display text-headline-sm text-text">Virtual accounts</h2>
           <span className="tnum text-label-md text-muted">{money(allocated, { compact: true })} allocated</span>
+          <Button
+            size="sm"
+            icon="plus"
+            className="ml-auto"
+            onClick={() => setAllocationDialog({ open: true, editing: null })}
+          >
+            Add allocation
+          </Button>
         </div>
 
         {/*
@@ -234,8 +275,8 @@ export const Accounts = () => {
           <Icon name="info" size={18} className="mt-0.5 shrink-0 text-primary" />
           <p className="text-body-sm text-muted">
             <strong className="text-text">Virtual accounts are allocations, not additional funds.</strong> They
-            divide the {money(allocated, { compact: true })} already sitting in your Main Current Account so you
-            can see what each pound is meant for. Your total balance doesn’t change.
+            divide the {money(allocated, { compact: true })} already sitting in {parentNames} so you can see
+            what each pound is meant for. Your total balance doesn’t change.
           </p>
         </div>
 
@@ -245,13 +286,17 @@ export const Accounts = () => {
               icon="layers"
               title="No allocations yet"
               description="Split an account into envelopes — bills, emergency fund, spending — to see what’s truly free."
+              action={{
+                label: 'Add an allocation',
+                onClick: () => setAllocationDialog({ open: true, editing: null }),
+              }}
             />
           </Card>
         ) : (
           <>
             <Card tone="well" className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Label>Allocation of your Main Current Account</Label>
+                <Label>Allocation of {parentNames}</Label>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   {state.virtualAccounts.map((v, i) => (
                     <span key={v.id} className="flex items-center gap-1.5 text-label-sm text-muted">
@@ -285,14 +330,19 @@ export const Accounts = () => {
                         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-high text-primary">
                           <Icon name={(v.icon as IconName) ?? 'box'} size={18} />
                         </span>
-                        {v.target ? (
-                          <Badge tone={pct >= 100 ? 'success' : 'neutral'}>{percent(pct)} funded</Badge>
-                        ) : (
-                          <Badge tone="success">Unrestricted</Badge>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {v.locked && <Badge tone="primary" icon="lock">Held back</Badge>}
+                          {v.target ? (
+                            <Badge tone={pct >= 100 ? 'success' : 'neutral'}>{percent(pct)} funded</Badge>
+                          ) : (
+                            <Badge tone="success">Unrestricted</Badge>
+                          )}
+                        </div>
                       </div>
                       <h3 className="mt-3 font-display text-headline-sm text-text">{v.name}</h3>
-                      <p className="mt-0.5 text-body-sm text-muted">{v.description}</p>
+                      <p className="mt-0.5 text-body-sm text-muted">
+                        {v.description || `From ${state.accounts.find((a) => a.id === v.parentAccountId)?.name ?? 'an account'}`}
+                      </p>
                     </div>
 
                     <div className="space-y-2">
@@ -317,9 +367,23 @@ export const Accounts = () => {
                         {v.target && v.allocated < v.target
                           ? `${money(v.target - v.allocated, { compact: true })} to go${v.targetDate ? ` · by ${formatMediumDate(v.targetDate)}` : ''}`
                           : v.locked
-                            ? 'Fully funded · held back from Safe to Spend'
-                            : 'Free to spend'}
+                            ? 'Held back from Safe to Spend'
+                            : 'Still counted as free to spend'}
                       </p>
+                      <div className="flex justify-end gap-1 pt-1">
+                        <IconButton
+                          icon="edit"
+                          label={`Edit ${v.name}`}
+                          size={16}
+                          onClick={() => setAllocationDialog({ open: true, editing: v })}
+                        />
+                        <IconButton
+                          icon="trash"
+                          label={`Delete ${v.name}`}
+                          size={16}
+                          onClick={() => setDeletingAllocation(v)}
+                        />
+                      </div>
                     </div>
                   </Card>
                 );
@@ -349,6 +413,45 @@ export const Accounts = () => {
       </Card>
 
       <AccountDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
+
+      <VirtualAccountDialog
+        open={allocationDialog.open}
+        editing={allocationDialog.editing}
+        onClose={() => setAllocationDialog({ open: false, editing: null })}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deletingAllocation)}
+        onClose={() => setDeletingAllocation(null)}
+        onConfirm={() => {
+          if (!deletingAllocation) return;
+          dispatch({ type: 'delete-virtual', id: deletingAllocation.id });
+          toast({
+            tone: 'info',
+            title: 'Allocation removed',
+            // Worth saying plainly: deleting a label does not delete money.
+            description: `${deletingAllocation.name} · the money stays in the account.`,
+          });
+          setDeletingAllocation(null);
+        }}
+        title="Remove this allocation?"
+        subject={
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-high text-primary">
+              <Icon name={(deletingAllocation?.icon as IconName) ?? 'layers'} size={16} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-body-md font-semibold text-text">{deletingAllocation?.name}</p>
+              <p className="tnum text-body-sm text-muted">
+                {money(deletingAllocation?.allocated ?? 0)} set aside
+              </p>
+            </div>
+          </div>
+        }
+        consequence="The label goes and this money stops being held back."
+        preserved="The money itself stays exactly where it is — your balance does not change."
+        confirmLabel="Remove"
+      />
 
     </div>
   );

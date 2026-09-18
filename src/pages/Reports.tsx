@@ -6,6 +6,7 @@ import {
   monthSpend,
   monthlyCommitments,
   netWorth,
+  netWorthSeries,
   savingsRate,
   spendByCategory,
   subscriptionTotals,
@@ -110,7 +111,15 @@ export const Reports = () => {
   };
 
   const budgets = useMemo(() => budgetProgress(state, month), [state, month]);
-  const netWorthSeries = useMemo(() => state.netWorthHistory.slice(-Number(range)), [state.netWorthHistory, range]);
+  /**
+   * Stored snapshots when there are any, otherwise reconstructed from the
+   * ledger — see `netWorthSeries`. Nothing in the app writes snapshots, so
+   * without the fallback this chart was empty for every real account.
+   */
+  const netWorthPoints = useMemo(
+    () => netWorthSeries(state, today, Number(range)),
+    [state, today, range],
+  );
 
   const hasData = state.transactions.length > 0;
 
@@ -197,16 +206,16 @@ export const Reports = () => {
               action={
                 <Badge tone="success" icon="trending-up">
                   {money(
-                    (netWorthSeries[netWorthSeries.length - 1]?.assets ?? 0) -
-                      (netWorthSeries[netWorthSeries.length - 1]?.liabilities ?? 0) -
-                      ((netWorthSeries[0]?.assets ?? 0) - (netWorthSeries[0]?.liabilities ?? 0)),
+                    (netWorthPoints[netWorthPoints.length - 1]?.assets ?? 0) -
+                      (netWorthPoints[netWorthPoints.length - 1]?.liabilities ?? 0) -
+                      ((netWorthPoints[0]?.assets ?? 0) - (netWorthPoints[0]?.liabilities ?? 0)),
                     { compact: true, signed: true },
                   )}{' '}
                   over {range} months
                 </Badge>
               }
             />
-            <NetWorthChart points={netWorthSeries} />
+            <NetWorthChart points={netWorthPoints} />
           </Card>
 
           <div className="grid gap-4 xl:grid-cols-2">

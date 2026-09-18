@@ -112,6 +112,13 @@ export const SafeToSpendCard = ({
               value={`−${money(data.reserve, { masked: maskBalances })}`}
               tone="primary"
             />
+            {data.allocated > 0 && (
+              <Line
+                label="Locked allocations"
+                value={`−${money(data.allocated, { masked: maskBalances })}`}
+                tone="primary"
+              />
+            )}
           </dl>
         )}
 
