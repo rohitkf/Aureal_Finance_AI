@@ -104,6 +104,8 @@ interface SelectFieldProps {
   className?: string;
   disabled?: boolean;
   placeholder?: string;
+  /** One more thing the list can do — "New category…" and the like. */
+  action?: { label: string; onSelect: () => void };
 }
 
 export const SelectField = ({
@@ -118,6 +120,7 @@ export const SelectField = ({
   className,
   disabled,
   placeholder,
+  action,
 }: SelectFieldProps) => (
   <Field label={label} hint={hint} error={error} hideLabel={hideLabel} className={containerClassName}>
     {({ id, describedBy, invalid }) => (
@@ -130,6 +133,7 @@ export const SelectField = ({
         disabled={disabled}
         className={className}
         placeholder={placeholder}
+        action={action}
       >
         {children}
       </Select>

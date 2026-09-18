@@ -4,13 +4,17 @@ import {
   formatDay,
   formatMediumDate,
   isValidISO,
+  isValidTime,
   lastWorkingDayOfMonth,
+  nowTime,
   parseISO,
 } from '@/lib/date';
+import { evaluateExpression, isPlainNumber, stripToExpression } from '@/lib/calc';
 import { money } from '@/lib/format';
 import { FREQUENCY_LABELS, previewOccurrences } from '@/lib/recurrence';
 import { newId, useAppState, useCategories, useStore, useToday } from '@/lib/store';
 import type {
+  Account,
   Category,
   Frequency,
   RecurringPayment,
@@ -27,12 +31,13 @@ import {
   SelectField,
   TextAreaField,
   TextField,
+  TimeField,
 } from './ui/Field';
 import { Modal } from './ui/Modal';
 import { useToast } from './ui/Toast';
 import { CategoryIcon } from './CategoryIcon';
-import { Icon } from './ui/Icon';
 import { NewCategoryDialog } from './NewCategoryDialog';
+import { AccountDialog } from './AccountDialog';
 
 const STATUS_OPTIONS: Array<{ value: TransactionStatus; label: string }> = [
   { value: 'cleared', label: 'Cleared' },
@@ -135,9 +140,15 @@ export const AddTransactionSheet = ({
   const [categoryId, setCategoryId] = useState('');
   const [merchant, setMerchant] = useState('');
   const [date, setDate] = useState(today);
+  const [time, setTime] = useState(nowTime);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | undefined>();
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
+  /**
+   * Which picker asked for a new account, so the one that asked is the one it
+   * comes back selected in. Null when the dialog is closed.
+   */
+  const [newAccountFor, setNewAccountFor] = useState<'from' | 'to' | null>(null);
 
   // Only ever shown when editing. A new transaction's status follows its date,
   // which is the rule the ledger is built on; an existing one needs to be
@@ -165,6 +176,7 @@ export const AddTransactionSheet = ({
     setMerchant(editing?.merchant ?? '');
     setNotes(editing?.notes ?? '');
     setDate(editing?.date ?? today);
+    setTime(editing?.time ?? nowTime());
     setStatus(editing?.status ?? 'cleared');
     setDateMode(editing ? 'custom' : 'today');
     setRepeats(false);
@@ -241,7 +253,13 @@ export const AddTransactionSheet = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repeats, canRepeat, date, dateMode, type, categoryId, accountId, frequency, adjustToWorkingDay]);
 
-  const parsed = Number.parseFloat(amount);
+  /**
+   * The amount field takes a sum, not only a number: `12.40+3.60` while the
+   * receipt is still in your hand. A bare number goes through the same parser
+   * and comes out itself.
+   */
+  const parsed = evaluateExpression(amount);
+  const sum = !isPlainNumber(amount) && Number.isFinite(parsed) ? parsed : null;
   // A date input can be cleared, and an empty date is not something the
   // ledger can record against a day.
   const valid = Number.isFinite(parsed) && parsed > 0 && Boolean(accountId) && isValidISO(date);
@@ -293,7 +311,7 @@ export const AddTransactionSheet = ({
     const transaction: Transaction = {
       id: editing?.id ?? newId(),
       date,
-      time: editing?.time ?? new Date().toTimeString().slice(0, 5),
+      time: isValidTime(time) ? time : nowTime(),
       merchant:
         merchant.trim() ||
         (type === 'transfer'
@@ -353,6 +371,20 @@ export const AddTransactionSheet = ({
     setNewCategoryOpen(false);
   };
 
+  /**
+   * Back with it chosen — in the picker that asked, not the other one.
+   *
+   * The effect that keeps the selections valid runs on the same render and
+   * would otherwise snap a picker whose account has just arrived back to the
+   * top of the list; setting it here wins because the account is in the list
+   * by then.
+   */
+  const onAccountCreated = (account: Account) => {
+    if (newAccountFor === 'to') setToAccountId(account.id);
+    else setAccountId(account.id);
+    setNewAccountFor(null);
+  };
+
   return (
     <>
       <Modal
@@ -379,13 +411,25 @@ export const AddTransactionSheet = ({
             value={amount}
             tone={type}
             error={error}
+            hint={sum !== null ? `= ${money(sum)}` : undefined}
             autoFocus
             onChange={(e) => {
-              setAmount(e.target.value.replace(/[^0-9.]/g, ''));
+              setAmount(stripToExpression(e.target.value));
               setError(undefined);
             }}
+            onBlur={() => {
+              // Settle the sum once you leave the field, so what is saved is
+              // what the line under it has been showing.
+              if (sum !== null) setAmount(String(sum));
+            }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && valid) submit();
+              if (e.key !== 'Enter') return;
+              if (sum !== null) {
+                e.preventDefault();
+                setAmount(String(sum));
+                return;
+              }
+              if (valid) submit();
             }}
           />
 
@@ -412,28 +456,42 @@ export const AddTransactionSheet = ({
             </p>
           ) : (
             <div className="grid gap-5 sm:grid-cols-2">
+              {/* Each account carries what is in it. Choosing where a payment
+                  comes from without seeing whether it can cover it is the
+                  question this dropdown was always being asked silently. */}
               <SelectField
                 label={type === 'transfer' ? 'From account' : 'Account'}
                 value={accountId}
                 onChange={(value) => setAccountId(value)}
+                action={{ label: 'New account…', onSelect: () => setNewAccountFor('from') }}
               >
                 {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
+                  <option key={a.id} value={a.id} data-hint={money(a.balance)}>
                     {a.name}
                   </option>
                 ))}
               </SelectField>
 
               {type === 'transfer' ? (
-                <SelectField label="To account" value={toAccountId} onChange={(value) => setToAccountId(value)}>
+                <SelectField
+                  label="To account"
+                  value={toAccountId}
+                  onChange={(value) => setToAccountId(value)}
+                  action={{ label: 'New account…', onSelect: () => setNewAccountFor('to') }}
+                >
                   {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
+                    <option key={a.id} value={a.id} data-hint={money(a.balance)}>
                       {a.name}
                     </option>
                   ))}
                 </SelectField>
               ) : (
-                <SelectField label="Category" value={categoryId} onChange={(value) => setCategoryId(value)}>
+                <SelectField
+                  label="Category"
+                  value={categoryId}
+                  onChange={(value) => setCategoryId(value)}
+                  action={{ label: 'New category…', onSelect: () => setNewCategoryOpen(true) }}
+                >
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -468,16 +526,6 @@ export const AddTransactionSheet = ({
                   );
                 })}
 
-                {/* Categories are the user's own, so one can be created inline
-                    rather than filing a purchase under the wrong heading. */}
-                <button
-                  type="button"
-                  onClick={() => setNewCategoryOpen(true)}
-                  className="flex items-center gap-2 rounded-full px-4 py-2 text-[13px] text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.3)] transition-all duration-500 ease-fluid hover:bg-primary/10 active:scale-[0.97]"
-                >
-                  <Icon name="plus" size={14} />
-                  New category
-                </button>
               </div>
             </div>
           )}
@@ -501,6 +549,10 @@ export const AddTransactionSheet = ({
                 }}
                 hint={date > today ? 'Future date — this will appear in your forecast.' : undefined}
               />
+              {/* When, not only which day. Two coffees on the same afternoon
+                  read in the order they happened, and a statement that runs a
+                  balance down the page needs that order to be real. */}
+              <TimeField label="Time" value={time} onChange={setTime} containerClassName="mt-1" />
               <div className="flex flex-wrap gap-2">
                 <Chip active={dateMode === 'today'} onClick={() => setDateFromMode('today')}>
                   Today
@@ -609,6 +661,12 @@ export const AddTransactionSheet = ({
         onClose={() => setNewCategoryOpen(false)}
         kind={type === 'transfer' ? 'transfer' : type}
         onCreated={onCategoryCreated}
+      />
+
+      <AccountDialog
+        open={newAccountFor !== null}
+        onClose={() => setNewAccountFor(null)}
+        onCreated={onAccountCreated}
       />
     </>
   );

@@ -73,7 +73,10 @@ const choose = async (
   option: string | RegExp,
 ) => {
   await user.click(screen.getByRole('combobox', { name: field }));
-  await user.click(screen.getByRole('option', { name: option }));
+  // An account option announces its balance after its name, so match on the
+  // start of the name rather than the whole of it.
+  const wanted = typeof option === 'string' ? new RegExp(`^${option}\\b`) : option;
+  await user.click(screen.getAllByRole('option').find((o) => wanted.test(o.textContent ?? ''))!);
 };
 
 /** The date a DateField is showing, as the ISO string behind it. */
@@ -99,11 +102,19 @@ const pickDate = async (
   await user.click(screen.getByRole('gridcell', { name: label }));
 };
 
-/** The labels a dropdown is currently offering. */
+/**
+ * The labels a dropdown is currently offering.
+ *
+ * Without the "New …" row pinned at the foot, which every one of these lists
+ * now carries and which is not one of the things being offered to choose from.
+ */
 const optionsOf = async (user: ReturnType<typeof userEvent.setup>, field: string | RegExp) => {
   const trigger = screen.getByRole('combobox', { name: field });
   await user.click(trigger);
-  const labels = screen.getAllByRole('option').map((o) => o.textContent);
+  const labels = screen
+    .getAllByRole('option')
+    .map((o) => o.textContent ?? '')
+    .filter((label) => !label.startsWith('New '));
   await user.keyboard('{Escape}');
   return labels;
 };
@@ -450,5 +461,101 @@ describe('repeating a transaction', () => {
     expect(preview).toContain('29 May');
     expect(preview).toContain('30 Jun');
     expect(preview).toContain('31 Jul');
+  });
+});
+
+describe('what the form knows before you leave it', () => {
+  it('shows each account’s balance while you choose one', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.click(screen.getByRole('combobox', { name: 'Account' }));
+    const current = screen.getAllByRole('option').find((o) => /^Current/.test(o.textContent ?? ''))!;
+    expect(current).toHaveTextContent('£1,200.00');
+  });
+
+  it('records the time as well as the day, so a second coffee sorts after the first', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.keyboard('3.20');
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    expect(dispatch.mock.calls[0][0].transaction.time).toMatch(/^([01]\d|2[0-3]):[0-5]\d$/);
+  });
+
+  it('lets the time be set rather than only taken from the clock', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.keyboard('3.20');
+    await user.click(screen.getByLabelText('Time'));
+    await user.click(screen.getByRole('button', { name: /^9\s*am$/ }));
+    await user.click(screen.getByRole('button', { name: /^45$/ }));
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    expect(dispatch.mock.calls[0][0].transaction.time).toBe('09:45');
+  });
+
+  it('offers a new category from inside the dropdown that is missing it', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.click(screen.getByRole('combobox', { name: 'Category' }));
+    await user.click(screen.getByRole('option', { name: /New category/ }));
+
+    expect(screen.getByRole('dialog', { name: /New category/i })).toBeInTheDocument();
+  });
+
+  it('offers a new account from inside the account dropdown', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.click(screen.getByRole('combobox', { name: 'Account' }));
+    await user.click(screen.getByRole('option', { name: /New account/ }));
+
+    expect(screen.getByRole('dialog', { name: /Add an account/i })).toBeInTheDocument();
+  });
+});
+
+describe('arithmetic in the amount field', () => {
+  it('adds a receipt up and saves what it came to', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.keyboard('12.40+3.60');
+    expect(screen.getByText('= £16.00')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+    expect(dispatch.mock.calls[0][0].transaction.amount).toBe(16);
+  });
+
+  it('settles the sum in the field when Enter is pressed, rather than saving', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.keyboard('(18+4)/2{Enter}');
+
+    expect(screen.getByLabelText('Amount')).toHaveValue('11');
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('keeps Save disabled while the sum is still half-typed', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.keyboard('12+');
+    expect(screen.getByRole('button', { name: /save transaction/i })).toBeDisabled();
+
+    await user.keyboard('3');
+    expect(screen.getByRole('button', { name: /save transaction/i })).toBeEnabled();
+  });
+
+  it('says nothing about a plain number, because there is no sum to show', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.keyboard('42.50');
+    expect(screen.queryByText(/^= /)).not.toBeInTheDocument();
   });
 });

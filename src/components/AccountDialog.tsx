@@ -18,13 +18,18 @@ interface AccountDialogProps {
   open: boolean;
   onClose: () => void;
   editing?: Account | null;
+  /**
+   * The account that was just made. Lets a form that sent you here get you
+   * back with it already chosen, rather than leaving you to find it.
+   */
+  onCreated?: (account: Account) => void;
 }
 
 /**
  * Add or edit an account by hand. Until bank connections exist this is the only
  * way accounts get into Aureal, so it is the first thing a new user needs.
  */
-export const AccountDialog = ({ open, onClose, editing }: AccountDialogProps) => {
+export const AccountDialog = ({ open, onClose, editing, onCreated }: AccountDialogProps) => {
   const { dispatch } = useStore();
   const toast = useToast();
 
@@ -88,6 +93,7 @@ export const AccountDialog = ({ open, onClose, editing }: AccountDialogProps) =>
       title: editing ? 'Account updated' : 'Account added',
       description: account.name,
     });
+    if (!editing) onCreated?.(account);
     onClose();
   };
 
