@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 350 tests
+npm run test         # vitest — 366 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -274,6 +274,20 @@ Each of these has already cost real time here.
   by undoing every transaction since each month end — arithmetic that mirrors
   `apply_transaction_to_balances` and is checked against it in `npm run test:db`.
   Change one and the other has to follow.
+- **`dispatch` is fire-and-forget, and its writes are serialised for a reason.**
+  Each action used to start its own async chain the instant it was called, so
+  two actions in a row raced and anything depending on the one before it could
+  lose — an account and its opening balance failed on
+  `transactions_account_id_fkey`, leaving the account created and its balance
+  £0.00. `run` now appends to a promise chain. Two writes that depend on each
+  other still belong in **one** action rather than two queued ones, so a
+  failure cannot half-succeed.
+- **Preventing the default on `pointerdown` cancels touch scrolling.** The
+  dropdown's options did it to keep focus on the trigger, which is right for a
+  mouse and made the list impossible to scroll on a phone. A finger commits on
+  `click` instead. For the same reason `pointerenter` only moves the highlight
+  for a mouse, and the list only scrolls itself when the highlight moved by
+  key — otherwise a drag drags the list back under the finger.
 - **Supabase's built-in email sender delivers only to project members** and
   is rate-limited to a couple an hour. It looks like it works because it
   works for you. Real sign-ups need custom SMTP — SETUP.md §5.

@@ -25,7 +25,7 @@ interface AccountDialogProps {
  * way accounts get into Aureal, so it is the first thing a new user needs.
  */
 export const AccountDialog = ({ open, onClose, editing }: AccountDialogProps) => {
-  const { dispatch, today } = useStore();
+  const { dispatch } = useStore();
   const toast = useToast();
 
   const [name, setName] = useState('');
@@ -74,26 +74,14 @@ export const AccountDialog = ({ open, onClose, editing }: AccountDialogProps) =>
       aer: type === 'savings' ? Number.parseFloat(aer) || undefined : undefined,
     };
 
-    dispatch({ type: 'upsert-account', account });
-
-    if (!editing && parsedBalance > 0) {
-      dispatch({
-        type: 'add-transaction',
-        transaction: {
-          id: newId(),
-          date: today,
-          merchant: 'Opening balance',
-          amount: parsedBalance,
-          // On a credit account the stored balance is what you owe, so an
-          // opening balance is money out, not money in.
-          type: isCredit ? 'expense' : 'income',
-          accountId: account.id,
-          categoryId: '',
-          status: 'cleared',
-          notes: 'Recorded when the account was added.',
-        },
-      });
-    }
+    // One action, not two. Sent separately, the opening balance raced the
+    // account it belonged to and lost: the account was created and the
+    // transaction was rejected by its own foreign key.
+    dispatch({
+      type: 'upsert-account',
+      account,
+      openingBalance: editing ? undefined : parsedBalance,
+    });
 
     toast({
       tone: 'success',

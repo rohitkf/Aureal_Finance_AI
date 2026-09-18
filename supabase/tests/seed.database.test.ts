@@ -232,3 +232,54 @@ describe('positionAsOf against the trigger that owns the arithmetic', () => {
     psql(`delete from auth.users where id = '${UID}'`, false);
   });
 });
+
+/**
+ * Adding an account with an opening balance, against the real foreign key.
+ *
+ * `transactions_account_id_fkey` is what rejected this in production: the
+ * opening balance was a second, independent write and could reach Postgres
+ * before the account it named existed. Both writes are one action now, in one
+ * order, and this is the constraint that decides whether that is true.
+ */
+describe('an account and its opening balance', () => {
+  it('lands in an order the foreign key accepts', async () => {
+    signUp();
+
+    const accountId = '33333333-3333-4333-8333-333333333333';
+    // Exactly what the store now sends, in the order it now sends it.
+    psql(
+      `insert into public.accounts (id, name, type, institution, masked_number, sync_status)
+       values ('${accountId}', 'Rohit Revolut', 'current', 'Revolut', '', 'manual')`,
+      true,
+    );
+    psql(
+      `insert into public.transactions
+         (account_id, occurred_on, merchant, amount, type, status)
+       values ('${accountId}', current_date, 'Opening balance', 250, 'income', 'cleared')`,
+      true,
+    );
+
+    // The trigger turns that transaction into the balance the screen shows.
+    expect(rows(`select balance from public.accounts where id = '${accountId}'`)[0]!.balance).toBe(
+      '250.00',
+    );
+
+    psql(`delete from auth.users where id = '${UID}'`, false);
+  });
+
+  it('is the other order that the database refuses', () => {
+    signUp();
+    const missing = '44444444-4444-4444-8444-444444444444';
+
+    expect(() =>
+      psql(
+        `insert into public.transactions
+           (account_id, occurred_on, merchant, amount, type, status)
+         values ('${missing}', current_date, 'Opening balance', 250, 'income', 'cleared')`,
+        true,
+      ),
+    ).toThrow(/transactions_account_id_fkey/);
+
+    psql(`delete from auth.users where id = '${UID}'`, false);
+  });
+});
