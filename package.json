@@ -11,6 +11,7 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:db": "vitest run --config vitest.database.config.ts",
     "qa": "node scripts/qa/run-all.mjs",
     "qa:responsive": "node scripts/qa/responsive.mjs",
     "qa:a11y": "node scripts/qa/accessibility.mjs",
