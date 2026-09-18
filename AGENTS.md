@@ -25,13 +25,19 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 112 tests
+npm run test         # vitest — 245 tests
 npm run build        # resolves project references and builds the worker
 ```
 
 `npm run verify` runs all four in that order.
 
 A single file: `npx vitest run src/lib/__tests__/finance.test.ts`.
+
+`npm run test:db` is separate, because it needs a Postgres holding the
+migrations — it runs the sample seed against the real schema through a client
+that copies what PostgREST does with a batch insert. CI runs it in the
+database job; locally, point `PGHOST`/`PGPORT`/`PGDATABASE` at a server you
+have applied `supabase/_local_test/*.sql` and `supabase/migrations/*.sql` to.
 
 The browser QA suites (`npm run qa`) drive a real Chromium over every screen
 at six widths in both themes, checking overflow, contrast and focus. They

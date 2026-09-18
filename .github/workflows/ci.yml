@@ -53,6 +53,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
 
       # Applying the migrations to a bare Postgres catches a SQL error before
       # it reaches a real project. `_local_test/` stubs the parts Supabase
@@ -77,6 +82,14 @@ jobs:
             echo "Running $f"
             psql -d aureal_ci -v ON_ERROR_STOP=1 -f "$f"
           done
+
+      # The sample seed is the one piece of application code that writes to
+      # every table at once, and the one place a batch insert's shape can be
+      # wrong in a way nothing else notices. Run it for real.
+      - name: Run the sample seed against the real schema
+        env:
+          PGDATABASE: aureal_ci
+        run: npm run test:db
 
       # A migration that has shipped is immutable; editing one leaves every
       # existing database on a schema no file describes any more.

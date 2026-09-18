@@ -166,7 +166,11 @@ export const AppShell = () => {
               </kbd>
             </button>
 
-            <div className="ml-auto flex shrink-0 items-center gap-1 lg:ml-0">
+            {/* Keeps its `ml-auto` at every width. The search button is capped
+                at max-w-xl, so without an auto margin here the leftover space
+                collects at the far right and these controls sit against the
+                search field instead of the edge of the screen. */}
+            <div className="ml-auto flex shrink-0 items-center gap-1">
               <IconButton icon="search" label="Search" className="md:hidden" onClick={() => setSearchOpen(true)} />
               <IconButton
                 icon={maskBalances ? 'eye-off' : 'eye'}
