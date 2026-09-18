@@ -34,6 +34,7 @@ const CATEGORIES: Category[] = [
   { id: 'cat-mov', name: 'Transfer', kind: 'transfer', icon: 'swap', accent: 'neutral' },
 ];
 
+let ids = 0;
 let accounts = ACCOUNTS;
 // March 2026 ends on Tuesday the 31st; individual tests move this to a month
 // that ends at a weekend.
@@ -54,7 +55,9 @@ vi.mock('@/lib/store', () => ({
   useCategoryLookup: () => (id: string) =>
     CATEGORIES.find((c) => c.id === id) ?? { ...FALLBACK_CATEGORY, id },
   useToday: () => today,
-  newId: () => 'generated-id',
+  // Distinct each call: a single fixed id would make the link between the
+  // transaction and its rule true by accident.
+  newId: () => `id-${++ids}`,
 }));
 
 vi.mock('../ui/Toast', () => ({ useToast: () => toast }));
@@ -107,6 +110,7 @@ const optionsOf = async (user: ReturnType<typeof userEvent.setup>, field: string
 
 beforeEach(() => {
   accounts = ACCOUNTS;
+  ids = 0;
   today = '2026-03-15';
   dispatch.mockClear();
   toast.mockClear();
@@ -324,8 +328,39 @@ describe('repeating a transaction', () => {
     await tickRepeats(user);
     await user.click(screen.getByRole('button', { name: /save transaction/i }));
 
+    // The rule first: `transactions.recurring_id` is a foreign key, and writes
+    // leave in the order they are dispatched.
     const types = dispatch.mock.calls.map((c) => c[0].type);
-    expect(types).toEqual(['add-transaction', 'add-recurring']);
+    expect(types).toEqual(['add-recurring', 'add-transaction']);
+  });
+
+  it('ties the transaction to the rule, so the forecast counts the money once', async () => {
+    const user = userEvent.setup();
+    open();
+
+    // A future date, which is where the duplicate actually showed: the
+    // transaction is scheduled, and the rule's first occurrence is the same
+    // day. Unlinked, the forecast counted both.
+    await user.keyboard('6346.45');
+    await pickDate(user, 'Date', '2026-03-30');
+    await tickRepeats(user);
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    const transaction = dispatch.mock.calls.find((c) => c[0].type === 'add-transaction')![0].transaction;
+    expect(transaction.status).toBe('scheduled');
+    expect(transaction.recurringId).toBe(savedRule().id);
+    expect(transaction.recurringId).toBeTruthy();
+  });
+
+  it('leaves a one-off transaction unattached', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.keyboard('42.50');
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    const transaction = dispatch.mock.calls.find((c) => c[0].type === 'add-transaction')![0].transaction;
+    expect(transaction.recurringId).toBeUndefined();
   });
 
   it('anchors a month-end salary to the end of the month, not to the day it happened to land on', async () => {

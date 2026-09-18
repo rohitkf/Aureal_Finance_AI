@@ -249,6 +249,36 @@ export const AddTransactionSheet = ({
       return;
     }
 
+    /**
+     * The rule is built before the transaction so the transaction can name it.
+     *
+     * Without that link the two are strangers, and the forecast counts both:
+     * the scheduled payment the person just entered, and the rule's own
+     * occurrence on the very same day. A salary entered for the 30th with
+     * "this repeats" ticked showed up twice and doubled the month's expected
+     * income. `forecastEvents` has always known how to suppress the duplicate
+     * — it keys on `recurringId|date` — it was simply never given the key.
+     */
+    const rule: RecurringPayment | null =
+      repeats && canRepeat && !editing
+        ? {
+            id: newId(),
+            name: '',
+            amount: Math.round(parsed * 100) / 100,
+            direction: type === 'income' ? 'in' : type === 'transfer' ? 'transfer' : 'out',
+            categoryId,
+            accountId,
+            toAccountId: type === 'transfer' ? toAccountId : undefined,
+            frequency,
+            anchorDay: anchorFor(frequency, date),
+            startDate: date,
+            status: 'active',
+            adjustToWorkingDay,
+            // Money moved between your own accounts is not something you subscribe to.
+            isSubscription: type === 'transfer' ? false : isSubscription,
+          }
+        : null;
+
     const transaction: Transaction = {
       id: editing?.id ?? newId(),
       date,
@@ -270,40 +300,26 @@ export const AddTransactionSheet = ({
       // a payment that was due last week actually went out.
       status: editing ? status : date > today ? 'scheduled' : 'cleared',
       notes: notes.trim() || undefined,
-      recurringId: editing?.recurringId,
+      recurringId: editing?.recurringId ?? rule?.id,
       splits: editing?.splits,
       receiptName: editing?.receiptName,
       taxDeductible: editing?.taxDeductible,
     };
+
+    // Both, deliberately: the person is recording something that happened and
+    // saying it happens again. Creating only the rule would leave the ledger
+    // missing the payment they just entered.
+    //
+    // The rule goes first. `transactions.recurring_id` is a foreign key, and
+    // writes leave in the order they are dispatched, so the other way round the
+    // transaction would name a rule that did not exist yet.
+    if (rule) dispatch({ type: 'add-recurring', recurring: { ...rule, name: transaction.merchant } });
 
     dispatch(
       editing
         ? { type: 'update-transaction', transaction }
         : { type: 'add-transaction', transaction },
     );
-
-    // Both, deliberately: the person is recording something that happened and
-    // saying it happens again. Creating only the rule would leave the ledger
-    // missing the payment they just entered.
-    if (repeats && canRepeat && !editing) {
-      const rule: RecurringPayment = {
-        id: newId(),
-        name: transaction.merchant,
-        amount: transaction.amount,
-        direction: type === 'income' ? 'in' : type === 'transfer' ? 'transfer' : 'out',
-        categoryId,
-        accountId,
-        toAccountId: type === 'transfer' ? toAccountId : undefined,
-        frequency,
-        anchorDay: anchorFor(frequency, date),
-        startDate: date,
-        status: 'active',
-        adjustToWorkingDay,
-        // Money moved between your own accounts is not something you subscribe to.
-        isSubscription: type === 'transfer' ? false : isSubscription,
-      };
-      dispatch({ type: 'add-recurring', recurring: rule });
-    }
 
     toast({
       tone: 'success',
@@ -360,6 +376,14 @@ export const AddTransactionSheet = ({
             value={type}
             onChange={setType}
             options={TYPE_OPTIONS}
+            hint={
+              {
+                expense: 'Money leaving one of your accounts.',
+                income: 'Money arriving in one of your accounts.',
+                transfer:
+                  'Money moving between two of your own accounts. Your total doesn’t change, so this won’t reduce Safe to Spend — unless it lands somewhere you can’t spend from, like a credit card or an investment.',
+              }[type]
+            }
             className="w-full [&>button]:flex-1"
           />
 
@@ -467,30 +491,32 @@ export const AddTransactionSheet = ({
                   Last working day of month
                 </Chip>
               </div>
-              {dateMode === 'monthEnd' && lastWorkingDayOfMonth(today) !== endOfMonth(today) && (
+              {dateMode === 'monthEnd' && (
                 <p className="text-[12.5px] leading-snug text-faint">
-                  {formatDay(endOfMonth(today))} is a weekend, so this lands on{' '}
-                  {formatDay(lastWorkingDayOfMonth(today))}.
+                  {lastWorkingDayOfMonth(today) !== endOfMonth(today)
+                    ? `${formatDay(endOfMonth(today))} is a weekend, so this lands on ${formatDay(lastWorkingDayOfMonth(today))}. If you tick “this repeats”, every month follows the same rule.`
+                    : 'Month-end, moved back to the Friday whenever it falls at a weekend. If you tick “this repeats”, every month follows the same rule.'}
                 </p>
               )}
             </div>
           </div>
 
           {editing && (
-            <div className="flex flex-col gap-2">
-              <SegmentedControl
-                label="Status"
-                value={status}
-                onChange={setStatus}
-                options={STATUS_OPTIONS}
-                className="w-full [&>button]:flex-1"
-              />
-              <p className="text-[12.5px] leading-snug text-faint">
-                {status === 'scheduled'
-                  ? 'Scheduled money has not moved yet. It is held back from Safe to Spend until you mark it cleared.'
-                  : 'Cleared and pending money has left the account and is already in your balance.'}
-              </p>
-            </div>
+            <SegmentedControl
+              label="Status"
+              value={status}
+              onChange={setStatus}
+              options={STATUS_OPTIONS}
+              hint={
+                {
+                  cleared: 'It has happened. The money is already in your balance.',
+                  pending: 'It has happened but hasn’t settled. Counted in your balance all the same.',
+                  scheduled:
+                    'It hasn’t happened yet. Your balance is untouched, and the amount is held back from Safe to Spend until you mark it cleared.',
+                }[status]
+              }
+              className="w-full [&>button]:flex-1"
+            />
           )}
 
           {/* Repeating lives here rather than only on the Recurring screen,
@@ -502,7 +528,7 @@ export const AddTransactionSheet = ({
                 checked={repeats}
                 onChange={setRepeats}
                 label="This repeats"
-                description="Records this one now and adds it to your forecast from here on."
+                description="Saves this payment and sets up a schedule. Every one after it appears in your forecast on its own — you won't need to enter it again. You'll find it on the Recurring screen to change or stop."
               />
 
               {repeats && (
@@ -511,6 +537,7 @@ export const AddTransactionSheet = ({
                     label="How often"
                     value={frequency}
                     onChange={(value) => setFrequency(value as Frequency)}
+                    hint="Anchored to the date above — change that and the schedule follows."
                   >
                     {INLINE_FREQUENCIES.map((f) => (
                       <option key={f} value={f}>
@@ -523,7 +550,7 @@ export const AddTransactionSheet = ({
                     checked={adjustToWorkingDay}
                     onChange={setAdjustToWorkingDay}
                     label="Pay early if it lands at a weekend"
-                    description="Moves back to the Friday, the way a salary arrives."
+                    description="A payment due on a Saturday or Sunday shows on the Friday before, the way a salary actually arrives. The schedule itself doesn't move."
                   />
 
                   {type !== 'transfer' && (
@@ -531,7 +558,7 @@ export const AddTransactionSheet = ({
                       checked={isSubscription}
                       onChange={setIsSubscription}
                       label="This is a subscription"
-                      description="It’ll be tracked on the Subscriptions screen too."
+                      description="Also lists it on the Subscriptions screen, where you can see what it costs you a year and cancel what you don't use."
                     />
                   )}
 

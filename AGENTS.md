@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 391 tests
+npm run test         # vitest — 406 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -303,6 +303,17 @@ Each of these has already cost real time here.
   a transfer pointing at its own source). A rule left pointing nowhere is still
   treated as money leaving — Aureal is a record of accounts, not the bank, and
   deleting one here does not cancel a real standing order.
+- **A transaction created alongside a rule must name it.** `forecastEvents`
+  suppresses a rule's occurrence only where a transaction already claims
+  `recurringId|date` — so a scheduled payment created beside its own rule and
+  left unlinked is counted twice, and a future salary doubles the month's
+  expected income. Dispatch the rule first (`transactions.recurring_id` is a
+  foreign key) and set `recurringId` on the transaction. Both the inline
+  "this repeats" and Make recurring do this.
+- **A `SegmentedControl`'s `label` is an aria-label and nothing else.** Nothing
+  is drawn for a sighted person, so an option whose effect is not obvious from
+  one or two words needs `hint`, which follows the selection. Adding an option
+  without one leaves people pressing it to find out what it does.
 - **Supabase's built-in email sender delivers only to project members** and
   is rate-limited to a couple an hour. It looks like it works because it
   works for you. Real sign-ups need custom SMTP — SETUP.md §5.

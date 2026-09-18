@@ -224,6 +224,7 @@ export const SegmentedControl = <T extends string>({
   onChange,
   options,
   label,
+  hint,
   className,
   size = 'md',
 }: {
@@ -231,9 +232,20 @@ export const SegmentedControl = <T extends string>({
   onChange: (value: T) => void;
   options: Array<{ value: T; label: string }>;
   label: string;
+  /**
+   * What the option currently chosen actually does.
+   *
+   * `label` is only an aria-label, so without this a sighted person sees
+   * three unexplained words and has to press one to find out. Callers pass a
+   * line that changes with the selection, which is the only version worth
+   * reading: a static sentence describing all three at once is a paragraph
+   * nobody finishes.
+   */
+  hint?: ReactNode;
   className?: string;
   size?: 'sm' | 'md';
 }) => (
+  <div className="flex flex-col gap-2">
   <div
     role="radiogroup"
     aria-label={label}
@@ -265,6 +277,8 @@ export const SegmentedControl = <T extends string>({
         </button>
       );
     })}
+  </div>
+    {hint && <p className="text-[12.5px] leading-snug text-faint">{hint}</p>}
   </div>
 );
 

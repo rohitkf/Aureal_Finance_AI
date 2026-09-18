@@ -90,7 +90,13 @@ export const Forecast = () => {
             Built from your current balances, scheduled income and every recurring commitment you’ve set up.
           </p>
         </div>
-        <SegmentedControl label="Forecast horizon" value={horizon} onChange={setHorizon} options={HORIZONS} />
+        <SegmentedControl
+          label="Forecast horizon"
+          value={horizon}
+          onChange={setHorizon}
+          options={HORIZONS}
+          hint={`How far ahead to project. Every scheduled payment and recurring rule due in the next ${horizon} days is counted.`}
+        />
       </header>
 
       {/* ---------------- Headline diagnosis ---------------- */}
