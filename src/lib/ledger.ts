@@ -175,8 +175,43 @@ export const ledgerRows = (state: AppState, today: string, from: string, to: str
   return rows;
 };
 
+/**
+ * Whether a line belongs on the reminders list rather than the register.
+ *
+ * The register is a statement: money that has moved. A reminder is money that
+ * has not — a scheduled payment, an occurrence a rule says is coming, or one
+ * whose day has gone by without anybody confirming it. `settled` already draws
+ * exactly that line, so this is only a name for it that reads right at the
+ * call site.
+ */
+export const isReminder = (row: LedgerRow): boolean => !row.settled;
+
+/**
+ * The window the reminders list covers.
+ *
+ * Every scheduled row there has ever been, however old, because a bill nobody
+ * ticked off eight months ago is still owed and hiding it is how it stays
+ * unpaid. Forwards it stops a year out, like the register.
+ */
+export const reminderWindow = (today: string): { from: string; to: string } => ({
+  from: '0001-01-01',
+  to: addMonths(today, 12),
+});
+
 /** The window the register covers: a year ahead, and as far back as asked for. */
 export const ledgerWindow = (today: string, monthsBack: number): { from: string; to: string } => ({
   from: `${addMonths(today, -monthsBack).slice(0, 7)}-01`,
   to: addDays(addMonths(today, 12), 0),
 });
+
+/**
+ * Names the account a line is drawn against, or says so when it is gone.
+ *
+ * A transaction outlives the account it was made against — deleting one sets
+ * the reference to null rather than erasing history — so the column has to
+ * have something honest to say about a row with nowhere to point.
+ */
+export const accountNamer = (accounts: Array<{ id: string; name: string }>) => {
+  const byId = new Map(accounts.map((a) => [a.id, a.name]));
+  return (id: string) => byId.get(id) ?? 'Closed account';
+};

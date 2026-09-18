@@ -4,7 +4,8 @@ import { cn, pillClass } from '@/lib/cn';
 import { formatFullDate, formatMediumDate, monthKey, relativeDayLabel } from '@/lib/date';
 import { downloadCsv } from '@/lib/csv';
 import { Register } from '@/components/Register';
-import type { LedgerRow } from '@/lib/ledger';
+import { Reminders } from '@/components/Reminders';
+import { isReminder, ledgerRows, reminderWindow, type LedgerRow } from '@/lib/ledger';
 import { money } from '@/lib/format';
 import { newId, useAppState, useCategories, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
@@ -51,11 +52,11 @@ export const Transactions = () => {
   /**
    * How the page is being read.
    *
-   * The register answers "what did I have after that" and runs into the
-   * future; the list answers "find me the thing I am thinking of". They are
-   * two questions, not two pages — one destination, and a toggle.
+   * The register answers "what did I have after that"; reminders answer "what
+   * is still coming"; the list answers "find me the thing I am thinking of".
+   * Three questions, not three pages — one destination, and a toggle.
    */
-  const [view, setView] = useState<'register' | 'list'>('register');
+  const [view, setView] = useState<'register' | 'reminders' | 'list'>('register');
   /** A line drawn from a rule, opened for editing before any row exists. */
   const [occurrence, setOccurrence] = useState<Transaction | null>(null);
   const [skipping, setSkipping] = useState<LedgerRow | null>(null);
@@ -112,6 +113,16 @@ export const Transactions = () => {
     }),
     [filtered],
   );
+
+  /**
+   * How many reminders have a date that has already gone by — the count worth
+   * putting on the toggle. A badge that also counted next March's salary would
+   * never be zero and would therefore never mean anything.
+   */
+  const dueCount = useMemo(() => {
+    const { from, to } = reminderWindow(today);
+    return ledgerRows(state, today, from, to).filter((row) => isReminder(row) && row.date <= today).length;
+  }, [state, today]);
 
   const activeFilters =
     (typeFilter !== 'all' ? 1 : 0) +
@@ -243,6 +254,7 @@ export const Transactions = () => {
             onChange={setView}
             options={[
               { value: 'register', label: 'Register' },
+              { value: 'reminders', label: dueCount > 0 ? `Reminders · ${dueCount}` : 'Reminders' },
               { value: 'list', label: 'List' },
             ]}
           />
@@ -258,6 +270,10 @@ export const Transactions = () => {
       {view === 'register' ? (
         <Card className="p-2 sm:p-3">
           <Register onOpen={openLine} onSkip={setSkipping} />
+        </Card>
+      ) : view === 'reminders' ? (
+        <Card className="p-2 sm:p-3">
+          <Reminders onOpen={openLine} onSkip={setSkipping} />
         </Card>
       ) : (
         <>
