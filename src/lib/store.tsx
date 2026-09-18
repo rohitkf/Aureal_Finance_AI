@@ -36,6 +36,7 @@ import {
   toGoal,
   toNetWorthPoint,
   toRecurring,
+  toRecurringSkip,
   toSettings,
   toTransaction,
   toVirtualAccount,
@@ -52,7 +53,8 @@ type Slice =
   | 'transactions'
   | 'budgets'
   | 'goals'
-  | 'netWorth';
+  | 'netWorth'
+  | 'recurringSkips';
 
 export type Action =
   | { type: 'add-transaction'; transaction: Transaction }
@@ -62,6 +64,10 @@ export type Action =
   | { type: 'update-recurring'; recurring: RecurringPayment }
   | { type: 'delete-recurring'; id: string }
   | { type: 'set-recurring-status'; id: string; status: RecurringPayment['status'] }
+  /** Strike out one occurrence of a rule, leaving the rule itself alone. */
+  | { type: 'skip-occurrence'; recurringId: string; occurrenceDate: string }
+  /** Put a struck-out occurrence back. */
+  | { type: 'unskip-occurrence'; recurringId: string; occurrenceDate: string }
   | { type: 'upsert-budget'; budget: Budget }
   | { type: 'delete-budget'; month: string; categoryId: string }
   | { type: 'upsert-goal'; goal: Goal }
@@ -275,6 +281,17 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             }),
         );
       }
+      if (wanted.has('recurringSkips')) {
+        jobs.push(
+          supabase
+            .from('recurring_skips')
+            .select('*')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.recurringSkips = (data ?? []).map(toRecurringSkip);
+            }),
+        );
+      }
       if (wanted.has('netWorth')) {
         jobs.push(
           supabase
@@ -305,6 +322,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       'budgets',
       'goals',
       'netWorth',
+      'recurringSkips',
     ],
     [],
   );
@@ -521,7 +539,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                 .eq('status', 'scheduled'),
             );
             check(await supabase.from('recurring_payments').delete().eq('id', action.id));
-            return ['recurring', 'transactions', 'accounts'];
+            // The skips cascade with the rule in the database; refetch so the
+            // client is not left holding skips for a rule that is gone.
+            return ['recurring', 'transactions', 'accounts', 'recurringSkips'];
           });
           break;
 
@@ -534,6 +554,40 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                 .eq('id', action.id),
             );
             return ['recurring'];
+          });
+          break;
+
+        case 'skip-occurrence':
+          run('skip that payment', async () => {
+            check(
+              await supabase.from('recurring_skips').insert({
+                recurring_id: action.recurringId,
+                occurrence_date: action.occurrenceDate,
+              }),
+            );
+            // Anything already recorded for that occurrence goes with it —
+            // otherwise the row stays on the register that was asked to lose it.
+            check(
+              await supabase
+                .from('transactions')
+                .delete()
+                .eq('recurring_id', action.recurringId)
+                .eq('recurring_date', action.occurrenceDate),
+            );
+            return ['recurringSkips', 'transactions', 'accounts'];
+          });
+          break;
+
+        case 'unskip-occurrence':
+          run('restore that payment', async () => {
+            check(
+              await supabase
+                .from('recurring_skips')
+                .delete()
+                .eq('recurring_id', action.recurringId)
+                .eq('occurrence_date', action.occurrenceDate),
+            );
+            return ['recurringSkips'];
           });
           break;
 
@@ -742,6 +796,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       'goals',
       'virtual_accounts',
       'net_worth_snapshots',
+      'recurring_skips',
       'accounts',
     ] as const) {
       const { error: e } = await supabase.from(table).delete().eq('user_id', uid);

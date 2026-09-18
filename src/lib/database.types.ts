@@ -120,6 +120,7 @@ export interface TransactionRow {
   status: 'cleared' | 'pending' | 'scheduled';
   notes: string | null;
   recurring_id: string | null;
+  recurring_date: string | null;
   receipt_name: string | null;
   tax_deductible: boolean;
   created_at: string;
@@ -157,5 +158,13 @@ export interface NetWorthRow {
   month: string;
   assets: number;
   liabilities: number;
+  created_at: string;
+}
+
+export interface RecurringSkipRow {
+  id: string;
+  user_id: string;
+  recurring_id: string;
+  occurrence_date: string;
   created_at: string;
 }

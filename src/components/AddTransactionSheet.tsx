@@ -99,6 +99,16 @@ interface AddTransactionSheetProps {
    * drift apart.
    */
   editing?: Transaction | null;
+  /**
+   * What saving an `editing` transaction should do.
+   *
+   * `update` is the ordinary case. `create` is for a line the register drew
+   * from a recurring rule: it is prefilled like an edit, because that is what
+   * it feels like, but there is no row behind it yet — saving writes the first
+   * one, and it carries `recurringDate` so the rule knows that occurrence is
+   * spoken for and stops projecting it.
+   */
+  mode?: 'update' | 'create';
 }
 
 /**
@@ -110,6 +120,7 @@ export const AddTransactionSheet = ({
   onClose,
   initialType = 'expense',
   editing = null,
+  mode = 'update',
 }: AddTransactionSheetProps) => {
   const { accounts } = useAppState();
   const { dispatch } = useStore();
@@ -301,6 +312,9 @@ export const AddTransactionSheet = ({
       status: editing ? status : date > today ? 'scheduled' : 'cleared',
       notes: notes.trim() || undefined,
       recurringId: editing?.recurringId ?? rule?.id,
+      // The occurrence this stands in for, kept even when the date is moved —
+      // that is the whole point of it.
+      recurringDate: editing?.recurringDate,
       splits: editing?.splits,
       receiptName: editing?.receiptName,
       taxDeductible: editing?.taxDeductible,
@@ -316,7 +330,7 @@ export const AddTransactionSheet = ({
     if (rule) dispatch({ type: 'add-recurring', recurring: { ...rule, name: transaction.merchant } });
 
     dispatch(
-      editing
+      editing && mode === 'update'
         ? { type: 'update-transaction', transaction }
         : { type: 'add-transaction', transaction },
     );
@@ -344,13 +358,17 @@ export const AddTransactionSheet = ({
       <Modal
         open={open}
         onClose={onClose}
-        title={editing ? 'Edit transaction' : 'Add transaction'}
-        description={`Recorded against ${formatMediumDate(date)}`}
+        title={editing ? (mode === 'create' ? 'Change this one' : 'Edit transaction') : 'Add transaction'}
+        description={
+          mode === 'create' && editing?.recurringId
+            ? 'Changes only this payment. The schedule it came from carries on unchanged.'
+            : `Recorded against ${formatMediumDate(date)}`
+        }
         footer={
           <>
             <Button onClick={onClose}>Cancel</Button>
             <Button variant="primary" icon="check" onClick={submit} disabled={!valid}>
-              {editing ? 'Save changes' : 'Save transaction'}
+              {editing ? (mode === 'create' ? 'Save this one' : 'Save changes') : 'Save transaction'}
             </Button>
           </>
         }

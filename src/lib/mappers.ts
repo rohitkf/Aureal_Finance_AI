@@ -6,6 +6,7 @@ import type {
   Goal,
   NetWorthPoint,
   RecurringPayment,
+  RecurringSkip,
   Settings,
   Transaction,
   VirtualAccount,
@@ -16,6 +17,7 @@ import type {
   CategoryRow,
   GoalRow,
   NetWorthRow,
+  RecurringSkipRow,
   ProfileRow,
   RecurringRow,
   TransactionRow,
@@ -117,6 +119,7 @@ export const toTransaction = (row: TransactionRow): Transaction => ({
   status: row.status,
   notes: row.notes ?? undefined,
   recurringId: row.recurring_id ?? undefined,
+  recurringDate: row.recurring_date ?? undefined,
   receiptName: row.receipt_name ?? undefined,
   taxDeductible: row.tax_deductible,
   splits: row.transaction_splits?.length
@@ -139,6 +142,12 @@ export const toGoal = (row: GoalRow): Goal => ({
   monthlyContribution: num(row.monthly_contribution),
   icon: row.icon,
   linkedAccountId: row.linked_account_id ?? undefined,
+});
+
+export const toRecurringSkip = (row: RecurringSkipRow): RecurringSkip => ({
+  id: row.id,
+  recurringId: row.recurring_id,
+  occurrenceDate: row.occurrence_date,
 });
 
 export const toNetWorthPoint = (row: NetWorthRow): NetWorthPoint => ({
@@ -172,6 +181,8 @@ export const transactionToRow = (t: Omit<Transaction, 'id'>) => ({
   status: t.status,
   notes: t.notes ?? null,
   recurring_id: t.recurringId ?? null,
+  // Only meaningful alongside a rule, and the database says so too.
+  recurring_date: t.recurringId ? (t.recurringDate ?? null) : null,
   receipt_name: t.receiptName ?? null,
   tax_deductible: t.taxDeductible ?? false,
 });
@@ -233,5 +244,6 @@ export const emptyAppState = (settings: Settings): AppState => ({
   budgets: [],
   goals: [],
   netWorthHistory: [],
+  recurringSkips: [],
   settings,
 });

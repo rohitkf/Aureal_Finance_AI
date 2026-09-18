@@ -25,7 +25,7 @@ export const PLANNING_NAV: NavItem[] = [
 /** Mobile keeps five destinations; everything else lives behind "More". */
 export const MOBILE_NAV: NavItem[] = [
   { to: '/', label: 'Home', icon: 'dashboard' },
-  { to: '/transactions', label: 'Activity', icon: 'receipt' },
+  { to: '/transactions', label: 'Transactions', icon: 'receipt' },
   { to: '/budget', label: 'Budget', icon: 'pie' },
   { to: '/forecast', label: 'Forecast', icon: 'trending-up' },
 ];

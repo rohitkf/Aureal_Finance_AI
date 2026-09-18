@@ -373,3 +373,119 @@ describe('recurring transfers', () => {
     psql(`delete from auth.users where id = '${UID}'`, false);
   });
 });
+
+/**
+ * Editing one occurrence of a rule, as the database has to hold it.
+ *
+ * Two marks, for two kinds of change: a transaction that says which occurrence
+ * it stands in for, and a skip that says one does not happen at all. Both hang
+ * off the rule, and both have to disappear with it — a rule deleted and its
+ * skips left behind would haunt whatever took its id.
+ */
+describe('one occurrence of a recurring rule', () => {
+  const setUp = () => {
+    signUp();
+    const [account] = rows(
+      `insert into public.accounts (user_id, name, type) values ('${UID}', 'Current', 'current') returning id`,
+      false,
+    );
+    const [rule] = rows(
+      `insert into public.recurring_payments
+         (user_id, name, amount, direction, account_id, frequency, anchor_day, start_date)
+       values ('${UID}', 'Salary', 2000, 'in', '${account!.id}', 'monthly', 30, '2026-01-30')
+       returning id`,
+      false,
+    );
+    return { accountId: account!.id!, ruleId: rule!.id! };
+  };
+
+  const done = () => psql(`delete from auth.users where id = '${UID}'`, false);
+
+  it('can be moved, recording the date it stands in for', () => {
+    const { accountId, ruleId } = setUp();
+
+    psql(
+      `insert into public.transactions
+         (user_id, account_id, occurred_on, merchant, amount, type, status, recurring_id, recurring_date)
+       values ('${UID}', '${accountId}', '2026-10-28', 'Salary', 2000, 'income', 'scheduled',
+               '${ruleId}', '2026-10-30')`,
+      false,
+    );
+
+    const [row] = rows('select occurred_on::text as on, recurring_date::text as stands_for from public.transactions', false);
+    expect(row).toMatchObject({ on: '2026-10-28', stands_for: '2026-10-30' });
+    done();
+  });
+
+  it('survives the rule being deleted, which a stricter constraint would forbid', () => {
+    // `recurring_id` is `on delete set null`. A check demanding a rule
+    // alongside `recurring_date` would make deleting a schedule fail outright
+    // once any occurrence of it had been edited.
+    const { accountId, ruleId } = setUp();
+    psql(
+      `insert into public.transactions
+         (user_id, account_id, occurred_on, merchant, amount, type, status, recurring_id, recurring_date)
+       values ('${UID}', '${accountId}', '2026-10-28', 'Salary', 2000, 'income', 'scheduled',
+               '${ruleId}', '2026-10-30')`,
+      false,
+    );
+
+    expect(() => psql(`delete from public.recurring_payments where id = '${ruleId}'`, false)).not.toThrow();
+    done();
+  });
+
+  it('can be skipped, once', () => {
+    const { ruleId } = setUp();
+
+    psql(
+      `insert into public.recurring_skips (user_id, recurring_id, occurrence_date)
+       values ('${UID}', '${ruleId}', '2026-10-30')`,
+      false,
+    );
+    expect(() =>
+      psql(
+        `insert into public.recurring_skips (user_id, recurring_id, occurrence_date)
+         values ('${UID}', '${ruleId}', '2026-10-30')`,
+        false,
+      ),
+    ).toThrow(/recurring_skips_once/);
+    done();
+  });
+
+  it('loses its skips when the rule itself goes', () => {
+    const { ruleId } = setUp();
+    psql(
+      `insert into public.recurring_skips (user_id, recurring_id, occurrence_date)
+       values ('${UID}', '${ruleId}', '2026-10-30')`,
+      false,
+    );
+
+    psql(`delete from public.recurring_payments where id = '${ruleId}'`, false);
+
+    const [count] = rows('select count(*) as n from public.recurring_skips', false);
+    expect(count!.n).toBe('0');
+    done();
+  });
+
+  it('keeps a moved transaction when the rule goes, simply unlinked', () => {
+    // The foreign key on `recurring_id` is ON DELETE SET NULL: deleting a
+    // schedule must not delete money that actually moved.
+    const { accountId, ruleId } = setUp();
+    psql(
+      `insert into public.transactions
+         (user_id, account_id, occurred_on, merchant, amount, type, status, recurring_id, recurring_date)
+       values ('${UID}', '${accountId}', '2026-08-28', 'Salary', 2000, 'income', 'cleared',
+               '${ruleId}', '2026-08-30')`,
+      false,
+    );
+
+    psql(`delete from public.recurring_payments where id = '${ruleId}'`, false);
+
+    const [row] = rows(
+      'select merchant, recurring_id is null as unlinked from public.transactions',
+      false,
+    );
+    expect(row).toMatchObject({ merchant: 'Salary', unlinked: 't' });
+    done();
+  });
+});

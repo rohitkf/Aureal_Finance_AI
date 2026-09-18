@@ -78,6 +78,15 @@ export interface Transaction {
   status: TransactionStatus;
   notes?: string;
   recurringId?: string;
+  /**
+   * The occurrence of `recurringId` this row stands in for.
+   *
+   * Usually the same as `date`, and left unset when it is. It matters when one
+   * occurrence is moved: a salary paid on the 28th instead of the 30th records
+   * 30 here, so the rule knows the 30th is accounted for and does not project
+   * it a second time.
+   */
+  recurringDate?: string;
   splits?: TransactionSplit[];
   receiptName?: string;
   taxDeductible?: boolean;
@@ -164,6 +173,13 @@ export interface Settings {
   theme: 'light' | 'dark' | 'system';
 }
 
+/** One occurrence of a rule that should not be projected at all. */
+export interface RecurringSkip {
+  id: string;
+  recurringId: string;
+  occurrenceDate: string;
+}
+
 export interface AppState {
   accounts: Account[];
   virtualAccounts: VirtualAccount[];
@@ -173,6 +189,7 @@ export interface AppState {
   budgets: Budget[];
   goals: Goal[];
   netWorthHistory: NetWorthPoint[];
+  recurringSkips: RecurringSkip[];
   settings: Settings;
 }
 
