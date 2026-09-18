@@ -67,7 +67,16 @@ export type Action =
   | { type: 'upsert-goal'; goal: Goal }
   | { type: 'delete-goal'; id: string }
   | { type: 'contribute-goal'; id: string; amount: number }
-  | { type: 'upsert-account'; account: Account }
+  | {
+      type: 'upsert-account';
+      account: Account;
+      /**
+       * A new account's starting balance, recorded as its first transaction.
+       * Part of this action rather than a second one, so it cannot be sent
+       * before the account it belongs to exists.
+       */
+      openingBalance?: number;
+    }
   | { type: 'delete-account'; id: string }
   | { type: 'upsert-virtual'; virtual: VirtualAccount }
   | { type: 'delete-virtual'; id: string }
@@ -382,9 +391,25 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   /* Writing                                                           */
   /* ---------------------------------------------------------------- */
 
+  /**
+   * Writes go out one at a time, in the order they were asked for.
+   *
+   * `dispatch` is fire-and-forget, and each action used to start its own async
+   * chain the instant it was called — so two actions in a row raced, and any
+   * action that depended on the one before it could lose. Adding an account
+   * with an opening balance is exactly that shape, and it failed with
+   * `transactions_account_id_fkey`: the transaction reached Postgres before
+   * the account it belonged to. The account was created, its opening balance
+   * was not, and the balance read £0.00.
+   *
+   * Serialising also stops two refetches from landing out of order and putting
+   * a stale slice into state.
+   */
+  const queue = useRef<Promise<void>>(Promise.resolve());
+
   const run = useCallback(
     (label: string, work: () => Promise<Slice[]>) => {
-      void (async () => {
+      queue.current = queue.current.then(async () => {
         try {
           const slices = await work();
           await refresh(slices);
@@ -401,10 +426,11 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
               : described.message,
           });
           // Pull the server's version back so the screen never shows a change
-          // that did not actually happen.
-          void refresh(ALL);
+          // that did not actually happen. Awaited, so the next action in the
+          // queue starts from the truth rather than from the failed guess.
+          await refresh(ALL).catch(() => {});
         }
-      })();
+      });
     },
     [refresh, toast, ALL],
   );
@@ -572,8 +598,32 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
               const row = accountToRow(a);
               delete (row as Partial<typeof row>).balance;
               check(await supabase.from('accounts').update(row).eq('id', a.id));
-            } else {
-              check(await supabase.from('accounts').insert({ id: a.id, ...accountToRow(a) }));
+              return ['accounts'];
+            }
+
+            check(await supabase.from('accounts').insert({ id: a.id, ...accountToRow(a) }));
+
+            // The opening balance is a transaction, because the database
+            // derives every balance from transactions. It is written here,
+            // after the account and inside the same action, so there is no
+            // moment where one exists without the other.
+            const opening = action.openingBalance ?? 0;
+            if (opening > 0) {
+              check(
+                await supabase.from('transactions').insert({
+                  id: newId(),
+                  account_id: a.id,
+                  occurred_on: ISO(new Date()),
+                  merchant: 'Opening balance',
+                  amount: opening,
+                  // On a credit account the stored balance is what is owed, so
+                  // an opening balance is money out, not money in.
+                  type: a.type === 'credit' ? 'expense' : 'income',
+                  status: 'cleared',
+                  notes: 'Recorded when the account was added.',
+                }),
+              );
+              return ['accounts', 'transactions'];
             }
             return ['accounts'];
           });

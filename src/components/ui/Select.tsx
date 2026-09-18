@@ -81,6 +81,15 @@ export const Select = ({
   const listRef = useRef<HTMLUListElement>(null);
   // Typing a few letters jumps to a match, the way a real select does.
   const typed = useRef({ text: '', at: 0 });
+  /**
+   * Whether the highlight last moved because of a key.
+   *
+   * Only then should the list scroll itself. Doing it for a pointer as well
+   * means that on a phone, dragging a finger down the list highlights whatever
+   * is under it and immediately scrolls that option back into view — the list
+   * hauls itself back under your finger and never moves.
+   */
+  const fromKeyboard = useRef(false);
 
   const selectedIndex = options.findIndex((o) => o.value === value);
   const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
@@ -115,9 +124,10 @@ export const Select = ({
     return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [open]);
 
-  // Keep the active option in view when arrowing through a long list.
+  // Keep the active option in view when arrowing through a long list — and
+  // only then, so a finger or a wheel is never fought for control of it.
   useEffect(() => {
-    if (!open) return;
+    if (!open || !fromKeyboard.current) return;
     listRef.current
       ?.querySelector<HTMLElement>(`[data-index="${active}"]`)
       ?.scrollIntoView({ block: 'nearest' });
@@ -125,6 +135,7 @@ export const Select = ({
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (disabled) return;
+    fromKeyboard.current = true;
 
     if (!open) {
       if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
@@ -219,7 +230,9 @@ export const Select = ({
           id={listId}
           role="listbox"
           aria-label="Options"
-          className="absolute z-50 mt-1.5 max-h-64 w-full overflow-y-auto rounded-2xl bg-[rgb(var(--surface-base))] p-1.5 shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),0_24px_48px_-16px_rgb(var(--ambient)/0.7)]"
+          // `overscroll-contain` stops a flick that reaches the end of this
+          // list from carrying on into the dialog behind it.
+          className="absolute z-50 mt-1.5 max-h-64 w-full touch-pan-y overflow-y-auto overscroll-contain rounded-2xl bg-[rgb(var(--surface-base))] p-1.5 shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),0_24px_48px_-16px_rgb(var(--ambient)/0.7)]"
         >
           {options.map((option, index) => {
             const isSelected = option.value === value;
@@ -230,13 +243,33 @@ export const Select = ({
                 role="option"
                 aria-selected={isSelected}
                 data-index={index}
-                // Pointer down rather than click: the trigger keeps focus, so
-                // there is no blur-then-click race to lose the selection to.
+                /*
+                  A mouse commits on pointer-down, because preventing the
+                  default there keeps focus on the trigger and there is no
+                  blur-then-click race to lose the selection to. A finger must
+                  not: preventing the default on a touch cancels the browser's
+                  own scrolling gesture before it begins, which is what made
+                  this list impossible to scroll on a phone. Touch commits on
+                  the click instead — and a drag that scrolls produces no
+                  click, so scrolling never selects anything by accident.
+                */
                 onPointerDown={(e) => {
+                  fromKeyboard.current = false;
+                  if (e.pointerType !== 'mouse') return;
                   e.preventDefault();
                   commit(index);
                 }}
-                onPointerEnter={() => setActive(index)}
+                onClick={(e) => {
+                  if (e.nativeEvent.detail === 0) return; // keyboard-synthesised
+                  commit(index);
+                }}
+                onPointerEnter={(e) => {
+                  // Hover is a mouse idea. A finger sliding down the list is
+                  // scrolling, not choosing.
+                  if (e.pointerType !== 'mouse') return;
+                  fromKeyboard.current = false;
+                  setActive(index);
+                }}
                 className={cn(
                   'flex cursor-pointer items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-[13.5px]',
                   'transition-colors duration-200 ease-fluid',
