@@ -7,6 +7,7 @@ import {
   availableNow,
   creditUtilisation,
   isDepository,
+  isSpendable,
   netWorth,
   totalCreditLimit,
   totalDebt,
@@ -57,6 +58,9 @@ export const Accounts = () => {
   }, [params, setParams]);
 
   const depository = state.accounts.filter(isDepository);
+  // The headline is spendable cash, so its count must be of the same accounts.
+  // An investment sits in the list below but is not money you can spend today.
+  const spendable = state.accounts.filter(isSpendable);
   const credit = state.accounts.filter((a) => a.type === 'credit');
   const liquid = availableNow(state.accounts);
   const debt = totalDebt(state.accounts);
@@ -100,7 +104,7 @@ export const Accounts = () => {
         <Card>
           <div className="flex items-center justify-between">
             <Eyebrow>Available now</Eyebrow>
-            <Badge tone="success">{depository.length} accounts</Badge>
+            <Badge tone="success">{spendable.length} accounts</Badge>
           </div>
           <p className="tnum mt-3 font-display text-metric-lg text-text">
             {money(liquid, { masked: maskBalances })}

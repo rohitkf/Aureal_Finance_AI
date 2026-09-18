@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
 import { formatFullDate, monthKey, relativeDayLabel } from '@/lib/date';
+import { downloadCsv } from '@/lib/csv';
 import { money } from '@/lib/format';
-import { useAppState, useCategories, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
+import { newId, useAppState, useCategories, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { TransactionRow } from '@/components/TransactionRow';
@@ -15,7 +16,7 @@ import { Icon } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { EmptyState, SkeletonRows } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
-import type { Transaction, TransactionType } from '@/lib/types';
+import type { RecurringPayment, Transaction, TransactionType } from '@/lib/types';
 
 type TypeFilter = 'all' | TransactionType | 'scheduled';
 
@@ -44,6 +45,7 @@ export const Transactions = () => {
   const [monthFilter, setMonthFilter] = useState(params.get('month') ?? monthKey(today));
   const [selected, setSelected] = useState<Transaction | null>(null);
   const [addOpen, setAddOpen] = useState(params.get('new') !== null);
+  const [editing, setEditing] = useState<Transaction | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const categories = useCategories();
 
@@ -104,6 +106,65 @@ export const Transactions = () => {
     (categoryFilter !== 'all' ? 1 : 0) +
     (query ? 1 : 0);
 
+  /**
+   * The rows on screen, as a file. Exactly what the filters are showing — an
+   * export that quietly ignored them would be a different set of numbers with
+   * the same name.
+   */
+  const exportCsv = () => {
+    if (filtered.length === 0) {
+      toast({ tone: 'info', title: 'Nothing to export', description: 'No transactions match these filters.' });
+      return;
+    }
+    downloadCsv(`aureal-transactions-${monthFilter === 'all' ? 'all' : monthFilter}`, [
+      ['Date', 'Time', 'Merchant', 'Category', 'Account', 'Type', 'Status', 'Amount', 'Notes'],
+      ...filtered.map((t) => [
+        t.date,
+        t.time ?? '',
+        t.merchant,
+        lookupCategory(t.categoryId).name,
+        state.accounts.find((a) => a.id === t.accountId)?.name ?? '',
+        t.type,
+        t.status,
+        t.amount.toFixed(2),
+        t.notes ?? '',
+      ]),
+    ]);
+    toast({
+      tone: 'success',
+      title: 'Export downloaded',
+      description: `${filtered.length} ${filtered.length === 1 ? 'transaction' : 'transactions'}.`,
+    });
+  };
+
+  /**
+   * Turns a transaction that already happened into a rule that says it happens
+   * again. Monthly on the same day is the overwhelmingly common case and the
+   * one worth guessing; anything else is two clicks away on the Recurring
+   * screen, which is where the toast points.
+   */
+  const makeRecurring = (t: Transaction) => {
+    const rule: RecurringPayment = {
+      id: newId(),
+      name: t.merchant,
+      amount: t.amount,
+      direction: t.type === 'income' ? 'in' : 'out',
+      categoryId: t.categoryId,
+      accountId: t.accountId,
+      frequency: 'monthly',
+      anchorDay: Number(t.date.slice(8, 10)),
+      startDate: t.date,
+      status: 'active',
+      adjustToWorkingDay: false,
+    };
+    dispatch({ type: 'add-recurring', recurring: rule });
+    toast({
+      tone: 'success',
+      title: 'Recurring payment created',
+      description: `${t.merchant} · monthly on day ${rule.anchorDay}. Change the schedule on the Recurring screen.`,
+    });
+  };
+
   const resetFilters = () => {
     setQuery('');
     setTypeFilter('all');
@@ -129,7 +190,7 @@ export const Transactions = () => {
         </div>
 
         <div className="flex gap-2">
-          <Button icon="download" className="hidden sm:inline-flex">
+          <Button icon="download" className="hidden sm:inline-flex" onClick={exportCsv}>
             Export CSV
           </Button>
           <Button variant="primary" icon="plus" onClick={() => setAddOpen(true)}>
@@ -266,6 +327,8 @@ export const Transactions = () => {
                 transaction={selected}
                 onDelete={() => setConfirmDelete(true)}
                 onClose={() => setSelected(null)}
+                onEdit={() => setEditing(selected)}
+                onMakeRecurring={() => makeRecurring(selected)}
               />
             ) : (
               <Card className="p-0">
@@ -288,6 +351,8 @@ export const Transactions = () => {
               transaction={selected}
               onDelete={() => setConfirmDelete(true)}
               onClose={() => setSelected(null)}
+              onEdit={() => setEditing(selected)}
+              onMakeRecurring={() => makeRecurring(selected)}
               embedded
             />
           )}
@@ -295,6 +360,11 @@ export const Transactions = () => {
       </div>
 
       <AddTransactionSheet open={addOpen} onClose={() => setAddOpen(false)} />
+      <AddTransactionSheet
+        open={Boolean(editing)}
+        onClose={() => setEditing(null)}
+        editing={editing}
+      />
 
       <ConfirmDialog
         open={confirmDelete}
@@ -328,11 +398,15 @@ const TransactionDetail = ({
   transaction,
   onDelete,
   onClose,
+  onEdit,
+  onMakeRecurring,
   embedded,
 }: {
   transaction: Transaction;
   onDelete: () => void;
   onClose: () => void;
+  onEdit: () => void;
+  onMakeRecurring: () => void;
   embedded?: boolean;
 }) => {
   const state = useAppState();
@@ -424,11 +498,16 @@ const TransactionDetail = ({
       </div>
 
       <div className="flex gap-2">
-        <Button icon="edit" fullWidth>
+        <Button icon="edit" fullWidth onClick={onEdit}>
           Edit
         </Button>
-        <Button icon="repeat" fullWidth>
-          Make recurring
+        <Button
+          icon="repeat"
+          fullWidth
+          onClick={onMakeRecurring}
+          disabled={Boolean(transaction.recurringId) || transaction.type === 'transfer'}
+        >
+          {transaction.recurringId ? 'Already recurring' : 'Make recurring'}
         </Button>
         <IconButton icon="trash" label="Delete transaction" variant="danger" onClick={onDelete} />
       </div>

@@ -10,7 +10,14 @@ import {
 import { money } from '@/lib/format';
 import { FREQUENCY_LABELS, previewOccurrences } from '@/lib/recurrence';
 import { newId, useAppState, useCategories, useStore, useToday } from '@/lib/store';
-import type { Category, Frequency, RecurringPayment, Transaction, TransactionType } from '@/lib/types';
+import type {
+  Category,
+  Frequency,
+  RecurringPayment,
+  Transaction,
+  TransactionStatus,
+  TransactionType,
+} from '@/lib/types';
 import { Button } from './ui/Button';
 import {
   AmountField,
@@ -26,6 +33,12 @@ import { useToast } from './ui/Toast';
 import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './ui/Icon';
 import { NewCategoryDialog } from './NewCategoryDialog';
+
+const STATUS_OPTIONS: Array<{ value: TransactionStatus; label: string }> = [
+  { value: 'cleared', label: 'Cleared' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'scheduled', label: 'Scheduled' },
+];
 
 const TYPE_OPTIONS: Array<{ value: TransactionType; label: string }> = [
   { value: 'expense', label: 'Expense' },
@@ -80,13 +93,24 @@ interface AddTransactionSheetProps {
   open: boolean;
   onClose: () => void;
   initialType?: TransactionType;
+  /**
+   * An existing transaction to change rather than a new one to record. The
+   * same form either way: the fields are identical, and two of them would
+   * drift apart.
+   */
+  editing?: Transaction | null;
 }
 
 /**
  * Add-transaction flow. The amount is the visual focus and everything else has
  * a sensible default, so recording an expense takes a few seconds on a phone.
  */
-export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: AddTransactionSheetProps) => {
+export const AddTransactionSheet = ({
+  open,
+  onClose,
+  initialType = 'expense',
+  editing = null,
+}: AddTransactionSheetProps) => {
   const { accounts } = useAppState();
   const { dispatch } = useStore();
   const allCategories = useCategories();
@@ -104,6 +128,11 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
   const [error, setError] = useState<string | undefined>();
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
 
+  // Only ever shown when editing. A new transaction's status follows its date,
+  // which is the rule the ledger is built on; an existing one needs to be
+  // changeable, because a scheduled payment that has gone through is the only
+  // way to tell the app it is no longer owed.
+  const [status, setStatus] = useState<TransactionStatus>('cleared');
   const [dateMode, setDateMode] = useState<DateMode>('today');
   const [repeats, setRepeats] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>('monthly');
@@ -120,23 +149,33 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
 
   useEffect(() => {
     if (!open) return;
-    setType(initialType);
-    setAmount('');
-    setMerchant('');
-    setNotes('');
-    setDate(today);
-    setDateMode('today');
+    setType(editing?.type ?? initialType);
+    setAmount(editing ? String(editing.amount) : '');
+    setMerchant(editing?.merchant ?? '');
+    setNotes(editing?.notes ?? '');
+    setDate(editing?.date ?? today);
+    setStatus(editing?.status ?? 'cleared');
+    setDateMode(editing ? 'custom' : 'today');
     setRepeats(false);
     setFrequency('monthly');
     setAdjustToWorkingDay(true);
     setIsSubscription(false);
     setError(undefined);
-  }, [open, initialType, today]);
+    if (editing) {
+      setAccountId(editing.accountId);
+      setCategoryId(editing.categoryId);
+      if (editing.toAccountId) setToAccountId(editing.toAccountId);
+    }
+  }, [open, initialType, today, editing]);
 
   // Keep the selections valid as the available options change.
   useEffect(() => {
+    // An archived category still belongs on the transaction that used it, so
+    // an edit keeps whatever is already there rather than snapping to the top
+    // of the list.
+    if (editing && editing.categoryId === categoryId) return;
     if (!categories.some((c) => c.id === categoryId)) setCategoryId(categories[0]?.id ?? '');
-  }, [categories, categoryId]);
+  }, [categories, categoryId, editing]);
 
   useEffect(() => {
     if (!accounts.some((a) => a.id === accountId)) setAccountId(accounts[0]?.id ?? '');
@@ -209,9 +248,9 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
     }
 
     const transaction: Transaction = {
-      id: newId(),
+      id: editing?.id ?? newId(),
       date,
-      time: new Date().toTimeString().slice(0, 5),
+      time: editing?.time ?? new Date().toTimeString().slice(0, 5),
       merchant:
         merchant.trim() ||
         (type === 'transfer'
@@ -225,16 +264,26 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
       toAccountId: type === 'transfer' ? toAccountId : undefined,
       categoryId,
       // A date in the future is a plan, not a fact — it lands in the forecast.
-      status: date > today ? 'scheduled' : 'cleared',
+      // On an edit the person says which it is, because only they know whether
+      // a payment that was due last week actually went out.
+      status: editing ? status : date > today ? 'scheduled' : 'cleared',
       notes: notes.trim() || undefined,
+      recurringId: editing?.recurringId,
+      splits: editing?.splits,
+      receiptName: editing?.receiptName,
+      taxDeductible: editing?.taxDeductible,
     };
 
-    dispatch({ type: 'add-transaction', transaction });
+    dispatch(
+      editing
+        ? { type: 'update-transaction', transaction }
+        : { type: 'add-transaction', transaction },
+    );
 
     // Both, deliberately: the person is recording something that happened and
     // saying it happens again. Creating only the rule would leave the ledger
     // missing the payment they just entered.
-    if (repeats && canRepeat) {
+    if (repeats && canRepeat && !editing) {
       const rule: RecurringPayment = {
         id: newId(),
         name: transaction.merchant,
@@ -254,7 +303,9 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
 
     toast({
       tone: 'success',
-      title: `${type === 'income' ? 'Income' : type === 'transfer' ? 'Transfer' : 'Expense'} saved`,
+      title: editing
+        ? 'Transaction updated'
+        : `${type === 'income' ? 'Income' : type === 'transfer' ? 'Transfer' : 'Expense'} saved`,
       description:
         repeats && canRepeat
           ? `${money(transaction.amount)} · ${transaction.merchant} · repeats ${FREQUENCY_LABELS[frequency].toLowerCase()}`
@@ -273,13 +324,13 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
       <Modal
         open={open}
         onClose={onClose}
-        title="Add transaction"
+        title={editing ? 'Edit transaction' : 'Add transaction'}
         description={`Recorded against ${formatMediumDate(date)}`}
         footer={
           <>
             <Button onClick={onClose}>Cancel</Button>
             <Button variant="primary" icon="check" onClick={submit} disabled={!valid}>
-              Save transaction
+              {editing ? 'Save changes' : 'Save transaction'}
             </Button>
           </>
         }
@@ -421,10 +472,27 @@ export const AddTransactionSheet = ({ open, onClose, initialType = 'expense' }: 
             </div>
           </div>
 
+          {editing && (
+            <div className="flex flex-col gap-2">
+              <SegmentedControl
+                label="Status"
+                value={status}
+                onChange={setStatus}
+                options={STATUS_OPTIONS}
+                className="w-full [&>button]:flex-1"
+              />
+              <p className="text-[12.5px] leading-snug text-faint">
+                {status === 'scheduled'
+                  ? 'Scheduled money has not moved yet. It is held back from Safe to Spend until you mark it cleared.'
+                  : 'Cleared and pending money has left the account and is already in your balance.'}
+              </p>
+            </div>
+          )}
+
           {/* Repeating lives here rather than only on the Recurring screen,
               because "this happens every month" is something you know at the
               moment you record it, not on a separate trip later. */}
-          {canRepeat && (
+          {canRepeat && !editing && (
             <div className="space-y-4">
               <CheckboxField
                 checked={repeats}

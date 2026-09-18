@@ -121,8 +121,30 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   // people the second when it meant the first.
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Today, kept current.
+   *
+   * Every figure in this app is decided by comparing a date against today, and
+   * this is an installed PWA people leave open. Computed once, a tab opened on
+   * Sunday evening still calls Monday "tomorrow" and leaves Monday's rent out
+   * of Safe-to-Spend. The timer below crosses midnight with the user.
+   */
+  const [today, setToday] = useState(() => ISO(new Date()));
   // Guards against a slow response from a previous user landing in state.
   const userRef = useRef<string | null>(null);
+  /**
+   * The current state, for callbacks that must not change identity.
+   *
+   * `dispatch` goes into the context value, and every screen reads that value,
+   * so a new `dispatch` on every state change re-renders the whole app. It
+   * still needs today's goals and accounts, so it reads them here — which is
+   * also more correct: an action runs when the person clicks, and should see
+   * the state as it is then, not as it was when the callback was built.
+   */
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   /* ---------------------------------------------------------------- */
   /* Reading                                                           */
@@ -312,6 +334,28 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     setError(errorMessage(lastError, 'Could not load your data.'));
     setLoading(false);
   }, [fetchSlices, ALL]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const scheduleNextMidnight = () => {
+      const now = new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 2);
+      timer = setTimeout(() => {
+        setToday(ISO(new Date()));
+        scheduleNextMidnight();
+      }, midnight.getTime() - now.getTime());
+    };
+    scheduleNextMidnight();
+    // Waking from sleep skips the timer entirely, so check on the way back.
+    const onWake = () => setToday(ISO(new Date()));
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('focus', onWake);
+    };
+  }, []);
 
   // Load on sign-in; clear completely on sign-out so nothing leaks between users.
   useEffect(() => {
@@ -510,7 +554,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 
         case 'contribute-goal':
           run('add that contribution', async () => {
-            const goal = state.goals.find((g) => g.id === action.id);
+            const goal = stateRef.current.goals.find((g) => g.id === action.id);
             if (!goal) return ['goals'];
             const saved = Math.min(goal.target, goal.saved + action.amount);
             check(await supabase.from('goals').update({ saved }).eq('id', action.id));
@@ -521,7 +565,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         case 'upsert-account':
           run('save that account', async () => {
             const a = action.account;
-            const exists = state.accounts.some((x) => x.id === a.id);
+            const exists = stateRef.current.accounts.some((x) => x.id === a.id);
             if (exists) {
               // Balance is maintained by the database from transactions, so an
               // edit must not overwrite it.
@@ -630,7 +674,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           break;
       }
     },
-    [run, state.goals, state.accounts],
+    [run],
   );
 
   /* ---------------------------------------------------------------- */
@@ -681,7 +725,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     () => ({
       state,
       dispatch,
-      today: ISO(new Date()),
+      today,
       loading: notReady,
       loaded,
       error,
@@ -689,7 +733,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       clearAll,
       loadSampleData,
     }),
-    [state, dispatch, notReady, loaded, error, reload, clearAll, loadSampleData],
+    [state, dispatch, today, notReady, loaded, error, reload, clearAll, loadSampleData],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

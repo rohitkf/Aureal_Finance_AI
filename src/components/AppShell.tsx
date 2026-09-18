@@ -182,7 +182,6 @@ export const AppShell = () => {
                 label={`Switch to ${resolved === 'dark' ? 'light' : 'dark'} mode`}
                 onClick={toggle}
               />
-              <IconButton icon="bell" label="Notifications" className="hidden sm:inline-flex" />
               <NavLink
                 to="/settings"
                 className="ml-2 flex items-center gap-2.5 rounded-full py-1 pl-1 pr-1 transition-all duration-500 ease-fluid hover:bg-[rgb(var(--hairline)/0.06)] xl:pr-4"

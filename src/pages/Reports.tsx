@@ -11,10 +11,12 @@ import {
   subscriptionTotals,
   totalDebt,
 } from '@/lib/finance';
-import { formatMonthYear, formatShortMonth, monthKey } from '@/lib/date';
+import { addMonths, formatMonthYear, formatShortMonth, monthKey } from '@/lib/date';
+import { downloadCsv } from '@/lib/csv';
 import { money, percent } from '@/lib/format';
 import { monthlyEquivalent } from '@/lib/recurrence';
 import { useAppState, useCategoryLookup, useLoading, useSettings, useToday } from '@/lib/store';
+import { useToast } from '@/components/ui/Toast';
 import { DonutChart } from '@/components/charts/DonutChart';
 import { IncomeExpenseChart } from '@/components/charts/BarChart';
 import { NetWorthChart } from '@/components/charts/NetWorthChart';
@@ -34,6 +36,7 @@ export const Reports = () => {
   const loading = useLoading();
   const lookupCategory = useCategoryLookup();
   const [range, setRange] = useState<Range>('6');
+  const toast = useToast();
 
   const month = monthKey(today);
   const spent = monthSpend(state, month);
@@ -58,14 +61,26 @@ export const Reports = () => {
     [state.recurring],
   );
 
-  const history = useMemo(() => {
-    const months = state.netWorthHistory.slice(-Number(range));
-    return months.map((p) => ({
-      label: formatShortMonth(`${p.month}-01`),
-      income: monthIncome(state, p.month),
-      expenses: monthSpend(state, p.month),
-    }));
-  }, [state, range]);
+  /**
+   * The last N calendar months, counted back from this one.
+   *
+   * This used to walk `netWorthHistory`, which nothing in the app writes — so
+   * for everyone except someone who had loaded the sample data, the income and
+   * expenses chart was permanently empty however many transactions they had.
+   * The months come from the calendar now; the figures come from the ledger.
+   */
+  const history = useMemo(
+    () =>
+      Array.from({ length: Number(range) }, (_, i) => {
+        const key = monthKey(addMonths(`${month}-01`, i - (Number(range) - 1)));
+        return {
+          label: formatShortMonth(`${key}-01`),
+          income: monthIncome(state, key),
+          expenses: monthSpend(state, key),
+        };
+      }),
+    [state, range, month],
+  );
 
   const categorySlices = useMemo(() => {
     const spend = [...spendByCategory(state, month).entries()].sort((a, b) => b[1] - a[1]);
@@ -76,12 +91,30 @@ export const Reports = () => {
     return rest > 0 ? [...top, { id: 'other', label: 'Everything else', value: rest }] : top;
   }, [state, month, lookupCategory]);
 
+  /** The monthly series behind the charts, as a file. */
+  const exportCsv = () => {
+    downloadCsv(`aureal-report-${month}`, [
+      ['Month', 'Income', 'Expenses', 'Net', 'Savings rate %'],
+      ...history.map((h, i) => {
+        const key = monthKey(addMonths(`${month}-01`, i - (history.length - 1)));
+        return [
+          key,
+          h.income.toFixed(2),
+          h.expenses.toFixed(2),
+          (h.income - h.expenses).toFixed(2),
+          savingsRate(state, key).toFixed(1),
+        ];
+      }),
+    ]);
+    toast({ tone: 'success', title: 'Export downloaded', description: `${history.length} months.` });
+  };
+
   const budgets = useMemo(() => budgetProgress(state, month), [state, month]);
   const netWorthSeries = useMemo(() => state.netWorthHistory.slice(-Number(range)), [state.netWorthHistory, range]);
 
-  if (loading) return <SkeletonChart />;
-
   const hasData = state.transactions.length > 0;
+
+  if (loading) return <SkeletonChart />;
 
   return (
     <div className="space-y-8">
@@ -103,7 +136,7 @@ export const Reports = () => {
               { value: '12', label: '12M' },
             ]}
           />
-          <Button icon="download" size="sm">
+          <Button icon="download" size="sm" onClick={exportCsv} disabled={!hasData}>
             Export
           </Button>
         </div>
