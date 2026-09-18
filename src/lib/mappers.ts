@@ -91,6 +91,7 @@ export const toRecurring = (row: RecurringRow): RecurringPayment => ({
   direction: row.direction,
   categoryId: row.category_id ?? '',
   accountId: row.account_id ?? '',
+  toAccountId: row.to_account_id ?? undefined,
   frequency: row.frequency,
   customIntervalDays: row.custom_interval_days ?? undefined,
   anchorDay: row.anchor_day,
@@ -181,6 +182,9 @@ export const recurringToRow = (r: Omit<RecurringPayment, 'id'>) => ({
   direction: r.direction,
   category_id: r.categoryId || null,
   account_id: r.accountId || null,
+  // The database refuses a destination on anything that is not a transfer,
+  // so a rule switched away from one cannot leave its target behind.
+  to_account_id: r.direction === 'transfer' ? (r.toAccountId ?? null) : null,
   frequency: r.frequency,
   custom_interval_days: r.customIntervalDays ?? null,
   anchor_day: r.anchorDay,

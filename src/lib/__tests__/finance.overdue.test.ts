@@ -134,15 +134,21 @@ describe('what must not change', () => {
     expect(forecastEvents(s, TODAY, '2026-09-30')[0]!.overdue).toBe(false);
   });
 
-  it('a transfer still moves nothing overall, overdue or not', () => {
+  it('an overdue transfer between two spendable accounts changes no total', () => {
     const s = state({
       accounts: [account(), account({ id: 'acc-2', name: 'Savings', type: 'savings', balance: 0 })],
       transactions: [
         txn({ date: '2026-09-10', status: 'scheduled', type: 'transfer', toAccountId: 'acc-2' }),
       ],
     });
-    expect(forecastEvents(s, TODAY, '2026-09-30')).toHaveLength(0);
+    const events = forecastEvents(s, TODAY, '2026-09-30');
+    // On the timeline, because it is still going to happen…
+    expect(events).toHaveLength(1);
+    expect(events[0]!.overdue).toBe(true);
+    // …but counted nowhere, because the money stays spendable either way.
+    expect(events[0]!.affectsAvailable).toBe(false);
     expect(safeToSpend(s, TODAY).amount).toBe(1000);
+    expect(safeToSpend(s, TODAY).committed).toBe(0);
   });
 
   it('an overdue instance of a rule is not counted twice by the rule that made it', () => {

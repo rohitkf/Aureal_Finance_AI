@@ -129,32 +129,67 @@ export const isOverdue = (t: Transaction, today: string): boolean =>
  * recurring rules. A recurring rule that already has a scheduled transaction
  * on a date is not double-counted.
  */
+/**
+ * What a movement between two of the user's own accounts does to the cash they
+ * can actually spend.
+ *
+ * Usually nothing: money going from a current account to savings is still
+ * theirs and still spendable, so the figure must not move — subtracting it
+ * would tell somebody they were poorer for saving. But a transfer whose far
+ * end is not spendable, an investment account, really does put money out of
+ * reach, and one arriving from there really does bring it back. `null` means
+ * it nets out, and belongs on the timeline without touching a total.
+ */
+const transferEffect = (
+  accounts: Account[],
+  fromId: string,
+  toId: string | undefined,
+): 'in' | 'out' | null => {
+  const from = accounts.find((a) => a.id === fromId);
+  const to = accounts.find((a) => a.id === toId);
+  // An account that cannot be found cannot be reasoned about. Treating the
+  // money as leaving is the cautious answer for a forecast.
+  const leaves = from ? isSpendable(from) : true;
+  const arrives = to ? isSpendable(to) : false;
+  if (leaves === arrives) return null;
+  return leaves ? 'out' : 'in';
+};
+
 export const forecastEvents = (state: AppState, today: string, to: string): ForecastEvent[] => {
   const events: ForecastEvent[] = [];
   const claimed = new Set<string>();
 
   for (const t of state.transactions) {
-    if (t.type === 'transfer') continue;
     const overdue = isOverdue(t, today);
     // Anything on or before today has already moved the balance, unless it is
     // still only scheduled — in which case it has not, and still counts.
     if (!overdue && (t.date <= today || t.date > to)) continue;
     if (t.recurringId) claimed.add(`${t.recurringId}|${t.date}`);
+
+    const effect =
+      t.type === 'transfer' ? transferEffect(state.accounts, t.accountId, t.toAccountId) : null;
+
     events.push({
       id: t.id,
       date: t.date,
       label: t.merchant,
       amount: t.amount,
-      direction: t.type === 'income' ? 'in' : 'out',
+      direction: t.type === 'income' ? 'in' : t.type === 'transfer' ? (effect ?? 'out') : 'out',
       kind: t.recurringId ? 'recurring' : 'scheduled',
       accountId: t.accountId,
       categoryId: t.categoryId,
       projected: t.status === 'scheduled',
       overdue,
+      affectsAvailable: t.type !== 'transfer' || effect !== null,
     });
   }
 
   for (const rule of state.recurring) {
+    const effect =
+      rule.direction === 'transfer'
+        ? transferEffect(state.accounts, rule.accountId, rule.toAccountId)
+        : null;
+
     for (const date of expandRecurrence(rule, addDays(today, 1), to)) {
       if (claimed.has(`${rule.id}|${date}`)) continue;
       events.push({
@@ -162,12 +197,13 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
         date,
         label: rule.name,
         amount: rule.amount,
-        direction: rule.direction,
+        direction: rule.direction === 'transfer' ? (effect ?? 'out') : rule.direction,
         kind: rule.isSubscription ? 'subscription' : 'recurring',
         accountId: rule.accountId,
         categoryId: rule.categoryId,
         projected: true,
         overdue: false,
+        affectsAvailable: rule.direction !== 'transfer' || effect !== null,
       });
     }
   }
@@ -198,8 +234,11 @@ export const buildForecast = (state: AppState, today: string, horizonDays: numbe
   for (let i = 0; i <= horizonDays; i += 1) {
     const date = addDays(today, i);
     const dayEvents = byDate.get(date) ?? [];
-    const income = round2(dayEvents.filter((e) => e.direction === 'in').reduce((s, e) => s + e.amount, 0));
-    const expenses = round2(dayEvents.filter((e) => e.direction === 'out').reduce((s, e) => s + e.amount, 0));
+    // Only what changes the cash there is. A transfer between two spendable
+    // accounts appears on the day and moves the line by nothing.
+    const counted = dayEvents.filter((e) => e.affectsAvailable);
+    const income = round2(counted.filter((e) => e.direction === 'in').reduce((s, e) => s + e.amount, 0));
+    const expenses = round2(counted.filter((e) => e.direction === 'out').reduce((s, e) => s + e.amount, 0));
     const opening = running;
     running = round2(opening + income - expenses);
     totalIncome = round2(totalIncome + income);
@@ -375,10 +414,11 @@ export const lockedAllocations = (virtualAccounts: VirtualAccount[]): number =>
 export const safeToSpend = (state: AppState, today: string): SafeToSpend => {
   const through = endOfMonth(today);
   const events = forecastEvents(state, today, through);
+  const counted = events.filter((e) => e.affectsAvailable);
   const expectedIncome = round2(
-    events.filter((e) => e.direction === 'in').reduce((s, e) => s + e.amount, 0),
+    counted.filter((e) => e.direction === 'in').reduce((s, e) => s + e.amount, 0),
   );
-  const outgoing = events.filter((e) => e.direction === 'out');
+  const outgoing = counted.filter((e) => e.direction === 'out');
   const committed = round2(outgoing.reduce((s, e) => s + e.amount, 0));
   const overdue = round2(outgoing.filter((e) => e.overdue).reduce((s, e) => s + e.amount, 0));
   const available = availableNow(state.accounts);
@@ -434,10 +474,23 @@ export const budgetProgress = (state: AppState, month: string): BudgetProgress[]
 /* Commitments                                                         */
 /* ------------------------------------------------------------------ */
 
+/**
+ * What leaves every month. Transfers are not counted: money moved between your
+ * own accounts is still yours, and calling it a commitment would say you were
+ * spending your savings contribution.
+ */
 export const monthlyCommitments = (state: AppState): number =>
   round2(
     state.recurring
       .filter((r) => r.status === 'active' && r.direction === 'out')
+      .reduce((sum, r) => sum + monthlyEquivalent(r), 0),
+  );
+
+/** What moves between the user's own accounts each month, on a schedule. */
+export const monthlyTransfers = (state: AppState): number =>
+  round2(
+    state.recurring
+      .filter((r) => r.status === 'active' && r.direction === 'transfer')
       .reduce((sum, r) => sum + monthlyEquivalent(r), 0),
   );
 

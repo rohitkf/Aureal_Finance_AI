@@ -283,3 +283,93 @@ describe('an account and its opening balance', () => {
     psql(`delete from auth.users where id = '${UID}'`, false);
   });
 });
+
+/**
+ * The shape of a transfer rule, as the database insists on it.
+ *
+ * A standing order is the one recurring thing that needs two accounts, and
+ * `recurring_payments` had room for one. The constraints below are what stop a
+ * half-described transfer from ever being stored: the client can be wrong, and
+ * a rule with nowhere to send money would be acted on by the forecast every
+ * month thereafter.
+ */
+describe('recurring transfers', () => {
+  const account = (name: string, type: string) => {
+    const [row] = rows(
+      `insert into public.accounts (user_id, name, type)
+       values ('${UID}', '${name}', '${type}') returning id`,
+      false,
+    );
+    return row!.id!;
+  };
+
+  const addRule = (direction: string, from: string, to: string | null) =>
+    psql(
+      `insert into public.recurring_payments
+         (user_id, name, amount, direction, account_id, to_account_id, frequency, anchor_day, start_date)
+       values ('${UID}', 'Rule', 200, '${direction}', '${from}',
+               ${to === null ? 'null' : `'${to}'`}, 'monthly', 25, current_date)`,
+      false,
+    );
+
+  it('accepts a transfer that names somewhere to go', () => {
+    signUp();
+    const from = account('Current', 'current');
+    const to = account('Savings', 'savings');
+
+    addRule('transfer', from, to);
+
+    expect(rows('select direction from public.recurring_payments')[0]!.direction).toBe('transfer');
+    psql(`delete from auth.users where id = '${UID}'`, false);
+  });
+
+  it('refuses an expense that carries a destination', () => {
+    signUp();
+    const from = account('Current', 'current');
+    const to = account('Savings', 'savings');
+
+    expect(() => addRule('out', from, to)).toThrow(/recurring_transfer_target/);
+    psql(`delete from auth.users where id = '${UID}'`, false);
+  });
+
+  it('allows a transfer with no destination, so the far account can be deleted', () => {
+    // Deliberately not a constraint. Requiring one would make `on delete set
+    // null` impossible to satisfy, and deleting a savings account would fail
+    // outright because a standing order happened to mention it. The form is
+    // what insists on a destination when a rule is created.
+    signUp();
+    const from = account('Current', 'current');
+
+    expect(() => addRule('transfer', from, null)).not.toThrow();
+    psql(`delete from auth.users where id = '${UID}'`, false);
+  });
+
+  it('refuses a transfer to the account it came from', () => {
+    signUp();
+    const from = account('Current', 'current');
+
+    expect(() => addRule('transfer', from, from)).toThrow(/recurring_transfer_target/);
+    psql(`delete from auth.users where id = '${UID}'`, false);
+  });
+
+  it('keeps the rule when its destination account is deleted, pointing nowhere', () => {
+    // ON DELETE SET NULL rather than CASCADE: losing an account should not
+    // silently delete the schedule that mentioned it. The engine treats a rule
+    // with no destination as money leaving, which is the cautious reading.
+    signUp();
+    const from = account('Current', 'current');
+    const to = account('Savings', 'savings');
+    addRule('transfer', from, to);
+
+    psql(`delete from public.accounts where id = '${to}'`, false);
+
+    // Asked for as a boolean: psql prints a lone null column as an empty line,
+    // which this harness cannot tell from no rows at all.
+    const [row] = rows(
+      'select name, to_account_id is null as orphaned from public.recurring_payments',
+      false,
+    );
+    expect(row!.orphaned).toBe('t');
+    psql(`delete from auth.users where id = '${UID}'`, false);
+  });
+});

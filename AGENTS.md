@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 366 tests
+npm run test         # vitest — 391 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -66,12 +66,13 @@ Vocabulary that is easy to get wrong:
 
 | Word | What it means here |
 |---|---|
-| **Available now** | Cleared balances of depository accounts. Credit accounts are debts and never count towards it. |
+| **Available now** | Cleared balances of the accounts money can actually be spent from — current, savings, cash. Credit is a debt and investments are not cash, so neither counts. |
 | **A credit account's `balance`** | What is **owed**, as a positive number. Spending increases it; a payment reduces it. |
 | **`cleared`** | It happened. It is in the balance. |
 | **`scheduled`** | It is a plan. It is in the forecast and moves no balance until it clears. |
 | **A virtual account** | An allocation of money that already exists in a real account. It never adds to net worth. |
-| **A commitment** | A recurring payment that has not yet fallen due this month. |
+| **A commitment** | A recurring payment that has not yet fallen due this month. A transfer is not one: the money is still yours. |
+| **A transfer rule** | A standing order between two of your own accounts. `account_id` is the source, `to_account_id` the destination. |
 
 Other things that are true and not guessable:
 
@@ -288,6 +289,20 @@ Each of these has already cost real time here.
   `click` instead. For the same reason `pointerenter` only moves the highlight
   for a mouse, and the list only scrolls itself when the highlight moved by
   key — otherwise a drag drags the list back under the finger.
+- **A transfer is not free, and the forecast is not net worth.** Moving money
+  creates and destroys none of it, which is why `signedAmount` returns 0 — but
+  the forecast is a line of *spendable* cash, and paying £250 off a card leaves
+  £250 less to spend. `transferEffect` decides: a transfer counts only where it
+  crosses the `isSpendable` boundary, and is shown on the timeline either way
+  (`affectsAvailable`). Skipping transfers wholesale, as the forecast used to,
+  makes card payments and investment top-ups look free.
+- **`recurring_payments.to_account_id` may be null on a transfer, deliberately.**
+  It is `on delete set null`, so requiring one would make deleting an account a
+  standing order mentions fail outright. The form insists on a destination; the
+  constraint only rejects the incoherent shapes (a destination on a non-transfer,
+  a transfer pointing at its own source). A rule left pointing nowhere is still
+  treated as money leaving — Aureal is a record of accounts, not the bank, and
+  deleting one here does not cancel a real standing order.
 - **Supabase's built-in email sender delivers only to project members** and
   is rate-limited to a couple an hour. It looks like it works because it
   works for you. Real sign-ups need custom SMTP — SETUP.md §5.
