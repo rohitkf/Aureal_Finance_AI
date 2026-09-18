@@ -48,6 +48,7 @@ export type IconName =
   | 'briefcase'
   | 'swap'
   | 'calendar'
+  | 'clock'
   | 'filter'
   | 'download'
   | 'edit'
@@ -287,6 +288,12 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <rect x="3.5" y="5" width="17" height="16" rx="3" />
       <path d="M3.5 10h17M8 3v4m8-4v4" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 1.8" />
     </>
   ),
   filter: <path d="M3.5 5.5h17l-6.5 7.5v6l-4 2v-8z" />,

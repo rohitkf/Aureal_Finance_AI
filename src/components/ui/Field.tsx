@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn';
 import { Icon } from './Icon';
 import { Select } from './Select';
 import { DatePicker } from './DatePicker';
+import { TimePicker } from './TimePicker';
 
 /**
  * Controls are wells pressed into their surface — an inset hairline and a
@@ -337,6 +338,42 @@ interface DateFieldProps {
 }
 
 /** A date, chosen from the app's own calendar rather than the platform's. */
+interface TimeFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  hint?: string;
+  error?: string;
+  hideLabel?: boolean;
+  containerClassName?: string;
+  disabled?: boolean;
+}
+
+/** A time, drawn the way this app draws everything else. */
+export const TimeField = ({
+  label,
+  value,
+  onChange,
+  hint,
+  error,
+  hideLabel,
+  containerClassName,
+  disabled,
+}: TimeFieldProps) => (
+  <Field label={label} hint={hint} error={error} hideLabel={hideLabel} className={containerClassName}>
+    {({ id, describedBy, invalid }) => (
+      <TimePicker
+        id={id}
+        value={value}
+        onChange={onChange}
+        describedBy={describedBy}
+        invalid={invalid}
+        disabled={disabled}
+      />
+    )}
+  </Field>
+);
+
 export const DateField = ({
   label,
   value,

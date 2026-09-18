@@ -146,3 +146,24 @@ export const greeting = (date = new Date()): string => {
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
 };
+
+/**
+ * Times, as `HH:MM` strings.
+ *
+ * The same bargain the dates above make: a string the whole app agrees on,
+ * never a `Date`, so nothing drifts across a timezone on the way to storage.
+ */
+
+/** `14:32` → `2:32 pm`, which is how the time is read aloud in en-GB. */
+export const formatTime = (value: string): string => {
+  const [h, m] = value.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return '\u2014';
+  const hour = h! % 12 === 0 ? 12 : h! % 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${h! < 12 ? 'am' : 'pm'}`;
+};
+
+/** Whether a string is a 24-hour `HH:MM` this app can store. */
+export const isValidTime = (value: string): boolean => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+
+/** Now, as `HH:MM`. */
+export const nowTime = (): string => new Date().toTimeString().slice(0, 5);
