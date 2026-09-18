@@ -182,9 +182,11 @@ export const AddTransactionSheet = ({
     if (!accounts.some((a) => a.id === toAccountId)) setToAccountId(accounts[1]?.id ?? accounts[0]?.id ?? '');
   }, [accounts, accountId, toAccountId]);
 
-  // A transfer moves money between the user's own accounts; a recurrence has
-  // a single direction, in or out, so there is nothing coherent to repeat.
-  const canRepeat = type !== 'transfer';
+  // Transfers repeat too: a standing order into savings is one of the most
+  // common recurring things anybody has. It used to be refused here because a
+  // rule only knew a single direction, in or out, and had nowhere to put the
+  // destination. It has both now.
+  const canRepeat = true;
 
   const setDateFromMode = (mode: DateMode) => {
     setDateMode(mode);
@@ -212,7 +214,7 @@ export const AddTransactionSheet = ({
         id: 'preview',
         name: 'preview',
         amount: 0,
-        direction: type === 'income' ? 'in' : 'out',
+        direction: type === 'income' ? 'in' : type === 'transfer' ? 'transfer' : 'out',
         categoryId,
         accountId,
         frequency,
@@ -288,15 +290,17 @@ export const AddTransactionSheet = ({
         id: newId(),
         name: transaction.merchant,
         amount: transaction.amount,
-        direction: type === 'income' ? 'in' : 'out',
+        direction: type === 'income' ? 'in' : type === 'transfer' ? 'transfer' : 'out',
         categoryId,
         accountId,
+        toAccountId: type === 'transfer' ? toAccountId : undefined,
         frequency,
         anchorDay: anchorFor(frequency, date),
         startDate: date,
         status: 'active',
         adjustToWorkingDay,
-        isSubscription,
+        // Money moved between your own accounts is not something you subscribe to.
+        isSubscription: type === 'transfer' ? false : isSubscription,
       };
       dispatch({ type: 'add-recurring', recurring: rule });
     }
@@ -522,12 +526,14 @@ export const AddTransactionSheet = ({
                     description="Moves back to the Friday, the way a salary arrives."
                   />
 
-                  <CheckboxField
-                    checked={isSubscription}
-                    onChange={setIsSubscription}
-                    label="This is a subscription"
-                    description="It’ll be tracked on the Subscriptions screen too."
-                  />
+                  {type !== 'transfer' && (
+                    <CheckboxField
+                      checked={isSubscription}
+                      onChange={setIsSubscription}
+                      label="This is a subscription"
+                      description="It’ll be tracked on the Subscriptions screen too."
+                    />
+                  )}
 
                   {/* A recurrence rule is abstract. Show the dates it produces,
                       so the weekend rollback is visible before saving. */}

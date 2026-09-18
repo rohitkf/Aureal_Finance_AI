@@ -72,7 +72,8 @@ export interface RecurringRow {
   user_id: string;
   name: string;
   amount: number;
-  direction: 'in' | 'out';
+  direction: 'in' | 'out' | 'transfer';
+  to_account_id: string | null;
   category_id: string | null;
   account_id: string | null;
   frequency:

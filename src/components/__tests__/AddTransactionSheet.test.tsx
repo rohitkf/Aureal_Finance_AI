@@ -276,13 +276,44 @@ describe('repeating a transaction', () => {
     return call[0].recurring;
   };
 
-  it('is not offered for a transfer, which has no single direction', async () => {
+  it('is offered for a transfer too — a standing order is the commonest one there is', async () => {
     const user = userEvent.setup();
     open();
 
     expect(screen.getByRole('checkbox', { name: /this repeats/i })).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: 'Transfer' }));
-    expect(screen.queryByRole('checkbox', { name: /this repeats/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /this repeats/i })).toBeInTheDocument();
+  });
+
+  it('builds a transfer rule that knows where the money goes', async () => {
+    const user = userEvent.setup();
+    open();
+
+    // The amount first: the field is auto-focused when the sheet opens, and
+    // clicking anything else takes the caret with it.
+    await user.keyboard('200');
+    await user.click(screen.getByRole('radio', { name: 'Transfer' }));
+    await tickRepeats(user);
+    await user.click(screen.getByRole('button', { name: /Save transaction/ }));
+
+    expect(savedRule()).toMatchObject({
+      direction: 'transfer',
+      accountId: 'acc-1',
+      toAccountId: 'acc-2',
+      // Money moved between your own accounts is not something you subscribe to.
+      isSubscription: false,
+    });
+  });
+
+  it('does not offer to call a transfer a subscription', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await tickRepeats(user);
+    expect(screen.getByRole('checkbox', { name: /this is a subscription/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('radio', { name: 'Transfer' }));
+    expect(screen.queryByRole('checkbox', { name: /this is a subscription/i })).not.toBeInTheDocument();
   });
 
   it('records the transaction and creates the rule, not one or the other', async () => {

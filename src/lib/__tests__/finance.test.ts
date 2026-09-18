@@ -268,14 +268,58 @@ describe('buildForecast', () => {
     expect(forecast.trough.value).toBe(lowest);
   });
 
-  it('treats transfers as moving money, not creating or destroying it', () => {
+  /**
+   * A transfer creates and destroys nothing, but the forecast is a line of
+   * *spendable cash*, and that is a narrower thing than everything you own.
+   * Whether a transfer moves the line depends on where it lands.
+   */
+  it('leaves the line alone when the money is still spendable afterwards', () => {
+    const base = minimal();
+    const state: AppState = {
+      ...base,
+      accounts: [
+        ...base.accounts,
+        {
+          id: 's1',
+          name: 'Savings',
+          type: 'savings',
+          institution: 'Bank',
+          balance: 0,
+          maskedNumber: '••••3333',
+          syncStatus: 'manual',
+        },
+      ],
+      transactions: [
+        {
+          id: 't-x',
+          date: '2026-09-20',
+          merchant: 'To savings',
+          amount: 250,
+          type: 'transfer',
+          accountId: 'a1',
+          toAccountId: 's1',
+          categoryId: 'transfer',
+          status: 'scheduled',
+        },
+      ],
+    };
+    const forecast = buildForecast(state, TODAY, 10);
+    expect(forecast.end).toBe(forecast.start);
+    // Shown on the day it happens, all the same — it is something the person
+    // planned, and a timeline that hides it is lying by omission.
+    expect(forecast.days.flatMap((d) => d.events)).toHaveLength(1);
+  });
+
+  it('drops the line when the money lands somewhere it cannot be spent', () => {
+    // Paying a credit card is the commonest transfer there is, and £250 going
+    // to it really is £250 less to spend. This used to read as free.
     const state: AppState = {
       ...minimal(),
       transactions: [
         {
           id: 't-x',
           date: '2026-09-20',
-          merchant: 'Move',
+          merchant: 'Card payment',
           amount: 250,
           type: 'transfer',
           accountId: 'a1',
@@ -286,7 +330,8 @@ describe('buildForecast', () => {
       ],
     };
     const forecast = buildForecast(state, TODAY, 10);
-    expect(forecast.end).toBe(forecast.start);
+    expect(forecast.end).toBe(forecast.start - 250);
+    expect(forecast.totalExpenses).toBe(250);
   });
 });
 

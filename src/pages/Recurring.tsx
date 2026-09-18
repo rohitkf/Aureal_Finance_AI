@@ -4,7 +4,7 @@ import { cn, pillClass } from '@/lib/cn';
 import { formatMediumDate, relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
 import { FREQUENCY_LABELS, monthlyEquivalent, previewOccurrences } from '@/lib/recurrence';
-import { monthlyCommitments } from '@/lib/finance';
+import { monthlyCommitments, monthlyTransfers } from '@/lib/finance';
 import { newId, useAppState, useCategories, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { Badge } from '@/components/ui/Badge';
@@ -38,12 +38,13 @@ const FREQUENCIES = Object.keys(FREQUENCY_LABELS) as Frequency[];
 
 
 
-const emptyDraft = (today: string, accountId: string): DraftRule => ({
+const emptyDraft = (today: string, accountId: string, toAccountId = ''): DraftRule => ({
   name: '',
   amount: '',
   direction: 'out',
   categoryId: '',
   accountId,
+  toAccountId,
   frequency: 'monthly',
   customIntervalDays: '30',
   anchorDay: String(Number(today.slice(8, 10))),
@@ -63,6 +64,9 @@ const toRule = (draft: DraftRule): RecurringPayment => ({
   direction: draft.direction,
   categoryId: draft.categoryId,
   accountId: draft.accountId,
+  // Only a transfer carries a destination; the database rejects one anywhere
+  // else, so a rule switched away from transfer must not keep its old target.
+  toAccountId: draft.direction === 'transfer' ? draft.toAccountId || undefined : undefined,
   frequency: draft.frequency,
   customIntervalDays: draft.frequency === 'custom' ? Number(draft.customIntervalDays) || 30 : undefined,
   anchorDay: Number(draft.anchorDay) || 1,
@@ -109,6 +113,10 @@ export const Recurring = () => {
   const incoming = state.recurring
     .filter((r) => r.status === 'active' && r.direction === 'in')
     .reduce((s, r) => s + monthlyEquivalent(r), 0);
+  // Money moved between your own accounts is not a commitment — it is still
+  // yours — so it is counted apart from what actually leaves.
+  const moved = monthlyTransfers(state);
+  const transferCount = state.recurring.filter((r) => r.status === 'active' && r.direction === 'transfer').length;
 
   const nextDates = (rule: RecurringPayment) => previewOccurrences(rule, today, 1);
 
@@ -156,11 +164,17 @@ export const Recurring = () => {
           <p className="mt-0.5 text-body-sm text-muted">Per month, on average</p>
         </Card>
         <Card>
-          <Eyebrow>Net committed</Eyebrow>
+          <Eyebrow>{transferCount > 0 ? 'Moved between accounts' : 'Net committed'}</Eyebrow>
           <p className="tnum mt-2 font-display text-metric-lg text-primary">
-            {money(incoming - totalMonthly, { signed: true, masked: maskBalances })}
+            {transferCount > 0
+              ? money(moved, { masked: maskBalances })
+              : money(incoming - totalMonthly, { signed: true, masked: maskBalances })}
           </p>
-          <p className="mt-0.5 text-body-sm text-muted">Before any discretionary spending</p>
+          <p className="mt-0.5 text-body-sm text-muted">
+            {transferCount > 0
+              ? `${transferCount} standing ${transferCount === 1 ? 'order' : 'orders'} · still your money`
+              : 'Before any discretionary spending'}
+          </p>
         </Card>
       </section>
 
@@ -208,6 +222,11 @@ export const Recurring = () => {
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="truncate font-display text-headline-sm text-text">{rule.name}</h2>
                     {rule.isSubscription && <Badge tone="secondary">Subscription</Badge>}
+                    {rule.direction === 'transfer' && (
+                      <Badge tone="primary" icon="swap">
+                        Transfer
+                      </Badge>
+                    )}
                     {rule.status !== 'active' && (
                       <Badge tone={rule.status === 'paused' ? 'warning' : 'neutral'}>
                         {rule.status === 'paused' ? 'Paused' : 'Ended'}
@@ -218,7 +237,13 @@ export const Recurring = () => {
                     {FREQUENCY_LABELS[rule.frequency]}
                     {['monthly', 'bimonthly', 'quarterly', 'semiannual', 'yearly'].includes(rule.frequency) &&
                       ` · ${rule.anchorDay}${ordinal(rule.anchorDay)}`}
-                    {account && ` · ${account.name}`}
+                    {account &&
+                      (rule.direction === 'transfer'
+                        ? ` · ${account.name} → ${
+                            state.accounts.find((a) => a.id === rule.toAccountId)?.name ??
+                            'an account that no longer exists'
+                          }`
+                        : ` · ${account.name}`)}
                     {rule.endDate && ` · ends ${formatMediumDate(rule.endDate)}`}
                   </p>
                   {next && rule.status === 'active' && (
@@ -233,11 +258,15 @@ export const Recurring = () => {
                     <p
                       className={cn(
                         'tnum text-metric-sm font-semibold',
-                        rule.direction === 'in' ? 'text-success' : 'text-text',
+                        rule.direction === 'in'
+                          ? 'text-success'
+                          : rule.direction === 'transfer'
+                            ? 'text-primary'
+                            : 'text-text',
                         rule.status !== 'active' && 'opacity-60',
                       )}
                     >
-                      {rule.direction === 'in' ? '+' : '-'}
+                      {rule.direction === 'in' ? '+' : rule.direction === 'transfer' ? '' : '-'}
                       {money(rule.amount, { masked: maskBalances })}
                     </p>
                     <p className="tnum text-label-sm text-faint">
@@ -272,6 +301,7 @@ export const Recurring = () => {
                           direction: rule.direction,
                           categoryId: rule.categoryId,
                           accountId: rule.accountId,
+                          toAccountId: rule.toAccountId ?? '',
                           frequency: rule.frequency,
                           customIntervalDays: String(rule.customIntervalDays ?? 30),
                           anchorDay: String(rule.anchorDay),
@@ -347,7 +377,11 @@ const RecurringForm = ({
   }, [draft, today]);
 
   if (!draft) return null;
-  const valid = Number.parseFloat(draft.amount) > 0 && draft.name.trim().length > 0;
+  const isTransfer = draft.direction === 'transfer';
+  const valid =
+    Number.parseFloat(draft.amount) > 0 &&
+    draft.name.trim().length > 0 &&
+    (!isTransfer || (Boolean(draft.toAccountId) && draft.toAccountId !== draft.accountId));
   const isMonthly = ['monthly', 'bimonthly', 'quarterly', 'semiannual', 'yearly'].includes(draft.frequency);
   const isWeekly = draft.frequency === 'weekly' || draft.frequency === 'fortnightly';
 
@@ -370,7 +404,7 @@ const RecurringForm = ({
         <AmountField
           label="Amount"
           value={draft.amount}
-          tone={draft.direction === 'in' ? 'income' : 'expense'}
+          tone={draft.direction === 'in' ? 'income' : draft.direction === 'transfer' ? 'transfer' : 'expense'}
           onChange={(e) => setDraft({ ...draft, amount: e.target.value.replace(/[^0-9.]/g, '') })}
         />
 
@@ -381,12 +415,28 @@ const RecurringForm = ({
             setDraft({
               ...draft,
               direction,
-              categoryId: categories.find((c) => c.kind === (direction === 'in' ? 'income' : 'expense'))?.id ?? '',
+              categoryId:
+                categories.find(
+                  (c) =>
+                    c.kind ===
+                    (direction === 'in' ? 'income' : direction === 'transfer' ? 'transfer' : 'expense'),
+                )?.id ?? '',
+              // Pick a destination that is not the source, so the form opens
+              // in a state that can actually be saved.
+              toAccountId:
+                direction === 'transfer'
+                  ? draft.toAccountId && draft.toAccountId !== draft.accountId
+                    ? draft.toAccountId
+                    : (accounts.find((a) => a.id !== draft.accountId)?.id ?? '')
+                  : '',
+              // A standing order to your own savings is not a subscription.
+              isSubscription: direction === 'transfer' ? false : draft.isSubscription,
             })
           }
           options={[
             { value: 'out', label: 'Money out' },
             { value: 'in', label: 'Money in' },
+            { value: 'transfer', label: 'Transfer' },
           ]}
           className="w-full [&>button]:flex-1"
         />
@@ -403,20 +453,58 @@ const RecurringForm = ({
             value={draft.categoryId}
             onChange={(value) => setDraft({ ...draft, categoryId: value })}
           >
-            {categories.filter((c) => (draft.direction === 'in' ? c.kind === 'income' : c.kind === 'expense')).map((c) => (
+            {categories
+              .filter((c) =>
+                draft.direction === 'in'
+                  ? c.kind === 'income'
+                  : draft.direction === 'transfer'
+                    ? c.kind === 'transfer'
+                    : c.kind === 'expense',
+              )
+              .map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
           </SelectField>
 
-          <SelectField label="Account" value={draft.accountId} onChange={(value) => setDraft({ ...draft, accountId: value })}>
+          <SelectField
+            label={isTransfer ? 'From account' : 'Account'}
+            value={draft.accountId}
+            onChange={(value) =>
+              setDraft({
+                ...draft,
+                accountId: value,
+                // Never leave the two ends pointing at the same account.
+                toAccountId:
+                  isTransfer && draft.toAccountId === value
+                    ? (accounts.find((a) => a.id !== value)?.id ?? '')
+                    : draft.toAccountId,
+              })
+            }
+          >
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
               </option>
             ))}
           </SelectField>
+
+          {isTransfer && (
+            <SelectField
+              label="To account"
+              value={draft.toAccountId}
+              onChange={(value) => setDraft({ ...draft, toAccountId: value })}
+            >
+              {accounts
+                .filter((a) => a.id !== draft.accountId)
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+            </SelectField>
+          )}
 
           <SelectField
             label="Frequency"
@@ -515,12 +603,16 @@ const RecurringForm = ({
           description="Moves back to the Friday, the way a salary arrives. The schedule itself doesn’t move."
         />
 
-        <CheckboxField
-          checked={draft.isSubscription}
-          onChange={(isSubscription) => setDraft({ ...draft, isSubscription })}
-          label="This is a subscription"
-          description="It’ll be tracked on the Subscriptions screen too."
-        />
+        {/* A standing order into your own savings is not something you
+            subscribe to, so the option is not offered for one. */}
+        {!isTransfer && (
+          <CheckboxField
+            checked={draft.isSubscription}
+            onChange={(isSubscription) => setDraft({ ...draft, isSubscription })}
+            label="This is a subscription"
+            description="It’ll be tracked on the Subscriptions screen too."
+          />
+        )}
 
         <TextAreaField label="Notes" placeholder="Optional" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
 

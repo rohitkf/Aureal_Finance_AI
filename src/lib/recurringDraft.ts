@@ -1,4 +1,4 @@
-import type { Frequency } from './types';
+import type { Frequency, RecurringDirection } from './types';
 
 /**
  * The Recurring form's working copy of a rule. Everything is a string because
@@ -9,9 +9,11 @@ export interface DraftRule {
   id?: string;
   name: string;
   amount: string;
-  direction: 'in' | 'out';
+  direction: RecurringDirection;
   categoryId: string;
   accountId: string;
+  /** Destination, used only when the direction is a transfer. */
+  toAccountId: string;
   frequency: Frequency;
   customIntervalDays: string;
   anchorDay: string;

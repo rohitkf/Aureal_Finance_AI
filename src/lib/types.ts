@@ -96,13 +96,21 @@ export type Frequency =
 
 export type RecurringStatus = 'active' | 'paused' | 'ended';
 
+/**
+ * Which way a recurring rule moves money. `transfer` is the standing-order
+ * case: out of `accountId` and into `toAccountId`, both the user's own.
+ */
+export type RecurringDirection = 'in' | 'out' | 'transfer';
+
 export interface RecurringPayment {
   id: string;
   name: string;
   amount: number;
-  direction: 'in' | 'out';
+  direction: RecurringDirection;
   categoryId: string;
   accountId: string;
+  /** Destination, for a transfer. Nothing else carries one. */
+  toAccountId?: string;
   frequency: Frequency;
   /** Only for `custom`: repeat every N days. */
   customIntervalDays?: number;
@@ -182,6 +190,15 @@ export interface ForecastEvent {
   projected: boolean;
   /** Scheduled, its date gone by, and still not cleared. Owed, not upcoming. */
   overdue: boolean;
+  /**
+   * Whether this changes the cash that can actually be spent.
+   *
+   * A transfer between two spendable accounts moves money without changing how
+   * much there is, so it belongs on the timeline but not in any total. One
+   * that ends somewhere unspendable — an investment account — really does
+   * reduce what is available, and has to count.
+   */
+  affectsAvailable: boolean;
 }
 
 export interface ForecastDay {
