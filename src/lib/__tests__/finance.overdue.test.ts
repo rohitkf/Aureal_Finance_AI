@@ -151,6 +151,41 @@ describe('what must not change', () => {
     expect(safeToSpend(s, TODAY).committed).toBe(0);
   });
 
+  it('a future instance of a rule is not counted twice either', () => {
+    // How the salary duplicate was actually seen: "this repeats" ticked on a
+    // payday still to come. The transaction is scheduled, the rule's first
+    // occurrence is the same day, and unlinked the forecast counted both —
+    // £6,346.45 of salary became £12,692.90 of expected income.
+    const payday: RecurringPayment = {
+      id: 'r-pay',
+      name: 'SThree PLC',
+      amount: 6346.45,
+      direction: 'in',
+      categoryId: 'cat-1',
+      accountId: 'acc-1',
+      frequency: 'monthly',
+      anchorDay: 30,
+      startDate: '2026-09-30',
+      status: 'active',
+    };
+    const linked = state({
+      recurring: [payday],
+      transactions: [
+        txn({
+          id: 't-pay',
+          date: '2026-09-30',
+          merchant: 'SThree PLC',
+          amount: 6346.45,
+          type: 'income',
+          status: 'scheduled',
+          recurringId: 'r-pay',
+        }),
+      ],
+    });
+    expect(forecastEvents(linked, TODAY, '2026-09-30')).toHaveLength(1);
+    expect(safeToSpend(linked, TODAY).expectedIncome).toBe(6346.45);
+  });
+
   it('an overdue instance of a rule is not counted twice by the rule that made it', () => {
     const rule: RecurringPayment = {
       id: 'r-1',

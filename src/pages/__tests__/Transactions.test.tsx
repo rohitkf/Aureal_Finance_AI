@@ -65,7 +65,7 @@ vi.mock('@/lib/store', () => ({
   useCategories: () => CATEGORIES,
   useCategoryLookup: () => (id: string) =>
     CATEGORIES.find((c) => c.id === id) ?? { id, name: 'Uncategorised', kind: 'expense' as const, icon: 'box', accent: 'neutral' as const },
-  newId: () => 'generated-id',
+  newId: () => 'new-rule-id',
 }));
 vi.mock('@/components/ui/Toast', () => ({ useToast: () => toast }));
 
@@ -192,6 +192,22 @@ describe('the detail panel', () => {
         }),
       }),
     );
+  });
+
+  it('ties the transaction to the new rule, so it is not forecast twice', async () => {
+    const user = userEvent.setup();
+    render();
+    await select(user, 'Rent');
+
+    await user.click(screen.getAllByRole('button', { name: 'Make recurring' })[0]!);
+
+    const types = dispatch.mock.calls.map((c) => c[0].type);
+    // The rule first: the transaction's `recurring_id` is a foreign key to it.
+    expect(types).toEqual(['add-recurring', 'update-transaction']);
+    expect(dispatch.mock.calls.at(-1)![0].transaction).toMatchObject({
+      id: 'txn-2',
+      recurringId: 'new-rule-id',
+    });
   });
 
   it('will not make a second rule for money that already has one', async () => {

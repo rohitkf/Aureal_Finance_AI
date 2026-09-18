@@ -158,6 +158,12 @@ export const Transactions = () => {
       adjustToWorkingDay: false,
     };
     dispatch({ type: 'add-recurring', recurring: rule });
+    // Tie the transaction to the rule it just produced. Left unlinked, a
+    // transaction still in the future would be counted by the forecast twice:
+    // once as itself, and again as the rule's first occurrence on the same day.
+    // Writes leave in the order they are dispatched, so the rule exists by the
+    // time this names it.
+    dispatch({ type: 'update-transaction', transaction: { ...t, recurringId: rule.id } });
     toast({
       tone: 'success',
       title: 'Recurring payment created',

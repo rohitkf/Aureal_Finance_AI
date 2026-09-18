@@ -438,6 +438,14 @@ const RecurringForm = ({
             { value: 'in', label: 'Money in' },
             { value: 'transfer', label: 'Transfer' },
           ]}
+          hint={
+            {
+              out: 'A bill or payment that leaves on a schedule. Counted against Safe to Spend from the moment it is due.',
+              in: 'Money that arrives on a schedule — a salary, a pension. Counted towards what you have coming.',
+              transfer:
+                'A standing order between two of your own accounts. The money stays yours, so it is not counted as a commitment — unless it lands somewhere you can’t spend from, like a credit card or an investment.',
+            }[draft.direction]
+          }
           className="w-full [&>button]:flex-1"
         />
 
@@ -495,6 +503,7 @@ const RecurringForm = ({
               label="To account"
               value={draft.toAccountId}
               onChange={(value) => setDraft({ ...draft, toAccountId: value })}
+              hint="Where the money lands. Still yours either way."
             >
               {accounts
                 .filter((a) => a.id !== draft.accountId)
@@ -573,6 +582,13 @@ const RecurringForm = ({
             label="Ends"
             value={draft.endMode}
             onChange={(value) => setDraft({ ...draft, endMode: value as DraftRule['endMode'] })}
+            hint={
+              {
+                never: 'Keeps going, and keeps appearing in your forecast, until you pause or delete it.',
+                date: 'Stops after the date you choose. Nothing after it reaches your forecast.',
+                count: 'Stops once it has been paid the number of times you set.',
+              }[draft.endMode]
+            }
           >
             <option value="never">Never</option>
             <option value="date">On a date</option>
@@ -592,6 +608,7 @@ const RecurringForm = ({
               inputMode="numeric"
               value={draft.occurrences}
               onChange={(e) => setDraft({ ...draft, occurrences: e.target.value.replace(/\D/g, '') })}
+              hint="Counted from the start date, including any that have already been paid."
             />
           )}
         </div>
@@ -600,7 +617,7 @@ const RecurringForm = ({
           checked={draft.adjustToWorkingDay}
           onChange={(adjustToWorkingDay) => setDraft({ ...draft, adjustToWorkingDay })}
           label="Pay early if it lands at a weekend"
-          description="Moves back to the Friday, the way a salary arrives. The schedule itself doesn’t move."
+          description="A payment due on a Saturday or Sunday shows on the Friday before, the way a salary actually arrives. The schedule itself doesn't move, so the month after is unaffected."
         />
 
         {/* A standing order into your own savings is not something you
@@ -610,7 +627,7 @@ const RecurringForm = ({
             checked={draft.isSubscription}
             onChange={(isSubscription) => setDraft({ ...draft, isSubscription })}
             label="This is a subscription"
-            description="It’ll be tracked on the Subscriptions screen too."
+            description="Also lists it on the Subscriptions screen, where you can see what it costs you a year and cancel what you don't use."
           />
         )}
 
