@@ -27,6 +27,9 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
   const category = lookupCategory(transaction.categoryId);
   const account = accounts.find((a) => a.id === transaction.accountId);
   const scheduled = transaction.status === 'scheduled';
+  // Scheduled, and its date has been and gone. The money is still owed, and
+  // until somebody says otherwise the app has to keep holding it back.
+  const overdue = scheduled && transaction.date <= today;
 
   const sign = transaction.type === 'income' ? '+' : transaction.type === 'expense' ? '-' : '';
   const amountTone =
@@ -46,6 +49,7 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
         // Scheduled money is drawn as an outline, never as a solid surface —
         // it has not happened yet.
         scheduled && 'bg-transparent shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.09)] hover:bg-[rgb(var(--hairline)/0.03)]',
+        overdue && 'shadow-[inset_0_0_0_1px_rgb(var(--warning)/0.35)]',
         className,
       )}
     >
@@ -74,7 +78,9 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
           {scheduled ? (
             <>
               <span aria-hidden="true">·</span>
-              <span className="shrink-0 text-primary">{relativeDueLabel(transaction.date, today)}</span>
+              <span className={cn('shrink-0', overdue ? 'font-medium text-warning' : 'text-primary')}>
+                {overdue ? `Overdue · ${relativeDueLabel(transaction.date, today)}` : relativeDueLabel(transaction.date, today)}
+              </span>
             </>
           ) : transaction.time ? (
             <>
@@ -90,7 +96,9 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
           {sign}
           {money(transaction.amount, { masked: maskBalances })}
         </div>
-        <div className="text-label-sm capitalize text-faint">{transaction.status}</div>
+        <div className={cn('text-label-sm capitalize', overdue ? 'text-warning' : 'text-faint')}>
+          {overdue ? 'Not cleared' : transaction.status}
+        </div>
       </div>
 
       {onSelect && <Icon name="chevron-right" size={16} className="shrink-0 text-faint" />}

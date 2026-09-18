@@ -180,6 +180,8 @@ export interface ForecastEvent {
   categoryId: string;
   /** Projected money is never displayed like confirmed money. */
   projected: boolean;
+  /** Scheduled, its date gone by, and still not cleared. Owed, not upcoming. */
+  overdue: boolean;
 }
 
 export interface ForecastDay {

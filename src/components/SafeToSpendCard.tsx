@@ -97,6 +97,15 @@ export const SafeToSpendCard = ({
               value={`−${money(data.committed, { masked: maskBalances })}`}
               tone="danger"
             />
+            {/* Named separately because it is not upcoming at all: it was due,
+                it has not cleared, and it is still being held back. */}
+            {data.overdue > 0 && (
+              <Line
+                label="…of which overdue"
+                value={money(data.overdue, { masked: maskBalances })}
+                tone="warning"
+              />
+            )}
             <div className="h-px bg-[rgb(var(--hairline)/0.08)]" />
             <Line
               label="Minimum balance held back"
@@ -122,14 +131,20 @@ const Line = ({
 }: {
   label: string;
   value: string;
-  tone?: 'neutral' | 'success' | 'danger' | 'primary';
+  tone?: 'neutral' | 'success' | 'danger' | 'primary' | 'warning';
 }) => (
   <div className="flex items-baseline justify-between gap-4">
     <dt className="text-[12.5px] text-muted">{label}</dt>
     <dd
       className={cn(
         'tnum text-[13px] font-medium',
-        { neutral: 'text-text', success: 'text-success', danger: 'text-danger', primary: 'text-primary' }[tone],
+        {
+          neutral: 'text-text',
+          success: 'text-success',
+          danger: 'text-danger',
+          primary: 'text-primary',
+          warning: 'text-warning',
+        }[tone],
       )}
     >
       {value}

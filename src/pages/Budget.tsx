@@ -33,7 +33,11 @@ export const Budget = () => {
   const toast = useToast();
 
   const month = monthKey(today);
-  const [editing, setEditing] = useState<{ categoryId: string; limit: string } | null>(null);
+  const [editing, setEditing] = useState<{
+    categoryId: string;
+    limit: string;
+    error?: string;
+  } | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const progress = useMemo(() => budgetProgress(state, month), [state, month]);
@@ -61,7 +65,12 @@ export const Budget = () => {
   const saveBudget = () => {
     if (!editing) return;
     const limit = Number.parseFloat(editing.limit);
-    if (!Number.isFinite(limit) || limit <= 0) return;
+    // A button that looks live and does nothing when pressed is worse than one
+    // that is plainly disabled, so the dialog says what is wrong instead.
+    if (!Number.isFinite(limit) || limit <= 0) {
+      setEditing({ ...editing, error: 'Enter a monthly limit greater than £0.' });
+      return;
+    }
     dispatch({ type: 'upsert-budget', budget: { month, categoryId: editing.categoryId, limit } });
     toast({
       tone: 'success',
@@ -282,7 +291,14 @@ export const Budget = () => {
               inputMode="decimal"
               placeholder="400"
               value={editing.limit}
-              onChange={(e) => setEditing({ ...editing, limit: e.target.value.replace(/[^0-9.]/g, '') })}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  limit: e.target.value.replace(/[^0-9.]/g, ''),
+                  error: undefined,
+                })
+              }
+              error={editing.error}
               hint={`You've spent ${money(spend.get(editing.categoryId) ?? 0)} in this category this month.`}
             />
           </div>

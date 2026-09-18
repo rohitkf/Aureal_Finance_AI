@@ -21,6 +21,7 @@ interface Draft {
   saved: string;
   targetDate: string;
   monthlyContribution: string;
+  error?: string;
 }
 
 export const Goals = () => {
@@ -32,7 +33,7 @@ export const Goals = () => {
   const toast = useToast();
 
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [contributing, setContributing] = useState<{ goal: Goal; amount: string } | null>(null);
+  const [contributing, setContributing] = useState<{ goal: Goal; amount: string; error?: string } | null>(null);
   const [deleting, setDeleting] = useState<Goal | null>(null);
 
   const totals = useMemo(
@@ -56,12 +57,22 @@ export const Goals = () => {
   const save = () => {
     if (!draft) return;
     const target = Number.parseFloat(draft.target);
-    if (!Number.isFinite(target) || target <= 0) return;
+    // `draft.target` is the raw text of the field, so "abc" is truthy and got
+    // straight past the button's disabled check into a silent no-op.
+    if (!Number.isFinite(target) || target <= 0) {
+      setDraft({ ...draft, error: 'Enter a target greater than £0.' });
+      return;
+    }
+    const saved = Number.parseFloat(draft.saved) || 0;
+    if (saved > target) {
+      setDraft({ ...draft, error: 'Saved so far cannot be more than the target.' });
+      return;
+    }
     const goal: Goal = {
       id: draft.id ?? newId(),
       name: draft.name.trim() || 'New goal',
       target,
-      saved: Number.parseFloat(draft.saved) || 0,
+      saved,
       targetDate: draft.targetDate,
       monthlyContribution: Number.parseFloat(draft.monthlyContribution) || 0,
       icon: 'target',
@@ -266,7 +277,10 @@ export const Goals = () => {
                 inputMode="decimal"
                 placeholder="10000"
                 value={draft.target}
-                onChange={(e) => setDraft({ ...draft, target: e.target.value.replace(/[^0-9.]/g, '') })}
+                onChange={(e) =>
+                  setDraft({ ...draft, target: e.target.value.replace(/[^0-9.]/g, ''), error: undefined })
+                }
+                error={draft.error}
               />
               <TextField
                 label="Already saved"
@@ -306,7 +320,10 @@ export const Goals = () => {
               onClick={() => {
                 if (!contributing) return;
                 const amount = Number.parseFloat(contributing.amount);
-                if (!Number.isFinite(amount) || amount <= 0) return;
+                if (!Number.isFinite(amount) || amount <= 0) {
+                  setContributing({ ...contributing, error: 'Enter an amount greater than £0.' });
+                  return;
+                }
                 dispatch({ type: 'contribute-goal', id: contributing.goal.id, amount });
                 toast({
                   tone: 'success',
@@ -327,7 +344,14 @@ export const Goals = () => {
             inputMode="decimal"
             autoFocus
             value={contributing.amount}
-            onChange={(e) => setContributing({ ...contributing, amount: e.target.value.replace(/[^0-9.]/g, '') })}
+            error={contributing.error}
+            onChange={(e) =>
+              setContributing({
+                ...contributing,
+                amount: e.target.value.replace(/[^0-9.]/g, ''),
+                error: undefined,
+              })
+            }
             hint={`${money(Math.max(0, contributing.goal.target - contributing.goal.saved))} still needed.`}
           />
         )}

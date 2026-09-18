@@ -15,10 +15,27 @@ import { round2 } from './format';
 /* Balances                                                            */
 /* ------------------------------------------------------------------ */
 
+/** Anything that is not a credit facility, so it holds money rather than owing it. */
 export const isDepository = (a: Account): boolean => a.type !== 'credit';
 
-/** Cash you can actually spend today, across depository accounts. */
+/**
+ * Money that can be spent or moved today.
+ *
+ * An investment account holds real value and belongs in net worth, but it is
+ * not cash: selling takes days, may realise a loss, and may not be the user's
+ * to touch at all. Counting it as spendable made Safe-to-Spend offer people
+ * their pension. Every account that is not credit still counts as an asset —
+ * `totalAssets` is the figure for that.
+ */
+export const isSpendable = (a: Account): boolean =>
+  a.type === 'current' || a.type === 'savings' || a.type === 'cash';
+
+/** Cash you can actually spend today. */
 export const availableNow = (accounts: Account[]): number =>
+  round2(accounts.filter(isSpendable).reduce((sum, a) => sum + a.balance, 0));
+
+/** Everything held, spendable or not — investments included. */
+export const totalAssets = (accounts: Account[]): number =>
   round2(accounts.filter(isDepository).reduce((sum, a) => sum + a.balance, 0));
 
 /** Everything owed on credit facilities (a positive number). */
@@ -40,7 +57,7 @@ export const availableCredit = (account: Account): number =>
   round2((account.creditLimit ?? 0) - account.balance);
 
 export const netWorth = (accounts: Account[]): number =>
-  round2(availableNow(accounts) - totalDebt(accounts));
+  round2(totalAssets(accounts) - totalDebt(accounts));
 
 /* ------------------------------------------------------------------ */
 /* Transactions                                                        */
@@ -92,17 +109,34 @@ export const spendByCategory = (state: AppState, month: string): Map<string, num
 /* ------------------------------------------------------------------ */
 
 /**
- * Every future money movement in `(today, to]`: scheduled transactions the user
- * already entered, plus occurrences generated from recurring rules. A recurring
- * rule that already has a scheduled transaction on a date is not double-counted.
+ * Money that is still owed although its date has passed.
+ *
+ * A scheduled transaction moves nothing — the database trigger skips it, and
+ * every "what has happened" total filters it out. So once its date goes by
+ * without anyone marking it cleared, it falls through every crack in the app:
+ * not in the balance, not in the ledger totals, and not in the forecast, which
+ * only ever looked forwards. Safe-to-Spend quietly told people they had money
+ * that was already spoken for. It is still committed until it is cleared.
+ */
+export const isOverdue = (t: Transaction, today: string): boolean =>
+  t.status === 'scheduled' && t.date <= today;
+
+/**
+ * Every money movement still to come, plus anything overdue: scheduled
+ * transactions the user already entered, and occurrences generated from
+ * recurring rules. A recurring rule that already has a scheduled transaction
+ * on a date is not double-counted.
  */
 export const forecastEvents = (state: AppState, today: string, to: string): ForecastEvent[] => {
   const events: ForecastEvent[] = [];
   const claimed = new Set<string>();
 
   for (const t of state.transactions) {
-    if (t.date <= today || t.date > to) continue;
     if (t.type === 'transfer') continue;
+    const overdue = isOverdue(t, today);
+    // Anything on or before today has already moved the balance, unless it is
+    // still only scheduled — in which case it has not, and still counts.
+    if (!overdue && (t.date <= today || t.date > to)) continue;
     if (t.recurringId) claimed.add(`${t.recurringId}|${t.date}`);
     events.push({
       id: t.id,
@@ -114,6 +148,7 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
       accountId: t.accountId,
       categoryId: t.categoryId,
       projected: t.status === 'scheduled',
+      overdue,
     });
   }
 
@@ -130,6 +165,7 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
         accountId: rule.accountId,
         categoryId: rule.categoryId,
         projected: true,
+        overdue: false,
       });
     }
   }
@@ -143,9 +179,12 @@ export const buildForecast = (state: AppState, today: string, horizonDays: numbe
   const events = forecastEvents(state, today, to);
   const byDate = new Map<string, ForecastEvent[]>();
   for (const e of events) {
-    const list = byDate.get(e.date) ?? [];
+    // An overdue event keeps its real date for display, but lands on today in
+    // the projection: the money has not left yet, so it leaves now.
+    const bucket = e.date < today ? today : e.date;
+    const list = byDate.get(bucket) ?? [];
     list.push(e);
-    byDate.set(e.date, list);
+    byDate.set(bucket, list);
   }
 
   const start = availableNow(state.accounts);
@@ -195,8 +234,8 @@ export const balanceHistory = (state: AppState, today: string, days = 30): numbe
         const from = state.accounts.find((a) => a.id === t.accountId);
         const to = state.accounts.find((a) => a.id === t.toAccountId);
         let delta = 0;
-        if (from && isDepository(from)) delta += t.type === 'income' ? t.amount : -t.amount;
-        if (t.type === 'transfer' && to && isDepository(to)) delta += t.amount;
+        if (from && isSpendable(from)) delta += t.type === 'income' ? t.amount : -t.amount;
+        if (t.type === 'transfer' && to && isSpendable(to)) delta += t.amount;
         return sum + delta;
       }, 0);
 
@@ -218,6 +257,8 @@ export interface SafeToSpend {
   available: number;
   expectedIncome: number;
   committed: number;
+  /** The part of `committed` whose date has already passed. */
+  overdue: number;
   reserve: number;
   through: string;
 }
@@ -233,7 +274,9 @@ export const safeToSpend = (state: AppState, today: string): SafeToSpend => {
   const expectedIncome = round2(
     events.filter((e) => e.direction === 'in').reduce((s, e) => s + e.amount, 0),
   );
-  const committed = round2(events.filter((e) => e.direction === 'out').reduce((s, e) => s + e.amount, 0));
+  const outgoing = events.filter((e) => e.direction === 'out');
+  const committed = round2(outgoing.reduce((s, e) => s + e.amount, 0));
+  const overdue = round2(outgoing.filter((e) => e.overdue).reduce((s, e) => s + e.amount, 0));
   const available = availableNow(state.accounts);
   const reserve = state.settings.minimumBalance;
 
@@ -242,6 +285,7 @@ export const safeToSpend = (state: AppState, today: string): SafeToSpend => {
     available,
     expectedIncome,
     committed,
+    overdue,
     reserve,
     through,
   };

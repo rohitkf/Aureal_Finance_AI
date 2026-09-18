@@ -223,14 +223,15 @@ Built to WCAG 2.2 AA and verified automatically on every screen in both themes:
 
 ```bash
 npm run verify        # lint + typecheck + tests + build
-npm test              # 245 tests
+npm test              # 314 tests
 npm run test:db       # the sample seed, against a real Postgres
 ```
 
 | Where | What it covers |
 | --- | --- |
 | `src/lib/__tests__/` | The finance engine, the nine recurrence frequencies, date arithmetic across both British Summer Time transitions, formatting, and the Postgres↔domain mappers — including numerics arriving as strings, the case that makes every total quietly wrong rather than visibly broken |
-| `src/components/**/__tests__/` | The dialog's focus behaviour, and Add-transaction driven end to end through the real component |
+| `src/components/**/__tests__/` | The dialog's focus behaviour, Add-transaction driven end to end through the real component in both its modes, the update gate, and the charts' behaviour on degenerate data |
+| `src/pages/__tests__/` | The screens where a save used to fail in silence, the ledger's export, edit and make-recurring, and the report that was reading the wrong table |
 | `supabase/tests/` | What only the database can answer. **Balances**: the trigger across insert, edit, delete, transfers and credit inversion; scheduled rows moving nothing until they clear; the check constraints; the cascade when a user is deleted. **Row-level security**: two users, impersonated for real, each proving they can see and touch only their own rows — and that the `SECURITY DEFINER` balance function stays un-callable over RPC |
 
 The database tests run in CI against a bare Postgres 17, with

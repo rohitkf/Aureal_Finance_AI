@@ -27,7 +27,10 @@ export const NetWorthChart = ({
   if (points.length === 0) return <div ref={ref} className={className} style={{ height: chartHeight }} />;
 
   const series = points.map((p) => ({ ...p, net: p.assets - p.liabilities }));
-  const max = Math.max(...series.map((p) => p.assets)) * 1.12;
+  // `|| 1` is load-bearing: a set of snapshots that are all zero gives a max of
+  // zero, and every y coordinate below becomes NaN — an SVG path of `M NaN,NaN`
+  // that renders as nothing at all, with no error to explain it.
+  const max = Math.max(...series.map((p) => p.assets), 0) * 1.12 || 1;
   const innerW = Math.max(width - pad.left - pad.right, 10);
   const innerH = Math.max(chartHeight - pad.top - pad.bottom, 10);
   const sx = (i: number) => pad.left + (series.length <= 1 ? 0 : (i / (series.length - 1)) * innerW);

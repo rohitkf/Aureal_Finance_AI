@@ -5,7 +5,7 @@ import {
   balanceHistory,
   buildForecast,
   budgetProgress,
-  isDepository,
+  isSpendable,
   monthIncome,
   monthSpend,
   safeToSpend,
@@ -77,14 +77,16 @@ export const Dashboard = () => {
 
   // The next two weeks of money movements, for the cash-flow timeline.
   const upcoming = useMemo(
-    () => forecast.days.slice(1).flatMap((d) => d.events).slice(0, 6),
+    // Not `slice(1)`: today's bucket is where anything overdue lands, and
+    // overdue money is the first thing somebody needs to see.
+    () => forecast.days.flatMap((d) => d.events).slice(0, 6),
     [forecast],
   );
 
   const allocation = useMemo(
     () =>
       state.accounts
-        .filter(isDepository)
+        .filter(isSpendable)
         .map((a): Segment => ({
           value: Math.max(a.balance, 0),
           tone: a.type === 'savings' ? 'success' : a.type === 'cash' ? 'secondary' : 'primary',
@@ -236,7 +238,7 @@ export const Dashboard = () => {
                     </div>
                     <SegmentedBar segments={allocation} />
                     <div className="grid grid-cols-2 gap-x-5 gap-y-2 pt-1 sm:grid-cols-4">
-                      {state.accounts.filter(isDepository).map((a) => (
+                      {state.accounts.filter(isSpendable).map((a) => (
                         <div key={a.id}>
                           <span className="block truncate text-[11px] text-faint">{a.name}</span>
                           <span className="tnum block text-[13px] font-medium text-text">
