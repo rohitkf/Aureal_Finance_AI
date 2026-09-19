@@ -68,14 +68,20 @@ export const Goals = () => {
       setDraft({ ...draft, error: 'Saved so far cannot be more than the target.' });
       return;
     }
+    // The goal being edited, so anything the form has no control for — the
+    // account it is linked to, the icon it was given — survives the edit.
+    // Building a fresh object writes undefined over all of it, and
+    // `goalToRow` turns that into a real NULL.
+    const existing = draft.id ? state.goals.find((g) => g.id === draft.id) : undefined;
     const goal: Goal = {
+      ...existing,
       id: draft.id ?? newId(),
       name: draft.name.trim() || 'New goal',
       target,
       saved,
       targetDate: draft.targetDate,
       monthlyContribution: Number.parseFloat(draft.monthlyContribution) || 0,
-      icon: 'target',
+      icon: existing?.icon ?? 'target',
     };
     dispatch({ type: 'upsert-goal', goal });
     toast({ tone: 'success', title: draft.id ? 'Goal updated' : 'Goal created', description: goal.name });

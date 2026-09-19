@@ -77,6 +77,15 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
     if (!valid) return;
 
     const account: Account = {
+      /**
+       * Everything the form does not ask about, carried through untouched.
+       *
+       * Without it, saving an edit writes `undefined` over every field this
+       * dialog has no control for — `accountToRow` turns that into a real
+       * NULL, so the statement day, the minimum payment and the note were
+       * silently wiped by the act of correcting a typo in the name.
+       */
+      ...(editing ?? {}),
       id: editing?.id ?? newId(),
       name: name.trim(),
       type,
@@ -85,7 +94,10 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
       // below, because the database derives balances from transactions.
       balance: editing?.balance ?? 0,
       maskedNumber: lastFour ? `••••${lastFour.slice(-4)}` : '',
-      syncStatus: 'manual',
+      // A new account is entered by hand. An existing one keeps whatever it
+      // already was, so editing a connected account does not quietly
+      // demote it to a manual one.
+      syncStatus: editing?.syncStatus ?? 'manual',
       creditLimit: isCredit ? Number.parseFloat(creditLimit) || undefined : undefined,
       apr: isCredit ? Number.parseFloat(apr) || undefined : undefined,
       paymentDueDay: isCredit ? Number.parseInt(dueDay, 10) || undefined : undefined,

@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/cn';
 import { Icon } from './Icon';
 
@@ -104,14 +105,54 @@ export const Select = ({
    */
   const fromKeyboard = useRef(false);
 
+  /**
+   * Where to draw the list, in viewport coordinates.
+   *
+   * The list used to be `absolute` next to the trigger, which put it inside
+   * whatever the trigger was inside — and inside a dialog that is a box with
+   * `overflow-y-auto`. An absolutely positioned popup cannot escape a
+   * scrolling ancestor: on a short sheet the options were clipped to the few
+   * pixels left below the field, and reaching them meant scrolling the dialog
+   * and the list, one inside the other.
+   *
+   * So it is drawn in a portal at the document root, positioned by the
+   * trigger's own rectangle. Nothing can clip it, and it is measured against
+   * the viewport rather than the dialog, so it gets the room that is actually
+   * on screen.
+   */
+  const [rect, setRect] = useState<{ top: number; left: number; width: number; below: boolean; max: number } | null>(
+    null,
+  );
+
+  const place = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const r = trigger.getBoundingClientRect();
+    const GAP = 6;
+    const MARGIN = 8;
+    const roomBelow = window.innerHeight - r.bottom - GAP - MARGIN;
+    const roomAbove = r.top - GAP - MARGIN;
+    // Below unless above is genuinely roomier — a list that flips upward for
+    // the sake of twenty pixels is more startling than a slightly short one.
+    const below = roomBelow >= Math.min(256, roomAbove) || roomBelow >= roomAbove;
+    setRect({
+      top: below ? r.bottom + GAP : Math.max(MARGIN, r.top - GAP - Math.min(256, roomAbove)),
+      left: r.left,
+      width: r.width,
+      below,
+      max: Math.max(120, Math.min(256, below ? roomBelow : roomAbove)),
+    });
+  }, []);
+
   const selectedIndex = options.findIndex((o) => o.value === value);
   const selected = selectedIndex >= 0 ? options[selectedIndex] : undefined;
 
   const openList = useCallback(() => {
     if (disabled) return;
     setActive(selectedIndex >= 0 ? selectedIndex : 0);
+    place();
     setOpen(true);
-  }, [disabled, selectedIndex]);
+  }, [disabled, selectedIndex, place]);
 
   const close = useCallback((refocus = true) => {
     setOpen(false);
@@ -141,11 +182,29 @@ export const Select = ({
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      // The list is portalled out of the trigger's tree, so "inside" is now
+      // two places rather than one.
+      if (rootRef.current?.contains(target) || listRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [open]);
+
+  // The trigger can move under an open list — the dialog behind it scrolls,
+  // the phone rotates, the keyboard appears. Capture, so a scroll on any
+  // ancestor is heard and not just one on the page.
+  useEffect(() => {
+    if (!open) return;
+    const onMove = () => place();
+    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
+    return () => {
+      window.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', onMove);
+    };
+  }, [open, place]);
 
   // Keep the active option in view when arrowing through a long list — and
   // only then, so a finger or a wheel is never fought for control of it.
@@ -247,15 +306,19 @@ export const Select = ({
         />
       </button>
 
-      {open && (
+      {open && rect && createPortal(
         <ul
           ref={listRef}
           id={listId}
           role="listbox"
           aria-label="Options"
+          style={{ top: rect.top, left: rect.left, width: rect.width, maxHeight: rect.max }}
+          // `fixed` and at the document root, so no scrolling ancestor can
+          // clip it. `z-[130]` clears the dialog it is drawn over — dialogs
+          // are `z-[100]`, and toasts at `z-[120]` are the only thing above.
           // `overscroll-contain` stops a flick that reaches the end of this
           // list from carrying on into the dialog behind it.
-          className="absolute z-50 mt-1.5 max-h-64 w-full touch-pan-y overflow-y-auto overscroll-contain rounded-2xl bg-[rgb(var(--surface-base))] p-1.5 shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),0_24px_48px_-16px_rgb(var(--ambient)/0.7)]"
+          className="fixed z-[130] touch-pan-y overflow-y-auto overscroll-contain rounded-2xl bg-[rgb(var(--surface-base))] p-1.5 shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),0_24px_48px_-16px_rgb(var(--ambient)/0.7)]"
         >
           {options.map((option, index) => {
             const isSelected = option.value === value;
@@ -341,7 +404,8 @@ export const Select = ({
               <span className="truncate">{action.label}</span>
             </li>
           )}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   );
