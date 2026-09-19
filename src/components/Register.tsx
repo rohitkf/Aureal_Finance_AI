@@ -1,14 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { formatMonthYear, monthKey } from '@/lib/date';
 import { accountNamer, isReminder, ledgerRows, ledgerWindow, type LedgerRow } from '@/lib/ledger';
 import { useAppState, useSettings, useToday } from '@/lib/store';
-import { Button } from './ui/Button';
 import { EmptyState } from './ui/States';
 import { LedgerLine } from './LedgerLine';
-
-/** Months of history shown at first, and how many more each press adds. */
-const MONTHS_AT_FIRST = 3;
-const MONTHS_PER_PRESS = 6;
 
 /**
  * The register: a statement, not a feed.
@@ -18,9 +13,10 @@ const MONTHS_PER_PRESS = 6;
  * and the one people actually open a statement for.
  *
  * It runs newest first, the way a bank app does and the way anybody scanning
- * for "what did I just spend" reads it. The balance column is still computed
- * in time order underneath — it has to be, it is a running total — and only
- * the drawing is reversed.
+ * for "what did I just spend" reads it, and it holds everything: scrolling is
+ * how you reach last year, not a button asking whether you would like your own
+ * history. The balance column is still computed in time order underneath — it
+ * has to be, it is a running total — and only the drawing is reversed.
  *
  * What has not happened yet is not here. A scheduled payment and a projected
  * one are both promises, and mixing promises into a statement makes the
@@ -38,9 +34,7 @@ export const Register = ({
   const state = useAppState();
   const today = useToday();
   const { maskBalances } = useSettings();
-  const [monthsBack, setMonthsBack] = useState(MONTHS_AT_FIRST);
-
-  const { from, to } = useMemo(() => ledgerWindow(today, monthsBack), [today, monthsBack]);
+  const { from, to } = useMemo(() => ledgerWindow(today), [today]);
   const rows = useMemo(
     () => ledgerRows(state, today, from, to).filter((row) => !isReminder(row)),
     [state, today, from, to],
@@ -104,14 +98,6 @@ export const Register = ({
           </section>
         ))
       )}
-
-      {/* At the foot, because that is where you run out of history now that
-          the column runs backwards. */}
-      <div className="flex justify-center pt-1">
-        <Button size="sm" icon="calendar" onClick={() => setMonthsBack((m) => m + MONTHS_PER_PRESS)}>
-          Show {MONTHS_PER_PRESS} earlier months
-        </Button>
-      </div>
     </div>
   );
 };

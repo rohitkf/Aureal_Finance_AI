@@ -1,5 +1,5 @@
 import type { Account, AppState, Transaction, TransactionStatus } from './types';
-import { addDays, addMonths } from './date';
+import { addMonths } from './date';
 import { expandRecurrence } from './recurrence';
 import { round2 } from './format';
 import { skippedOccurrences } from './finance';
@@ -203,21 +203,25 @@ export const ledgerRows = (state: AppState, today: string, from: string, to: str
 export const isReminder = (row: LedgerRow): boolean => row.status === 'scheduled';
 
 /**
- * The window the reminders list covers.
+ * The window both lists cover: everything behind, a year ahead.
  *
- * Every scheduled row there has ever been, however old, because a bill nobody
- * ticked off eight months ago is still owed and hiding it is how it stays
- * unpaid. Forwards it stops a year out, like the register.
+ * Backwards it does not stop. The register used to load a few months and offer
+ * a button for more, which made sense while it ran oldest-first and you read
+ * down into the past. Running newest-first, the far end of the column is the
+ * oldest thing you have — there is nothing below it to go and fetch, and a
+ * button sitting under the last row asking whether you would like your own
+ * history is a question with one answer.
+ *
+ * Reminders needs the same reach for a different reason: a bill nobody ticked
+ * off eight months ago is still owed, and hiding it is how it stays unpaid.
+ *
+ * Forwards it stops a year out. Only the reminders list draws anything from
+ * there, and a year of a monthly rule is twelve rows; further is a prediction
+ * nobody is reading.
  */
-export const reminderWindow = (today: string): { from: string; to: string } => ({
+export const ledgerWindow = (today: string): { from: string; to: string } => ({
   from: '0001-01-01',
   to: addMonths(today, 12),
-});
-
-/** The window the register covers: a year ahead, and as far back as asked for. */
-export const ledgerWindow = (today: string, monthsBack: number): { from: string; to: string } => ({
-  from: `${addMonths(today, -monthsBack).slice(0, 7)}-01`,
-  to: addDays(addMonths(today, 12), 0),
 });
 
 /**
