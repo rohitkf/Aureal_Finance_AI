@@ -888,7 +888,7 @@ export const AddTransactionSheet = ({
                       checked={isSubscription}
                       onChange={setIsSubscription}
                       label="This is a subscription"
-                      description="Also lists it on the Subscriptions screen, where you can see what it costs you a year and cancel what you don't use."
+                      description="Groups it under Subscriptions on the Recurring screen, where you can see what it costs you a year and cancel what you don't use."
                     />
                   )}
 

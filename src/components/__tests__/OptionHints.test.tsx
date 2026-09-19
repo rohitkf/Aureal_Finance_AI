@@ -119,9 +119,12 @@ describe('the subscription option', () => {
     open();
     await user.click(screen.getByRole('checkbox', { name: /this repeats/i }));
 
-    expect(screen.getByRole('checkbox', { name: /this is a subscription/i }).textContent).toMatch(
-      /Subscriptions screen/,
-    );
+    // Subscriptions is a filter on Recurring rather than a screen of its own,
+    // so the hint has to name where the thing actually ends up. The test is
+    // about the promise being kept, not about the noun.
+    const hint = screen.getByRole('checkbox', { name: /this is a subscription/i }).textContent ?? '';
+    expect(hint).toMatch(/Subscriptions/);
+    expect(hint).toMatch(/costs you a year/);
   });
 });
 

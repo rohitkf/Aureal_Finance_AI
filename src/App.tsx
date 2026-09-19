@@ -31,7 +31,6 @@ const Goals = lazy(() => import('@/pages/Goals').then((m) => ({ default: m.Goals
 const Recurring = lazy(() => import('@/pages/Recurring').then((m) => ({ default: m.Recurring })));
 const Reports = lazy(() => import('@/pages/Reports').then((m) => ({ default: m.Reports })));
 const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.Settings })));
-const Subscriptions = lazy(() => import('@/pages/Subscriptions').then((m) => ({ default: m.Subscriptions })));
 const Transactions = lazy(() => import('@/pages/Transactions').then((m) => ({ default: m.Transactions })));
 import { ForgotPassword } from '@/pages/auth/ForgotPassword';
 import { ResetPassword } from '@/pages/auth/ResetPassword';
@@ -132,7 +131,10 @@ const ProtectedApp = () => (
           <Route path="budget" element={<Screen><Budget /></Screen>} />
           <Route path="forecast" element={<Screen><Forecast /></Screen>} />
           <Route path="recurring" element={<Screen><Recurring /></Screen>} />
-          <Route path="subscriptions" element={<Screen><Subscriptions /></Screen>} />
+          {/* Subscriptions is a filter on Recurring now, not a screen of its
+              own. The old address still works, so a bookmark, a shared link
+              or an installed shortcut lands where it always did. */}
+          <Route path="subscriptions" element={<Navigate to="/recurring?filter=subscriptions" replace />} />
           <Route path="goals" element={<Screen><Goals /></Screen>} />
           <Route path="debts" element={<Screen><Debts /></Screen>} />
           <Route path="reports" element={<Screen><Reports /></Screen>} />

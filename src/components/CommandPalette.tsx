@@ -89,7 +89,7 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
         title: r.name,
         subtitle: `${money(monthlyEquivalent(r))} per month · ${r.status}`,
         amount: -r.amount,
-        to: r.isSubscription ? '/subscriptions' : '/recurring',
+        to: r.isSubscription ? '/recurring?filter=subscriptions' : '/recurring',
         categoryId: r.categoryId,
       });
     }

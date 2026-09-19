@@ -16,7 +16,6 @@ export const PRIMARY_NAV: NavItem[] = [
 
 export const PLANNING_NAV: NavItem[] = [
   { to: '/recurring', label: 'Recurring', icon: 'repeat' },
-  { to: '/subscriptions', label: 'Subscriptions', icon: 'subscriptions' },
   { to: '/goals', label: 'Goals', icon: 'target' },
   { to: '/debts', label: 'Debts', icon: 'card' },
   { to: '/reports', label: 'Reports', icon: 'analytics' },
