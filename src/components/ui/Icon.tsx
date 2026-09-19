@@ -71,6 +71,7 @@ export type IconName =
   | 'layers'
   | 'split'
   | 'scale'
+  | 'upload'
   | 'flag'
   | 'lightbulb'
   | 'user';
@@ -403,6 +404,14 @@ const PATHS: Record<IconName, JSX.Element> = {
   ),
   // One line that becomes two: a payment going to more than one place.
   // A balance: two pans on a beam. What a liability sits on the other side of.
+  // The download arrow, turned round: something coming back in.
+  upload: (
+    <>
+      <path d="M12 16V4m0 0L8 8m4-4 4 4" />
+      <path d="M4 17v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1" />
+    </>
+  ),
+
   scale: (
     <>
       <path d="M12 4v16M8 20h8" />

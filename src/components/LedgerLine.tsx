@@ -1,6 +1,8 @@
 import { cn } from '@/lib/cn';
+import { ACCENT_BAR, ACCENT_TEXT, kindOfRow } from '@/lib/accents';
 import { formatMediumDate, relativeDayLabel } from '@/lib/date';
 import { money } from '@/lib/format';
+import type { AccentName, LedgerKind } from '@/lib/accents';
 import type { LedgerRow } from '@/lib/ledger';
 import { Badge } from './ui/Badge';
 import { Icon } from './ui/Icon';
@@ -17,6 +19,7 @@ export const LedgerLine = ({
   today,
   masked,
   accountName,
+  accents,
   onOpen,
   onSkip,
 }: {
@@ -24,11 +27,15 @@ export const LedgerLine = ({
   today: string;
   masked: boolean;
   accountName: string;
+  /** Which colour each kind of line is drawn in — the person's choice. */
+  accents: Record<LedgerKind, AccentName>;
   onOpen: () => void;
   onSkip: () => void;
 }) => {
   const incoming = row.direction === 'in';
   const isToday = row.date === today;
+  const kind = kindOfRow(row);
+  const accent = accents[kind];
   // Cancelled: still on the statement, because you want to see it was there,
   // but struck through and drawn back so it never reads as money.
   const voided = row.status === 'void';
@@ -38,7 +45,12 @@ export const LedgerLine = ({
       className={cn(
         'group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors duration-300 ease-fluid',
         'hover:bg-[rgb(var(--hairline)/0.05)]',
-        isToday && 'shadow-[inset_2px_0_0_0_rgb(var(--primary-strong))]',
+        // A bar down the left saying what kind of movement this is, before the
+        // number is read at all.
+        ACCENT_BAR[accent],
+        // Today used to own that bar. It is a tint now, so the two facts do
+        // not compete for the same two pixels.
+        isToday && 'bg-[rgb(var(--primary)/0.06)]',
       )}
     >
       <button
@@ -80,7 +92,7 @@ export const LedgerLine = ({
         <span
           className={cn(
             'w-[86px] shrink-0 text-right tnum text-body-md font-medium sm:w-[104px]',
-            incoming ? 'text-success' : 'text-text',
+            ACCENT_TEXT[accent],
             !row.settled && 'opacity-70',
             voided && 'line-through opacity-50',
           )}

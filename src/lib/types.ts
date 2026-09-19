@@ -1,4 +1,5 @@
 /** Domain model for Aureal Finance AI. All money is stored in pounds as a number. */
+import type { AccentName, LedgerKind } from './accents';
 
 export type AccountType =
   | 'current'
@@ -148,6 +149,14 @@ export interface Transaction {
    * it a second time.
    */
   recurringDate?: string;
+  /**
+   * The balance the account was carrying when it was added.
+   *
+   * Written as an income (or, on something you owe, an expense) because the
+   * database derives every balance from transactions — but it is not money you
+   * received, and the register says so in a different colour.
+   */
+  isOpening?: boolean;
   splits?: TransactionSplit[];
   /**
    * Siblings of one payment split across several accounts.
@@ -261,6 +270,8 @@ export interface Settings {
   userName: string;
   maskBalances: boolean;
   theme: 'light' | 'dark' | 'system';
+  /** Which colour each kind of line is drawn in. Merged over the defaults. */
+  accents: Record<LedgerKind, AccentName>;
 }
 
 /** One occurrence of a rule that should not be projected at all. */

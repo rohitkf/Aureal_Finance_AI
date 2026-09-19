@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { ACCENT_BAR, ACCENT_TEXT, kindOf } from '@/lib/accents';
 import { relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
 import { useAppState, useCategoryLookup, useLabelLookup, useSettings, useToday } from '@/lib/store';
@@ -22,7 +23,7 @@ interface TransactionRowProps {
  */
 export const TransactionRow = ({ transaction, onSelect, selected, compact, className }: TransactionRowProps) => {
   const { accounts } = useAppState();
-  const { maskBalances } = useSettings();
+  const { maskBalances, accents } = useSettings();
   const today = useToday();
   const lookupCategory = useCategoryLookup();
   const lookupLabel = useLabelLookup();
@@ -35,8 +36,10 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
   const overdue = scheduled && transaction.date <= today;
 
   const sign = transaction.type === 'income' ? '+' : transaction.type === 'expense' ? '-' : '';
-  const amountTone =
-    transaction.type === 'income' ? 'text-success' : transaction.type === 'transfer' ? 'text-primary' : 'text-text';
+  // The same accent the register uses, so one transaction is one colour
+  // wherever it is drawn.
+  const accent = accents[kindOf(transaction)];
+  const amountTone = ACCENT_TEXT[accent];
 
   const Wrapper = onSelect ? 'button' : 'div';
 
@@ -52,6 +55,7 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
         // Scheduled money is drawn as an outline, never as a solid surface —
         // it has not happened yet.
         scheduled && 'bg-transparent shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.09)] hover:bg-[rgb(var(--hairline)/0.03)]',
+        ACCENT_BAR[accent],
         overdue && 'shadow-[inset_0_0_0_1px_rgb(var(--warning)/0.35)]',
         // Cancelled. Kept, so the history is honest, and faded so it is never
         // mistaken for money.

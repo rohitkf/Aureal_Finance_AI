@@ -28,7 +28,7 @@ export const Reminders = ({
 }) => {
   const state = useAppState();
   const today = useToday();
-  const { maskBalances } = useSettings();
+  const { maskBalances, accents } = useSettings();
 
   const { from, to } = useMemo(() => ledgerWindow(today), [today]);
   const rows = useMemo(
@@ -89,6 +89,7 @@ export const Reminders = ({
               row={row}
               today={today}
               masked={maskBalances}
+              accents={accents}
               accountName={accountName(row.accountId)}
               onOpen={() => onOpen(row)}
               onSkip={() => onSkip(row)}

@@ -12,6 +12,7 @@
  * left-hand end of the chart drifts away from the right-hand end.
  */
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import { netWorth, netWorthSeries, positionAsOf } from '@/lib/finance';
 import { emptyAppState } from '@/lib/mappers';
 import type { Account, AppState, NetWorthPoint, Settings, Transaction } from '@/lib/types';
@@ -23,6 +24,7 @@ const SETTINGS: Settings = {
   userName: 'Test',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const TODAY = '2026-09-18';

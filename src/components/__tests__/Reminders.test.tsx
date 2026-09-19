@@ -9,6 +9,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import type { Account, AppState, RecurringPayment, Settings, Transaction } from '@/lib/types';
 
 const SETTINGS: Settings = {
@@ -18,6 +19,7 @@ const SETTINGS: Settings = {
   userName: 'Test',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const TODAY = '2026-09-18';

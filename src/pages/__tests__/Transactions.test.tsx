@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
 import type { Account, AppState, Category, Settings, Transaction } from '@/lib/types';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 
 const dispatch = vi.fn();
 const toast = vi.fn();
@@ -20,6 +21,7 @@ const SETTINGS: Settings = {
   userName: 'Test',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const ACCOUNTS: Account[] = [

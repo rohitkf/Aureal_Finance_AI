@@ -11,6 +11,7 @@ import { render as rtlRender, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import type { AppState, Category, Goal, Settings } from '@/lib/types';
 
 const dispatch = vi.fn();
@@ -23,6 +24,7 @@ const SETTINGS: Settings = {
   userName: 'Test',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const CATEGORIES: Category[] = [

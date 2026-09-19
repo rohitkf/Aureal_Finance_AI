@@ -853,15 +853,12 @@ export const AddTransactionSheet = ({
                   icon="split"
                   onClick={() => {
                     setSplitting(true);
-                    // One part: the payment as it already stands, with its
-                    // category and its whole amount. Pressing "Add a part" is
-                    // what says it is actually being divided, and that row
-                    // arrives holding the remainder. Opening with two empty
-                    // rows made the form look like it wanted four answers
-                    // before it wanted any.
+                    // Two parts, because one part is not a split. The first
+                    // takes what is entered so far, the second the remainder.
                     const whole = Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
                     setParts([
                       { key: newId(), targetId: categoryId, amount: whole ? String(whole) : '', note: '' },
+                      { key: newId(), targetId: '', amount: '', note: '' },
                     ]);
                   }}
                 >

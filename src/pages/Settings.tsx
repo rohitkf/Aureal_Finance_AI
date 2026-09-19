@@ -1,5 +1,24 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { describeError } from '@/lib/errors';
+import { formatMediumDate } from '@/lib/date';
+import {
+  ACCENT_LABELS,
+  ACCENT_NAMES,
+  ACCENT_SWATCH,
+  ACCENT_TEXT,
+  DEFAULT_ACCENTS,
+  KIND_HINTS,
+  KIND_LABELS,
+  LEDGER_KINDS,
+} from '@/lib/accents';
+import {
+  TABLE_LABELS,
+  buildBackup,
+  downloadBackup,
+  parseBackup,
+  summarise,
+  type Backup,
+} from '@/lib/backup';
 import { useDevMode } from '@/lib/devMode';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/cn';
@@ -50,7 +69,7 @@ export const Settings = () => {
     editing: null,
   });
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
-  const [busy, setBusy] = useState<'sample' | 'clear' | null>(null);
+  const [busy, setBusy] = useState<'sample' | 'clear' | 'backup' | null>(null);
 
   const grouped = useMemo(
     () => ({
@@ -62,6 +81,45 @@ export const Settings = () => {
 
   const hasData =
     state.transactions.length + state.accounts.length + state.recurring.length + state.goals.length > 0;
+
+  /** A chosen file that parsed, waiting on the confirm that replaces everything. */
+  const [pendingRestore, setPendingRestore] = useState<Backup | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const downloadFullBackup = async () => {
+    setBusy('backup');
+    try {
+      downloadBackup(await buildBackup());
+      toast({
+        tone: 'success',
+        title: 'Backup downloaded',
+        description: 'Everything in your account, in one file you can restore from.',
+      });
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Couldn’t make a backup', description: errorMessageWithDetail(e) });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * Reads the chosen file and checks it before anything is destroyed.
+   *
+   * Nothing is written here. A restore replaces everything, so the file has to
+   * be understood in full first — and the person has to see what is in it and
+   * say yes.
+   */
+  const onBackupChosen = async (file: File | undefined) => {
+    if (fileInput.current) fileInput.current.value = '';
+    if (!file) return;
+
+    const result = parseBackup(await file.text());
+    if (!result.ok) {
+      toast({ tone: 'danger', title: 'That isn’t a backup Aureal can read', description: result.reason });
+      return;
+    }
+    setPendingRestore(result.backup);
+  };
 
   const exportData = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -363,6 +421,105 @@ export const Settings = () => {
         </p>
       </Card>
 
+      {/* ---------------- Colours ---------------- */}
+      <Card className="space-y-6" id="colours">
+        <CardHeader
+          title="Colours"
+          description="Which colour each kind of line is drawn in, on the register and everywhere else. Red for spending reads as an alarm to some people and as ordinary to others, so it is yours to set."
+        />
+
+        <div className="space-y-5">
+          {LEDGER_KINDS.map((kind) => (
+            <div key={kind} className="space-y-2.5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-[13.5px] font-medium text-text">{KIND_LABELS[kind]}</p>
+                {/* The actual thing, in the colour chosen, so the choice is
+                    made against what it looks like rather than a word. */}
+                <p className={cn('tnum text-body-md font-medium', ACCENT_TEXT[state.settings.accents[kind]])}>
+                  {kind === 'expense' ? '−' : '+'}
+                  {money(kind === 'opening' ? 58 : 20, { masked: false })}
+                </p>
+              </div>
+
+              <p className="text-[12.5px] leading-snug text-faint">{KIND_HINTS[kind]}</p>
+
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={`${KIND_LABELS[kind]} colour`}>
+                {ACCENT_NAMES.map((accent) => {
+                  const chosen = state.settings.accents[kind] === accent;
+                  return (
+                    <button
+                      key={accent}
+                      type="button"
+                      role="radio"
+                      aria-checked={chosen}
+                      aria-label={`${KIND_LABELS[kind]}: ${ACCENT_LABELS[accent]}`}
+                      onClick={() =>
+                        dispatch({
+                          type: 'update-settings',
+                          settings: { accents: { ...state.settings.accents, [kind]: accent } },
+                        })
+                      }
+                      className={cn(
+                        'flex items-center gap-2 rounded-full px-3 py-1.5 text-[12.5px]',
+                        'transition-all duration-400 ease-fluid active:scale-[0.97]',
+                        chosen
+                          ? 'text-text shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))]'
+                          : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)]',
+                      )}
+                    >
+                      <span className={cn('h-2.5 w-2.5 rounded-full', ACCENT_SWATCH[accent])} />
+                      {ACCENT_LABELS[accent]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Button
+          size="sm"
+          icon="repeat"
+          onClick={() => dispatch({ type: 'update-settings', settings: { accents: DEFAULT_ACCENTS } })}
+        >
+          Back to the defaults
+        </Button>
+      </Card>
+
+      {/* ---------------- Backup ---------------- */}
+      <Card className="space-y-6" id="backup">
+        <CardHeader
+          title="Backup & restore"
+          description="One file holding everything — accounts, transactions, schedules, budgets, goals, labels. Yours to keep somewhere else."
+        />
+
+        <div className="flex flex-wrap gap-2.5">
+          <Button icon="download" disabled={busy !== null} onClick={downloadFullBackup}>
+            {busy === 'backup' ? 'Making it…' : 'Download a backup'}
+          </Button>
+
+          {/* A file input styled as a button: the control has to be a real
+              <input type="file"> for the browser to open a picker at all. */}
+          <Button icon="upload" disabled={busy !== null} onClick={() => fileInput.current?.click()}>
+            Restore from a backup
+          </Button>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            aria-label="Choose a backup file"
+            onChange={(e) => void onBackupChosen(e.target.files?.[0])}
+          />
+        </div>
+
+        <p className="text-[12.5px] leading-relaxed text-faint">
+          A backup is a copy of your rows, not of the app — so it restores into whichever account you are signed into,
+          and it carries no password, no email and no session. Account balances are rebuilt from the transactions in
+          the file rather than copied, which is the same way they are maintained normally.
+        </p>
+      </Card>
+
       {/* ---------------- Danger zone ---------------- */}
       <Card className="space-y-5 shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.3)]">
         <CardHeader
@@ -373,6 +530,43 @@ export const Settings = () => {
           Delete account
         </Button>
       </Card>
+
+      <ConfirmDialog
+        open={pendingRestore !== null}
+        onClose={() => setPendingRestore(null)}
+        onConfirm={() => {
+          if (!pendingRestore) return;
+          dispatch({ type: 'restore-backup', backup: pendingRestore });
+          toast({
+            tone: 'info',
+            title: 'Restoring…',
+            description: 'Everything is being replaced with the contents of that file.',
+          });
+          setPendingRestore(null);
+        }}
+        title="Replace everything with this backup?"
+        subject={
+          pendingRestore && (
+            <div className="space-y-1">
+              <p className="text-[14px] font-medium text-text">
+                {pendingRestore.exportedAt
+                  ? `Taken on ${formatMediumDate(pendingRestore.exportedAt.slice(0, 10))}`
+                  : 'A backup file'}
+              </p>
+              <p className="text-[12.5px] leading-relaxed text-muted">
+                {summarise(pendingRestore).length === 0
+                  ? 'It is empty — restoring it would leave you with nothing.'
+                  : summarise(pendingRestore)
+                      .map((entry) => `${entry.count} ${TABLE_LABELS[entry.table]}`)
+                      .join(' · ')}
+              </p>
+            </div>
+          )
+        }
+        consequence="Everything currently in this account is deleted first, and cannot be recovered unless you have a backup of it too."
+        preserved="Your sign-in, your email and your password are untouched — a backup holds none of them."
+        confirmLabel="Replace everything"
+      />
 
       <NewCategoryDialog
         open={categoryDialog.open}

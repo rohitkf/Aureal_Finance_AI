@@ -22,6 +22,9 @@ import type {
   Transaction,
   VirtualAccount,
 } from './types';
+import { DEFAULT_ACCENTS } from './accents';
+import { BACKUP_TABLES, type Backup } from './backup';
+import { batch } from '@/data/sample';
 import { describeError, errorMessage } from './errors';
 import { supabase } from './supabase';
 import { useAuth } from './auth';
@@ -66,6 +69,8 @@ export type Action =
   | { type: 'add-transaction'; transaction: Transaction }
   | { type: 'update-transaction'; transaction: Transaction }
   | { type: 'delete-transaction'; id: string }
+  /** Replace everything this account holds with the contents of a backup. */
+  | { type: 'restore-backup'; backup: Backup }
   | { type: 'upsert-account-group'; group: AccountGroup }
   | { type: 'delete-account-group'; id: string }
   | { type: 'add-label'; label: Label }
@@ -109,6 +114,7 @@ const DEFAULT_SETTINGS: Settings = {
   userName: 'You',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 interface StoreValue {
@@ -578,6 +584,54 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           });
           break;
 
+        case 'restore-backup':
+          run('restore that backup', async () => {
+            const { backup } = action;
+
+            // Out, children before parents. Cascades would take most of this
+            // anyway, but leaning on them means the order of the table list is
+            // load-bearing in a way nobody reading it would notice.
+            for (const table of [...BACKUP_TABLES].reverse()) {
+              const key = table === 'transaction_labels' ? 'transaction_id' : 'id';
+              check(await supabase.from(table).delete().not(key, 'is', null));
+            }
+
+            // Back in, parents before children, keeping the original ids so
+            // every reference between them still points somewhere.
+            for (const table of BACKUP_TABLES) {
+              const rows = backup.data[table];
+              if (!rows?.length) continue;
+
+              /**
+               * An account's balance is not restored — it is rebuilt.
+               *
+               * The database derives it from transactions through
+               * `apply_transaction_to_balances`, and those transactions are in
+               * this same backup. Writing the stored figure *and* replaying the
+               * transactions that produced it would count every penny twice.
+               */
+              const prepared =
+                table === 'accounts' ? rows.map((row) => ({ ...row, balance: 0 })) : rows;
+
+              // Rectangular, for the reason `batch` explains: PostgREST takes a
+              // batch's column list from the union of its rows' keys and writes
+              // NULL wherever one is missing, so a column DEFAULT never runs.
+              check(await supabase.from(table).insert(batch(prepared)));
+            }
+
+            if (backup.settings) {
+              // The profile row already exists and is keyed by the signed-in
+              // user, so this is an update and the backup's own id is not
+              // wanted — it belongs to whoever took the backup.
+              const settings = { ...(backup.settings as Record<string, unknown>) };
+              delete settings.id;
+              check(await supabase.from('profiles').update(settings).not('id', 'is', null));
+            }
+
+            return ALL;
+          });
+          break;
+
         case 'upsert-account-group':
           run('save that account group', async () => {
             check(
@@ -800,6 +854,10 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                   // an opening balance is money out, not money in.
                   type: a.type === 'credit' ? 'expense' : 'income',
                   status: 'cleared',
+                  // A fact about the row, so renaming it later leaves it an
+                  // opening balance — and the register keeps colouring it as
+                  // one rather than as money that arrived.
+                  is_opening: true,
                   notes: 'Recorded when the account was added.',
                 }),
               );
@@ -891,6 +949,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             if (s.maskBalances !== undefined) patch.mask_balances = s.maskBalances;
             if (s.theme !== undefined) patch.theme = s.theme;
             if (s.locale !== undefined) patch.locale = s.locale;
+            // Stored whole rather than merged in SQL: it is one small map, and
+            // `resolveAccents` merges it over the defaults on the way back in.
+            if (s.accents !== undefined) patch.row_accents = s.accents;
             // Reflect it immediately — these are preferences, not money.
             setState((prev) => ({ ...prev, settings: { ...prev.settings, ...s } }));
             if (Object.keys(patch).length > 0) {
@@ -904,7 +965,10 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           break;
       }
     },
-    [run],
+    // `ALL` is a `useMemo` with no dependencies, so listing it costs nothing
+    // and keeps `dispatch` honest about what it closes over — a restore is the
+    // one action that refetches everything.
+    [run, ALL],
   );
 
   /* ---------------------------------------------------------------- */

@@ -9,6 +9,7 @@
  * the same money to spend.
  */
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import { lockedAllocations, availableNow, netWorth, safeToSpend } from '@/lib/finance';
 import { emptyAppState } from '@/lib/mappers';
 import type { Account, AppState, Settings, VirtualAccount } from '@/lib/types';
@@ -20,6 +21,7 @@ const SETTINGS: Settings = {
   userName: 'Test',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const ACCOUNT: Account = {

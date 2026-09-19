@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import type { AccountRow, GoalRow, ProfileRow, TransactionRow } from '../database.types';
 import type { Goal, Transaction } from '../types';
 import {
@@ -201,6 +202,9 @@ describe('toSettings', () => {
       userName: 'Rohit',
       maskBalances: false,
       theme: 'dark',
+      // A profile with no stored accents reads as "as designed", not as no
+      // colour at all.
+      accents: DEFAULT_ACCENTS,
     });
   });
 });
@@ -213,6 +217,7 @@ describe('emptyAppState', () => {
       minimum_balance: 0,
       mask_balances: false,
       theme: 'system',
+      accents: DEFAULT_ACCENTS,
     } as unknown as ProfileRow);
     const state = emptyAppState(settings);
     expect(state.accounts).toEqual([]);
