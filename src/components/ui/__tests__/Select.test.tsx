@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { SelectField } from '../Field';
 
 const FRUIT = [
@@ -210,5 +210,82 @@ describe('Select', () => {
       </SelectField>,
     );
     expect(screen.getByRole('combobox', { name: 'Fruit' })).toHaveTextContent('Pick one');
+  });
+});
+
+/**
+ * Where the list is drawn.
+ *
+ * It was `absolute`, next to the trigger — which put it inside whatever the
+ * trigger was inside, and inside a dialog that is a box with `overflow-y-auto`.
+ * An absolutely positioned popup cannot escape a scrolling ancestor, so on a
+ * short sheet (Add a budget, on a phone) the options were clipped to the few
+ * pixels left below the field, and reaching them meant scrolling the dialog
+ * and the list, one inside the other.
+ */
+describe('a list inside something that scrolls', () => {
+  const Clipped = () => (
+    <div data-testid="scroller" style={{ maxHeight: 80, overflowY: 'auto' }}>
+      <SelectField label="Letter" value="a" onChange={vi.fn()}>
+        <option value="a">Alpha</option>
+        <option value="b">Bravo</option>
+        <option value="c">Charlie</option>
+      </SelectField>
+    </div>
+  );
+
+  it('is drawn outside the box that would clip it', async () => {
+    const user = userEvent.setup();
+    const { getByTestId } = render(<Clipped />);
+
+    await user.click(screen.getByRole('combobox'));
+
+    const list = screen.getByRole('listbox');
+    expect(list).toBeInTheDocument();
+    // The whole point: not a descendant of the scroll container.
+    expect(getByTestId('scroller')).not.toContainElement(list);
+    expect(document.body).toContainElement(list);
+  });
+
+  it('is positioned against the viewport, not the box', async () => {
+    const user = userEvent.setup();
+    render(<Clipped />);
+
+    await user.click(screen.getByRole('combobox'));
+
+    // `fixed` is what makes a scrolling ancestor irrelevant; `absolute` is
+    // what made it decisive.
+    expect(screen.getByRole('listbox').className).toContain('fixed');
+    expect(screen.getByRole('listbox').className).not.toContain('absolute');
+  });
+
+  it('still chooses an option, now that the list is somewhere else', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <div style={{ maxHeight: 80, overflowY: 'auto' }}>
+        <SelectField label="Letter" value="a" onChange={onChange}>
+          <option value="a">Alpha</option>
+          <option value="b">Bravo</option>
+        </SelectField>
+      </div>,
+    );
+
+    await user.click(screen.getByRole('combobox'));
+    await user.click(screen.getByRole('option', { name: /bravo/i }));
+
+    expect(onChange).toHaveBeenCalledWith('b');
+  });
+
+  it('does not treat a press on its own list as a press outside itself', async () => {
+    const user = userEvent.setup();
+    render(<Clipped />);
+
+    await user.click(screen.getByRole('combobox'));
+    // Portalled out of the trigger's tree, so "inside" had to learn to mean
+    // two places rather than one — otherwise the first press closed it.
+    await user.pointer({ target: screen.getByRole('listbox'), keys: '[MouseLeft>]' });
+
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
   });
 });

@@ -164,4 +164,72 @@ describe('an account opened for editing', () => {
     render(<AccountDialog open onClose={vi.fn()} onDelete={vi.fn()} />);
     expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument();
   });
+
+  /**
+   * The dialog has no control for the statement day, the minimum payment or
+   * the note, and it built a fresh `Account` from its own fields. Everything
+   * it did not ask about arrived as `undefined`, and `accountToRow` writes
+   * `?? null` — a real NULL. So correcting a typo in the name wiped three
+   * fields that are drawn on the account card, the Debts page and the account
+   * detail screen, with no warning and nothing on screen to show it had gone.
+   *
+   * Latent until the day the dialog was first given an account to edit.
+   */
+  it('keeps what it never asked about, rather than nulling it', async () => {
+    const user = userEvent.setup();
+    render(
+      <AccountDialog
+        open
+        onClose={vi.fn()}
+        editing={{ ...EXISTING, statementDay: 15, minimumPayment: 25, note: 'joint account' }}
+      />,
+    );
+
+    await user.clear(screen.getByLabelText('Account name'));
+    await user.type(screen.getByLabelText('Account name'), 'Everyday');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(sent()[0].account).toMatchObject({
+      name: 'Everyday',
+      statementDay: 15,
+      minimumPayment: 25,
+      note: 'joint account',
+    });
+  });
+
+  it('does not quietly demote a connected account to a manual one', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, syncStatus: 'live' }} />);
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(sent()[0].account.syncStatus).toBe('live');
+  });
+
+  it('still records a new account as entered by hand', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} />);
+    await user.type(screen.getByLabelText('Account name'), 'Revolut');
+    await user.click(screen.getByRole('button', { name: /Add account/ }));
+
+    expect(sent()[0].account.syncStatus).toBe('manual');
+  });
+
+  it('still clears the credit fields when the type stops being a credit card', async () => {
+    const user = userEvent.setup();
+    // Carrying everything through must not carry through what the form does
+    // control — a savings account with an APR is nonsense.
+    render(
+      <AccountDialog
+        open
+        onClose={vi.fn()}
+        editing={{ ...EXISTING, type: 'savings', creditLimit: 3000, apr: 22.9, paymentDueDay: 5 }}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(sent()[0].account.creditLimit).toBeUndefined();
+    expect(sent()[0].account.apr).toBeUndefined();
+    expect(sent()[0].account.paymentDueDay).toBeUndefined();
+  });
 });
