@@ -79,6 +79,15 @@ export const Accounts = () => {
   const [deletingAllocation, setDeletingAllocation] = useState<VirtualAccount | null>(null);
   const [editingGroup, setEditingGroup] = useState<AccountGroup | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<AccountGroup | null>(null);
+  /**
+   * The account being changed, and the one being removed.
+   *
+   * `AccountDialog` has always taken an `editing` account and always known how
+   * to save one — nothing ever passed it, so an account could be created and
+   * then never corrected. A typo in the name was permanent.
+   */
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState<Account | null>(null);
 
   useEffect(() => {
     if (params.get('new') !== null) {
@@ -318,10 +327,10 @@ export const Accounts = () => {
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   {section.accounts.map((account) => (
+              <div key={account.id} className="group relative min-w-0">
               <Link
-                key={account.id}
                 to={`/accounts/${account.id}`}
-                className="plate group flex min-w-0 flex-col justify-between gap-7 p-6 transition-transform duration-500 ease-fluid hover:-translate-y-1"
+                className="plate flex h-full min-w-0 flex-col justify-between gap-7 p-6 transition-transform duration-500 ease-fluid hover:-translate-y-1"
               >
                 <div>
                   <div className="flex items-start justify-between">
@@ -352,6 +361,26 @@ export const Accounts = () => {
                   {account.note && <p className="mt-1 truncate text-label-sm text-muted">{account.note}</p>}
                 </div>
               </Link>
+
+              {/* Beside the card rather than inside it: a button nested in a
+                  link is invalid, and every click on it would also follow the
+                  link. On a touch screen there is no hover to reveal them, so
+                  there they simply stay. */}
+              <div className="absolute bottom-5 right-5 flex gap-1 opacity-0 transition-opacity duration-300 group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
+                <IconButton
+                  icon="edit"
+                  label={`Edit ${account.name}`}
+                  size={14}
+                  onClick={() => setEditingAccount(account)}
+                />
+                <IconButton
+                  icon="trash"
+                  label={`Delete ${account.name}`}
+                  size={14}
+                  onClick={() => setDeletingAccount(account)}
+                />
+              </div>
+              </div>
                   ))}
                 </div>
               </div>
@@ -544,6 +573,48 @@ export const Accounts = () => {
       </Card>
 
       <AccountDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
+
+      <AccountDialog
+        open={Boolean(editingAccount)}
+        onClose={() => setEditingAccount(null)}
+        editing={editingAccount}
+        onDelete={() => setDeletingAccount(editingAccount)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deletingAccount)}
+        onClose={() => setDeletingAccount(null)}
+        onConfirm={() => {
+          if (!deletingAccount) return;
+          dispatch({ type: 'delete-account', id: deletingAccount.id });
+          toast({
+            tone: 'info',
+            title: 'Account deleted',
+            description: deletingAccount.name,
+          });
+          setDeletingAccount(null);
+          setEditingAccount(null);
+        }}
+        title="Delete this account?"
+        subject={
+          deletingAccount && (
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Icon name={TYPE_ICON[deletingAccount.type]} size={18} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-body-md font-semibold text-text">{deletingAccount.name}</p>
+                <p className="tnum text-body-sm text-muted">{money(deletingAccount.balance)}</p>
+              </div>
+            </div>
+          )
+        }
+        /* Said plainly because the database means it: transactions on this
+           account are deleted with it, and that is most of what it was. */
+        consequence="Every transaction recorded against it goes too, along with any money set aside inside it. Your net worth and every report are recalculated without them."
+        preserved="Transfers from other accounts into this one are kept — they stop naming a destination, but the money that left the other account is still accounted for. Schedules and goals that pointed here survive, and ask you for a new account."
+        confirmLabel="Delete account"
+      />
 
       <AccountGroupDialog
         open={editingGroup !== null}

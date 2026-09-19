@@ -4,16 +4,7 @@ import { newId, useLabels, useStore } from '@/lib/store';
 import type { Label } from '@/lib/types';
 import { Icon } from './ui/Icon';
 import { TextField } from './ui/Field';
-
-/** The tint a label is drawn in. The same six categories use. */
-const ACCENT_CLASS: Record<Label['accent'], string> = {
-  primary: 'text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.35)] bg-primary/10',
-  success: 'text-success shadow-[inset_0_0_0_1px_rgb(var(--success)/0.35)] bg-success/10',
-  secondary: 'text-secondary shadow-[inset_0_0_0_1px_rgb(var(--secondary)/0.35)] bg-secondary/10',
-  warning: 'text-warning shadow-[inset_0_0_0_1px_rgb(var(--warning)/0.35)] bg-warning/10',
-  danger: 'text-danger shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.35)] bg-danger/10',
-  neutral: 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))]',
-};
+import { ACCENT_CLASS, ACCENTS } from './labelAccents';
 
 /** A label as it appears on a transaction: small, tinted, unmistakably a tag. */
 export const LabelChip = ({ label, className }: { label: Label; className?: string }) => (
@@ -28,15 +19,6 @@ export const LabelChip = ({ label, className }: { label: Label; className?: stri
   </span>
 );
 
-/**
- * The accent a new label gets.
- *
- * Cycled through the six rather than asked for. Being made to choose a colour
- * is a decision nobody wants at the moment they are trying to tag a receipt,
- * and a wall of identically grey labels is no use either. It can be changed
- * later from Settings.
- */
-const ACCENTS: Label['accent'][] = ['primary', 'success', 'secondary', 'warning', 'danger', 'neutral'];
 
 interface LabelPickerProps {
   /** The ids currently on the transaction. */

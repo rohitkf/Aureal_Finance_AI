@@ -22,6 +22,12 @@ interface AccountDialogProps {
   onClose: () => void;
   editing?: Account | null;
   /**
+   * Remove this account altogether. Only offered when one is open for
+   * editing — there is nothing to delete otherwise — and the page owns the
+   * confirmation, because what goes with it needs spelling out.
+   */
+  onDelete?: () => void;
+  /**
    * The account that was just made. Lets a form that sent you here get you
    * back with it already chosen, rather than leaving you to find it.
    */
@@ -32,7 +38,7 @@ interface AccountDialogProps {
  * Add or edit an account by hand. Until bank connections exist this is the only
  * way accounts get into Aureal, so it is the first thing a new user needs.
  */
-export const AccountDialog = ({ open, onClose, editing, onCreated }: AccountDialogProps) => {
+export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: AccountDialogProps) => {
   const { dispatch } = useStore();
   const { accountGroups } = useAppState();
   const toast = useToast();
@@ -123,6 +129,12 @@ export const AccountDialog = ({ open, onClose, editing, onCreated }: AccountDial
       }
       footer={
         <>
+          {/* At the far end, away from the button a thumb aims for. */}
+          {onDelete && editing && (
+            <Button variant="danger" icon="trash" onClick={onDelete} className="mr-auto">
+              Delete
+            </Button>
+          )}
           <Button onClick={onClose}>Cancel</Button>
           <Button variant="primary" icon="check" onClick={save} disabled={!valid}>
             {editing ? 'Save changes' : 'Add account'}
