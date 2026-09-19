@@ -572,28 +572,63 @@ describe('splitting a payment', () => {
     await user.click(screen.getByRole('button', { name: /split this payment/i }));
   };
 
+  /** Opens the editor and adds the second row, which most of these need. */
+  const startSplitWithTwo = async (user: ReturnType<typeof userEvent.setup>) => {
+    await startSplit(user);
+    await user.click(screen.getByRole('button', { name: /add a part/i }));
+  };
+
   it('is not in the way until it is asked for', () => {
     open();
     expect(screen.queryByRole('radio', { name: /by category/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /split this payment/i })).toBeInTheDocument();
   });
 
-  it('opens with two parts, because one part is not a split', async () => {
+  it('opens with one part: the payment as it already stands', async () => {
     const user = userEvent.setup();
     open();
     await user.keyboard('100');
     await startSplit(user);
 
-    expect(screen.getAllByRole('button', { name: /^Remove part/ })).toHaveLength(2);
-    // The first carries what was entered, so only the remainder is left to type.
+    // Two empty rows made the form look like it wanted four answers before it
+    // wanted any. One row, holding what is already there.
+    expect(screen.getAllByRole('button', { name: /^Remove part/ })).toHaveLength(1);
     expect(partAmountBox(1)).toHaveValue('100');
+  });
+
+  it('adds a row only when asked, and hands it the remainder', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('100');
+    await startSplit(user);
+
+    await user.clear(partAmountBox(1));
+    await user.type(partAmountBox(1), '60');
+    await user.click(screen.getByRole('button', { name: /add a part/i }));
+
+    expect(screen.getAllByRole('button', { name: /^Remove part/ })).toHaveLength(2);
+    // £40 is what is left, so it is what the new row starts with.
+    expect(partAmountBox(2)).toHaveValue('40');
+  });
+
+  it('will not save a split of one part, which is just the payment', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('100');
+    await startSplit(user);
+    await choose(user, /Part 1 category/i, 'Groceries');
+
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/at least two parts/i);
   });
 
   it('says how much is still unallocated, and then that it adds up', async () => {
     const user = userEvent.setup();
     open();
     await user.keyboard('100');
-    await startSplit(user);
+    await startSplitWithTwo(user);
 
     await user.clear(partAmountBox(1));
     await user.type(partAmountBox(1), '60');
@@ -607,7 +642,7 @@ describe('splitting a payment', () => {
     const user = userEvent.setup();
     open();
     await user.keyboard('100');
-    await startSplit(user);
+    await startSplitWithTwo(user);
     await user.type(partAmountBox(2), '30');
 
     expect(screen.getByText(/£30\.00 over/)).toBeInTheDocument();
@@ -617,7 +652,7 @@ describe('splitting a payment', () => {
     const user = userEvent.setup();
     open();
     await user.keyboard('100');
-    await startSplit(user);
+    await startSplitWithTwo(user);
     await user.clear(partAmountBox(1));
     await user.type(partAmountBox(1), '60');
 
@@ -631,9 +666,10 @@ describe('splitting a payment', () => {
     const user = userEvent.setup();
     open();
     await user.keyboard('100');
-    await startSplit(user);
+    await startSplitWithTwo(user);
     await user.clear(partAmountBox(1));
     await user.type(partAmountBox(1), '60');
+    await user.clear(partAmountBox(2));
     await user.type(partAmountBox(2), '40');
     await choose(user, /Part 2 category/i, 'Eating out');
     await user.click(screen.getByRole('button', { name: /save transaction/i }));
@@ -651,9 +687,10 @@ describe('splitting a payment', () => {
     const user = userEvent.setup();
     open();
     await user.keyboard('100');
-    await startSplit(user);
+    await startSplitWithTwo(user);
     await user.clear(partAmountBox(1));
     await user.type(partAmountBox(1), '60');
+    await user.clear(partAmountBox(2));
     await user.type(partAmountBox(2), '40');
     await choose(user, /Part 2 category/i, 'Eating out');
     await user.type(screen.getByLabelText('Part 1 note'), 'the food');
@@ -667,7 +704,7 @@ describe('splitting a payment', () => {
     const user = userEvent.setup();
     open();
     await user.keyboard('100');
-    await startSplit(user);
+    await startSplitWithTwo(user);
     await user.click(screen.getByRole('radio', { name: /by account/i }));
 
     await user.clear(partAmountBox(1));
@@ -694,7 +731,7 @@ describe('splitting a payment', () => {
     const user = userEvent.setup();
     open();
     await user.keyboard('100');
-    await startSplit(user);
+    await startSplitWithTwo(user);
     await user.click(screen.getByRole('radio', { name: /by account/i }));
 
     // Both pickers are back to "choose one" rather than showing a category

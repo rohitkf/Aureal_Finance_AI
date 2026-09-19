@@ -14,7 +14,7 @@ two answers and no way to tell which one was current.
 1. **Work on `develop`, and only `develop`.** Never create a branch. Never
    push to `main` — it is production and moves only by a pull request, which
    merges itself once CI is green.
-2. **Before pushing**: `npm run verify` (lint, typecheck, 572 tests, build).
+2. **Before pushing**: `npm run verify` (lint, typecheck, 574 tests, build).
    All clean, every time.
 3. **The app cannot reach Supabase from a sandbox** — outbound traffic to
    `*.supabase.co` is usually blocked, so the signed-in app cannot be
