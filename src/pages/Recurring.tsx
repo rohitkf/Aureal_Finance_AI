@@ -4,7 +4,7 @@ import { cn, pillClass } from '@/lib/cn';
 import { formatMediumDate, relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
 import { FREQUENCY_LABELS, WEEKEND_LABELS, monthlyEquivalent, previewOccurrences } from '@/lib/recurrence';
-import { monthlyCommitments, monthlyTransfers } from '@/lib/finance';
+import { monthlyCommitments, monthlyTransfers, subscriptionTotals } from '@/lib/finance';
 import { newId, useAppState, useCategories, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { Badge } from '@/components/ui/Badge';
@@ -47,11 +47,33 @@ const STATUS_TABS: Array<{ value: RecurringStatus | 'all'; label: string }> = [
   { value: 'ended', label: 'Ended' },
 ];
 
+/**
+ * Which of the two questions this page is being asked.
+ *
+ * Subscriptions used to be a screen of its own. It was the same rows out of
+ * the same table — `is_subscription` is a flag on a recurring payment, not a
+ * separate kind of thing — but with no editor, so its own "Add subscription"
+ * button sent you to this page, which created a plain recurring payment.
+ * Pressing Add on the subscriptions screen reliably produced a
+ * non-subscription.
+ *
+ * It is a filter here instead. One place to make and change a rule means that
+ * particular bug cannot be written again, and the question the other screen
+ * existed to answer — what am I paying for that I could cancel, and what does
+ * it cost me a year — is a heading and a filter rather than a route.
+ */
+type Kind = 'all' | 'subscriptions';
+
+const KIND_TABS: Array<{ value: Kind; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'subscriptions', label: 'Subscriptions' },
+];
+
 const FREQUENCIES = Object.keys(FREQUENCY_LABELS) as Frequency[];
 
 
 
-const emptyDraft = (today: string, accountId: string, toAccountId = ''): DraftRule => ({
+const emptyDraft = (today: string, accountId: string, toAccountId = '', isSubscription = false): DraftRule => ({
   name: '',
   amount: '',
   direction: 'out',
@@ -67,7 +89,7 @@ const emptyDraft = (today: string, accountId: string, toAccountId = ''): DraftRu
   endDate: '',
   occurrences: '',
   weekendMode: 'none',
-  isSubscription: false,
+  isSubscription,
   notes: '',
 });
 
@@ -123,12 +145,17 @@ export const Recurring = () => {
   const [params, setParams] = useSearchParams();
 
   const [tab, setTab] = useState<RecurringStatus | 'all'>('active');
+  const [kind, setKind] = useState<Kind>(params.get('filter') === 'subscriptions' ? 'subscriptions' : 'all');
   const [draft, setDraft] = useState<DraftRule | null>(null);
   const [deleting, setDeleting] = useState<RecurringPayment | null>(null);
 
+  const subscriptionsOnly = kind === 'subscriptions';
+
   useEffect(() => {
+    // Arriving from the old /subscriptions route, or from search.
+    if (params.get('filter') === 'subscriptions') setKind('subscriptions');
     if (params.get('new') !== null) {
-      setDraft(emptyDraft(today, state.accounts[0]?.id ?? ''));
+      setDraft(emptyDraft(today, state.accounts[0]?.id ?? '', '', params.get('filter') === 'subscriptions'));
       params.delete('new');
       setParams(params, { replace: true });
     }
@@ -137,9 +164,12 @@ export const Recurring = () => {
   const rules = useMemo(
     () =>
       state.recurring
+        .filter((r) => (subscriptionsOnly ? r.isSubscription : true))
         .filter((r) => (tab === 'all' ? true : r.status === tab))
+        // Biggest first, which is the order you want when the question is
+        // what to cancel.
         .sort((a, b) => monthlyEquivalent(b) - monthlyEquivalent(a)),
-    [state.recurring, tab],
+    [state.recurring, tab, subscriptionsOnly],
   );
 
   const totalMonthly = monthlyCommitments(state);
@@ -151,6 +181,7 @@ export const Recurring = () => {
   // yours — so it is counted apart from what actually leaves.
   const moved = monthlyTransfers(state);
   const transferCount = state.recurring.filter((r) => r.status === 'active' && r.direction === 'transfer').length;
+  const subs = subscriptionTotals(state);
 
   const nextDates = (rule: RecurringPayment) => previewOccurrences(rule, today, 1);
 
@@ -171,18 +202,55 @@ export const Recurring = () => {
     <div className="space-y-8">
       <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <Eyebrow>Recurring</Eyebrow>
-          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">Recurring payments</h1>
+          <Eyebrow>{subscriptionsOnly ? 'Subscriptions' : 'Recurring'}</Eyebrow>
+          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">
+            {subscriptionsOnly ? 'Subscriptions' : 'Recurring payments'}
+          </h1>
           <p className="mt-3 text-[14px] leading-relaxed text-muted">
-            Everything that leaves or arrives on a schedule. These drive your forecast.
+            {subscriptionsOnly
+              ? 'What you pay for month after month, biggest first — and what each one actually costs you a year.'
+              : 'Everything that leaves or arrives on a schedule. These drive your forecast.'}
           </p>
         </div>
-        <Button variant="primary" icon="plus" onClick={() => setDraft(emptyDraft(today, state.accounts[0]?.id ?? ''))}>
-          Add recurring payment
+        {/* The button makes the thing the page is currently showing. Add on a
+            subscriptions view that produced a plain recurring payment is the
+            bug this merge exists to make unwriteable. */}
+        <Button
+          variant="primary"
+          icon="plus"
+          onClick={() => setDraft(emptyDraft(today, state.accounts[0]?.id ?? '', '', subscriptionsOnly))}
+        >
+          {subscriptionsOnly ? 'Add subscription' : 'Add recurring payment'}
         </Button>
       </header>
 
       <section className="grid gap-4 sm:grid-cols-3">
+        {subscriptionsOnly ? (
+          <>
+            <Card>
+              <Eyebrow>Active subscriptions</Eyebrow>
+              <p className="tnum mt-2 font-display text-metric-lg text-text">{subs.count}</p>
+              <p className="mt-0.5 text-body-sm text-muted">Still being charged</p>
+            </Card>
+            <Card>
+              <Eyebrow>Monthly cost</Eyebrow>
+              <p className="tnum mt-2 font-display text-metric-lg text-text">
+                {money(subs.monthly, { masked: maskBalances })}
+              </p>
+              <p className="mt-0.5 text-body-sm text-muted">Everything, per month</p>
+            </Card>
+            <Card>
+              {/* The figure the whole view exists for. £14.99 a month reads as
+                  nothing; £180 a year is what gets something cancelled. */}
+              <Eyebrow>Annual cost</Eyebrow>
+              <p className="tnum mt-2 font-display text-metric-lg text-warning">
+                {money(subs.annual, { masked: maskBalances })}
+              </p>
+              <p className="mt-0.5 text-body-sm text-muted">What a year of these costs</p>
+            </Card>
+          </>
+        ) : (
+          <>
         <Card>
           <Eyebrow>Monthly commitments</Eyebrow>
           <p className="tnum mt-2 font-display text-metric-lg text-text">
@@ -210,11 +278,37 @@ export const Recurring = () => {
               : 'Before any discretionary spending'}
           </p>
         </Card>
+          </>
+        )}
       </section>
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {KIND_TABS.map((t) => {
+          const count =
+            t.value === 'all' ? state.recurring.length : state.recurring.filter((r) => r.isSubscription).length;
+          return (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => {
+                setKind(t.value);
+                // The address bar keeps up, so the view can be linked to and
+                // survives a reload.
+                if (t.value === 'subscriptions') params.set('filter', 'subscriptions');
+                else params.delete('filter');
+                setParams(params, { replace: true });
+              }}
+              aria-pressed={kind === t.value}
+              className={pillClass(kind === t.value)}
+            >
+              {t.label} <span className="tnum text-faint">({count})</span>
+            </button>
+          );
+        })}
+        <span aria-hidden="true" className="mx-1 h-5 w-px bg-[rgb(var(--hairline)/0.15)]" />
         {STATUS_TABS.map((t) => {
-          const count = t.value === 'all' ? state.recurring.length : state.recurring.filter((r) => r.status === t.value).length;
+          const inKind = state.recurring.filter((r) => (subscriptionsOnly ? r.isSubscription : true));
+          const count = t.value === 'all' ? inKind.length : inKind.filter((r) => r.status === t.value).length;
           return (
             <button
               key={t.value}
@@ -235,9 +329,24 @@ export const Recurring = () => {
         <Card className="p-0">
           <EmptyState
             icon="repeat"
-            title={tab === 'all' ? 'No recurring payments yet' : `Nothing ${tab}`}
-            description="Add your rent, salary and subscriptions once, and your forecast keeps itself up to date."
-            action={{ label: 'Add recurring payment', onClick: () => setDraft(emptyDraft(today, state.accounts[0]?.id ?? '')) }}
+            title={
+              subscriptionsOnly
+                ? tab === 'all'
+                  ? 'No subscriptions yet'
+                  : `No ${tab} subscriptions`
+                : tab === 'all'
+                  ? 'No recurring payments yet'
+                  : `Nothing ${tab}`
+            }
+            description={
+              subscriptionsOnly
+                ? 'Tick “This is a subscription” on anything you pay for month after month, and you will see what a year of it costs.'
+                : 'Add your rent, salary and subscriptions once, and your forecast keeps itself up to date.'
+            }
+            action={{
+              label: subscriptionsOnly ? 'Add subscription' : 'Add recurring payment',
+              onClick: () => setDraft(emptyDraft(today, state.accounts[0]?.id ?? '', '', subscriptionsOnly)),
+            }}
           />
         </Card>
       ) : (
@@ -679,7 +788,7 @@ const RecurringForm = ({
             checked={draft.isSubscription}
             onChange={(isSubscription) => setDraft({ ...draft, isSubscription })}
             label="This is a subscription"
-            description="Also lists it on the Subscriptions screen, where you can see what it costs you a year and cancel what you don't use."
+            description="Groups it under the Subscriptions filter, where you can see what it costs you a year and cancel what you don't use."
           />
         )}
 
