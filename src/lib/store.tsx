@@ -115,6 +115,7 @@ const DEFAULT_SETTINGS: Settings = {
   maskBalances: false,
   theme: 'system',
   accents: DEFAULT_ACCENTS,
+  dueHorizonDays: 2,
 };
 
 interface StoreValue {
@@ -952,6 +953,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             // Stored whole rather than merged in SQL: it is one small map, and
             // `resolveAccents` merges it over the defaults on the way back in.
             if (s.accents !== undefined) patch.row_accents = s.accents;
+            if (s.dueHorizonDays !== undefined) patch.due_horizon_days = s.dueHorizonDays;
             // Reflect it immediately — these are preferences, not money.
             setState((prev) => ({ ...prev, settings: { ...prev.settings, ...s } }));
             if (Object.keys(patch).length > 0) {

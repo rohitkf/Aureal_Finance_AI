@@ -20,6 +20,7 @@ const SETTINGS: Settings = {
   maskBalances: false,
   theme: 'system',
   accents: DEFAULT_ACCENTS,
+  dueHorizonDays: 2,
 };
 
 const TODAY = '2026-09-18';
@@ -53,6 +54,13 @@ vi.mock('@/lib/store', () => ({
   useAppState: () => state,
   useToday: () => TODAY,
   useSettings: () => SETTINGS,
+  useCategoryLookup: () => (id: string) => ({
+    id,
+    name: 'Uncategorised',
+    kind: 'expense' as const,
+    icon: 'box',
+    accent: 'neutral' as const,
+  }),
 }));
 
 const { Register } = await import('../Register');
@@ -123,10 +131,11 @@ describe('what is on the page', () => {
     expect(screen.getByText('Card machine')).toBeInTheDocument();
   });
 
-  it('names the account each line belongs to, so the balance column is not ambiguous', () => {
+  it('names the category and the account under each line', () => {
     state = { ...state, recurring: [], transactions: [cleared('t-1', '2026-09-15', 'Moved across', 'savings')] };
     show();
-    expect(within(rowFor('Moved across')).getByText('Rainy Day')).toBeInTheDocument();
+    // One line: what it was filed under, then which account it came out of.
+    expect(within(rowFor('Moved across')).getByText(/Uncategorised · Rainy Day/)).toBeInTheDocument();
   });
 
   it('shows everything, however old, without being asked twice', () => {

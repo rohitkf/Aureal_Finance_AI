@@ -1,5 +1,6 @@
 import { cn } from '@/lib/cn';
 import { ACCENT_BAR, ACCENT_TEXT, kindOf } from '@/lib/accents';
+import { StatusMark } from './StatusMark';
 import { relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
 import { useAppState, useCategoryLookup, useLabelLookup, useSettings, useToday } from '@/lib/store';
@@ -110,13 +111,27 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
       </div>
 
       <div className="shrink-0 text-right">
-        <div className={cn('tnum text-metric-sm font-semibold', amountTone, scheduled && 'opacity-70')}>
-          {sign}
-          {money(transaction.amount, { masked: maskBalances })}
+        <div className="flex items-center justify-end gap-1.5">
+          <span
+            className={cn(
+              'tnum text-metric-sm font-semibold',
+              amountTone,
+              scheduled && 'opacity-70',
+              voided && 'line-through opacity-50',
+            )}
+          >
+            {sign}
+            {money(transaction.amount, { masked: maskBalances })}
+          </span>
+          <StatusMark status={transaction.status} />
         </div>
-        <div className={cn('text-label-sm capitalize', overdue ? 'text-warning' : 'text-faint')}>
-          {overdue ? 'Not cleared' : transaction.status}
-        </div>
+        {/* Only the states that need saying. "None" is most rows, and a word
+            under every one of them is a column of noise. */}
+        {(overdue || scheduled || voided) && (
+          <div className={cn('text-label-sm', overdue ? 'text-warning' : 'text-faint')}>
+            {overdue ? 'Not cleared' : voided ? 'Void' : 'Scheduled'}
+          </div>
+        )}
       </div>
 
       {onSelect && <Icon name="chevron-right" size={16} className="shrink-0 text-faint" />}

@@ -20,6 +20,7 @@ const SETTINGS: Settings = {
   maskBalances: false,
   theme: 'system',
   accents: DEFAULT_ACCENTS,
+  dueHorizonDays: 2,
 };
 
 const TODAY = '2026-09-18';
@@ -53,6 +54,13 @@ vi.mock('@/lib/store', () => ({
   useAppState: () => state,
   useToday: () => TODAY,
   useSettings: () => SETTINGS,
+  useCategoryLookup: () => (id: string) => ({
+    id,
+    name: 'Uncategorised',
+    kind: 'expense' as const,
+    icon: 'box',
+    accent: 'neutral' as const,
+  }),
 }));
 
 const { Reminders } = await import('../Reminders');
@@ -116,10 +124,10 @@ describe('what is on the page', () => {
     expect(screen.queryByText('Card machine')).not.toBeInTheDocument();
   });
 
-  it('names the account each line belongs to', () => {
+  it('names the category and the account under each line', () => {
     state = { ...state, recurring: [], transactions: [scheduled('t-1', '2026-09-25', 'Water bill')] };
     show();
-    expect(within(rowFor('Water bill')).getByText('Everyday')).toBeInTheDocument();
+    expect(within(rowFor('Water bill')).getByText(/Uncategorised · Everyday/)).toBeInTheDocument();
   });
 });
 
@@ -137,13 +145,24 @@ describe('what is already owed', () => {
 
   it('is pulled to the top, however old it is', () => {
     show();
-    expect(positionOf('Due now')).toBeLessThan(positionOf('Forgotten bill'));
+    expect(positionOf('Overdue ·')).toBeLessThan(positionOf('Forgotten bill'));
     expect(positionOf('Forgotten bill')).toBeLessThan(positionOf('Water bill'));
   });
 
   it('is counted in the heading, so the number is the thing to act on', () => {
     show();
-    expect(screen.getByText(/Due now · 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Overdue · 1/)).toBeInTheDocument();
+  });
+
+  it('does not call today overdue, because today is due rather than late', () => {
+    state = {
+      ...state,
+      transactions: [scheduled('t-now', TODAY, 'Council tax')],
+    };
+    show();
+
+    expect(screen.queryByText(/Overdue ·/)).not.toBeInTheDocument();
+    expect(screen.getByText('Due today')).toBeInTheDocument();
   });
 
   it('is marked overdue rather than left to look like any other line', () => {
@@ -221,5 +240,51 @@ describe('when there is nothing to do', () => {
     state = { ...state, accounts: [], recurring: [] };
     show();
     expect(screen.getByText(/No accounts yet/)).toBeInTheDocument();
+  });
+});
+
+describe('saying how soon it is', () => {
+  const dueLine = () => document.body.textContent ?? '';
+
+  beforeEach(() => {
+    state = {
+      ...state,
+      recurring: [],
+      transactions: [
+        scheduled('t-today', TODAY, 'Water bill'),
+        scheduled('t-tom', '2026-09-19', 'Gym'),
+        scheduled('t-far', '2026-11-30', 'Insurance'),
+      ],
+    };
+  });
+
+  it('says today and tomorrow as distances, because that is how they are read', () => {
+    show();
+    expect(dueLine()).toContain('Due today');
+    expect(dueLine()).toContain('Due tomorrow');
+  });
+
+  it('gives a distant one its date and no distance', () => {
+    show();
+    // "Due in 72 days" is a number nobody converts back into November.
+    expect(dueLine()).not.toMatch(/Due in \d+ days/);
+    expect(dueLine()).toContain('November 2026');
+  });
+
+  it('widens with the setting, so a week ahead can say so', () => {
+    SETTINGS.dueHorizonDays = 90;
+    show();
+    expect(dueLine()).toMatch(/Due in \d+ days/);
+    SETTINGS.dueHorizonDays = 2;
+  });
+
+  it('says nothing at all when the setting is off', () => {
+    SETTINGS.dueHorizonDays = 0;
+    show();
+    expect(dueLine()).not.toContain('Due today');
+    expect(dueLine()).not.toContain('Due tomorrow');
+    // The dates are still there; only the distances are gone.
+    expect(dueLine()).toContain('September 2026');
+    SETTINGS.dueHorizonDays = 2;
   });
 });

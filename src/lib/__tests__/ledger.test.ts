@@ -23,6 +23,7 @@ const SETTINGS: Settings = {
   maskBalances: false,
   theme: 'system',
   accents: DEFAULT_ACCENTS,
+  dueHorizonDays: 2,
 };
 
 const TODAY = '2026-09-18';
