@@ -48,6 +48,8 @@ import { useToast } from './ui/Toast';
 import { CategoryIcon } from './CategoryIcon';
 import { NewCategoryDialog } from './NewCategoryDialog';
 import { AccountDialog } from './AccountDialog';
+import { SplitEditor } from './SplitEditor';
+import { partAmount, splitIsValid, splitTotals, type SplitKind, type SplitPart } from '@/lib/splits';
 
 /**
  * The four a transaction that has happened can be in.
@@ -176,6 +178,10 @@ export const AddTransactionSheet = ({
    * comes back selected in. Null when the dialog is closed.
    */
   const [newAccountFor, setNewAccountFor] = useState<'from' | 'to' | null>(null);
+  /** Off until Split is pressed; the kind is chosen inside the editor. */
+  const [splitting, setSplitting] = useState(false);
+  const [splitKind, setSplitKind] = useState<SplitKind>('category');
+  const [parts, setParts] = useState<SplitPart[]>([]);
 
   // Only ever shown when editing. A new transaction's status follows its date,
   // which is the rule the ledger is built on; an existing one needs to be
@@ -228,6 +234,18 @@ export const AddTransactionSheet = ({
     setOccurrences('');
     setIsSubscription(false);
     setError(undefined);
+    setSplitting(Boolean(editing?.splits?.length));
+    setSplitKind('category');
+    setParts(
+      editing?.splits?.length
+        ? editing.splits.map((split) => ({
+            key: newId(),
+            targetId: split.categoryId,
+            amount: String(split.amount),
+            note: split.note ?? '',
+          }))
+        : [],
+    );
     if (editing) {
       setAccountId(editing.accountId);
       setCategoryId(editing.categoryId);
@@ -338,6 +356,17 @@ export const AddTransactionSheet = ({
       setError('Choose two different accounts for a transfer.');
       return;
     }
+    if (splitting && !splitIsValid(parts, Math.round(parsed * 100) / 100)) {
+      const { remaining } = splitTotals(parts, Math.round(parsed * 100) / 100);
+      setError(
+        parts.length < 2
+          ? 'A split needs at least two parts.'
+          : remaining !== 0
+            ? `The parts don’t add up to ${money(Math.round(parsed * 100) / 100)} yet.`
+            : 'Every part needs somewhere to go and an amount above £0.',
+      );
+      return;
+    }
 
     /**
      * The rule is built before the transaction so the transaction can name it.
@@ -397,7 +426,19 @@ export const AddTransactionSheet = ({
       // The occurrence this stands in for, kept even when the date is moved —
       // that is the whole point of it.
       recurringDate: editing?.recurringDate,
-      splits: editing?.splits,
+      // A category split rides on the payment itself. An account split does
+      // not: those parts are separate transactions, written below.
+      splits:
+        splitting && splitKind === 'category'
+          ? parts.map((part) => ({
+              categoryId: part.targetId,
+              amount: partAmount(part),
+              note: part.note.trim() || undefined,
+            }))
+          : splitting
+            ? undefined
+            : editing?.splits,
+      splitGroupId: editing?.splitGroupId,
       receiptName: editing?.receiptName,
       taxDeductible: editing?.taxDeductible,
     };
@@ -411,11 +452,42 @@ export const AddTransactionSheet = ({
     // transaction would name a rule that did not exist yet.
     if (rule) dispatch({ type: 'add-recurring', recurring: { ...rule, name: transaction.merchant } });
 
-    dispatch(
-      editing && mode === 'update'
-        ? { type: 'update-transaction', transaction }
-        : { type: 'add-transaction', transaction },
-    );
+    if (splitting && splitKind === 'account' && !editing) {
+      /**
+       * One payment, several accounts, written as siblings.
+       *
+       * Each part is an ordinary transaction against its own account, which is
+       * the only way the balance trigger can be right: it works off
+       * `account_id`, and a side table would leave the second account
+       * untouched. They share a `splitGroupId`, so deleting one deletes the
+       * payment rather than leaving the other half claiming to be all of it.
+       */
+      const group = newId();
+      parts.forEach((part, index) => {
+        dispatch({
+          type: 'add-transaction',
+          transaction: {
+            ...transaction,
+            id: index === 0 ? transaction.id : newId(),
+            accountId: part.targetId,
+            amount: partAmount(part),
+            notes: part.note.trim() || transaction.notes,
+            splitGroupId: group,
+            // Only the first part answers for the schedule; the rest would
+            // each claim the same occurrence and the rule would think it had
+            // been paid several times.
+            recurringId: index === 0 ? transaction.recurringId : undefined,
+            recurringDate: index === 0 ? transaction.recurringDate : undefined,
+          },
+        });
+      });
+    } else {
+      dispatch(
+        editing && mode === 'update'
+          ? { type: 'update-transaction', transaction }
+          : { type: 'add-transaction', transaction },
+      );
+    }
 
     toast({
       tone: 'success',
@@ -762,6 +834,65 @@ export const AddTransactionSheet = ({
                       </span>
                     </p>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Splitting is off until it is asked for. Most payments are one
+              thing out of one account, and a permanent row of part-editors
+              would make the common case read like the rare one. */}
+          {accounts.length > 0 && (
+            <div className="space-y-4">
+              {!splitting ? (
+                <Button
+                  icon="split"
+                  onClick={() => {
+                    setSplitting(true);
+                    // Two parts, because one part is not a split. The first
+                    // takes what is entered so far, the second the remainder.
+                    const whole = Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
+                    setParts([
+                      { key: newId(), targetId: categoryId, amount: whole ? String(whole) : '', note: '' },
+                      { key: newId(), targetId: '', amount: '', note: '' },
+                    ]);
+                  }}
+                >
+                  Split this payment
+                </Button>
+              ) : (
+                <div className="space-y-4 rounded-2xl bg-[rgb(var(--hairline)/0.03)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-label-md text-text">Split</p>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSplitting(false);
+                        setParts([]);
+                        setError(undefined);
+                      }}
+                    >
+                      Don’t split
+                    </Button>
+                  </div>
+
+                  <SplitEditor
+                    kind={splitKind}
+                    onKindChange={(next) => {
+                      setSplitKind(next);
+                      // A category id is not an account id. Keeping the old
+                      // one would leave every row pointing at nothing while
+                      // looking like it pointed at something.
+                      setParts(parts.map((part) => ({ ...part, targetId: '' })));
+                    }}
+                    parts={parts}
+                    onPartsChange={setParts}
+                    total={Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0}
+                    categories={categories}
+                    accounts={accounts}
+                    newKey={newId}
+                    allowAccountSplit={!editing}
+                  />
                 </div>
               )}
             </div>

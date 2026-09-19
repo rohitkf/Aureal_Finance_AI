@@ -121,10 +121,15 @@ export const toTransaction = (row: TransactionRow): Transaction => ({
   notes: row.notes ?? undefined,
   recurringId: row.recurring_id ?? undefined,
   recurringDate: row.recurring_date ?? undefined,
+  splitGroupId: row.split_group_id ?? undefined,
   receiptName: row.receipt_name ?? undefined,
   taxDeductible: row.tax_deductible,
   splits: row.transaction_splits?.length
-    ? row.transaction_splits.map((s) => ({ categoryId: s.category_id ?? '', amount: num(s.amount) }))
+    ? row.transaction_splits.map((s) => ({
+        categoryId: s.category_id ?? '',
+        amount: num(s.amount),
+        note: s.note ?? undefined,
+      }))
     : undefined,
 });
 
@@ -184,6 +189,7 @@ export const transactionToRow = (t: Omit<Transaction, 'id'>) => ({
   recurring_id: t.recurringId ?? null,
   // Only meaningful alongside a rule, and the database says so too.
   recurring_date: t.recurringId ? (t.recurringDate ?? null) : null,
+  split_group_id: t.splitGroupId ?? null,
   receipt_name: t.receiptName ?? null,
   tax_deductible: t.taxDeductible ?? false,
 });

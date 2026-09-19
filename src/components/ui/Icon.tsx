@@ -69,6 +69,7 @@ export type IconName =
   | 'logout'
   | 'sliders'
   | 'layers'
+  | 'split'
   | 'flag'
   | 'lightbulb'
   | 'user';
@@ -399,6 +400,15 @@ const PATHS: Record<IconName, JSX.Element> = {
       <circle cx="19" cy="8" r="2" />
     </>
   ),
+  // One line that becomes two: a payment going to more than one place.
+  split: (
+    <>
+      <path d="M4 20V9a3 3 0 0 1 3-3h13" />
+      <path d="M4 20V15a3 3 0 0 1 3-3h13" />
+      <path d="M17 3l3 3-3 3M17 9l3 3-3 3" />
+    </>
+  ),
+
   layers: (
     <>
       <path d="m12 3 8.5 4.5L12 12 3.5 7.5z" />

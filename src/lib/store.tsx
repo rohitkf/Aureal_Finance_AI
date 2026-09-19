@@ -474,6 +474,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                     transaction_id: t.id,
                     category_id: s.categoryId || null,
                     amount: s.amount,
+                    note: s.note ?? null,
                   })),
                 ),
               );
@@ -485,8 +486,11 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         case 'update-transaction':
           run('update that transaction', async () => {
             const t = action.transaction;
-            check(await supabase.from('transactions').update(transactionToRow(t)).eq('id', t.id));
+            // The parts come off first. They have to total the payment — the
+            // database checks it — so changing the amount while the old parts
+            // are still attached is rejected, and the order is the whole fix.
             check(await supabase.from('transaction_splits').delete().eq('transaction_id', t.id));
+            check(await supabase.from('transactions').update(transactionToRow(t)).eq('id', t.id));
             if (t.splits?.length) {
               check(
                 await supabase.from('transaction_splits').insert(
@@ -494,6 +498,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                     transaction_id: t.id,
                     category_id: s.categoryId || null,
                     amount: s.amount,
+                    note: s.note ?? null,
                   })),
                 ),
               );
@@ -504,7 +509,15 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 
         case 'delete-transaction':
           run('delete that transaction', async () => {
-            check(await supabase.from('transactions').delete().eq('id', action.id));
+            // One part of a payment split across accounts is not a thing on its
+            // own: deleting it alone would leave the other half claiming to be
+            // the whole payment. The group goes together.
+            const group = stateRef.current.transactions.find((t) => t.id === action.id)?.splitGroupId;
+            check(
+              group
+                ? await supabase.from('transactions').delete().eq('split_group_id', group)
+                : await supabase.from('transactions').delete().eq('id', action.id),
+            );
             return ['transactions', 'accounts'];
           });
           break;

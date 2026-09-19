@@ -561,3 +561,142 @@ describe('arithmetic in the amount field', () => {
     expect(screen.queryByText(/^= /)).not.toBeInTheDocument();
   });
 });
+
+describe('splitting a payment', () => {
+  /** The amount box of one part, by its own (visually hidden) label. */
+  const partAmountBox = (n: number) => screen.getByLabelText(`Part ${n} amount`);
+
+  const startSplit = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('button', { name: /split this payment/i }));
+  };
+
+  it('is not in the way until it is asked for', () => {
+    open();
+    expect(screen.queryByRole('radio', { name: /by category/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /split this payment/i })).toBeInTheDocument();
+  });
+
+  it('opens with two parts, because one part is not a split', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('100');
+    await startSplit(user);
+
+    expect(screen.getAllByRole('button', { name: /^Remove part/ })).toHaveLength(2);
+    // The first carries what was entered, so only the remainder is left to type.
+    expect(partAmountBox(1)).toHaveValue('100');
+  });
+
+  it('says how much is still unallocated, and then that it adds up', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('100');
+    await startSplit(user);
+
+    await user.clear(partAmountBox(1));
+    await user.type(partAmountBox(1), '60');
+    expect(screen.getByText(/£40\.00 left/)).toBeInTheDocument();
+
+    await user.type(partAmountBox(2), '40');
+    expect(screen.getByText(/it all adds up/i)).toBeInTheDocument();
+  });
+
+  it('says so plainly when the parts overshoot', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('100');
+    await startSplit(user);
+    await user.type(partAmountBox(2), '30');
+
+    expect(screen.getByText(/£30\.00 over/)).toBeInTheDocument();
+  });
+
+  it('refuses to save parts that do not add up', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('100');
+    await startSplit(user);
+    await user.clear(partAmountBox(1));
+    await user.type(partAmountBox(1), '60');
+
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/don’t add up/i);
+  });
+
+  it('saves a category split as parts riding on the one payment', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('100');
+    await startSplit(user);
+    await user.clear(partAmountBox(1));
+    await user.type(partAmountBox(1), '60');
+    await user.type(partAmountBox(2), '40');
+    await choose(user, /Part 2 category/i, 'Eating out');
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    const calls = dispatch.mock.calls.filter((c) => c[0].type === 'add-transaction');
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0].transaction.splits).toEqual([
+      { categoryId: 'cat-food', amount: 60, note: undefined },
+      { categoryId: 'cat-fun', amount: 40, note: undefined },
+    ]);
+    expect(calls[0][0].transaction.splitGroupId).toBeUndefined();
+  });
+
+  it('keeps a part’s own note, which the payment’s note cannot carry', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('100');
+    await startSplit(user);
+    await user.clear(partAmountBox(1));
+    await user.type(partAmountBox(1), '60');
+    await user.type(partAmountBox(2), '40');
+    await choose(user, /Part 2 category/i, 'Eating out');
+    await user.type(screen.getByLabelText('Part 1 note'), 'the food');
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    const saved = dispatch.mock.calls.find((c) => c[0].type === 'add-transaction')![0];
+    expect(saved.transaction.splits[0].note).toBe('the food');
+  });
+
+  it('saves an account split as siblings, one per account, sharing a group', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('100');
+    await startSplit(user);
+    await user.click(screen.getByRole('radio', { name: /by account/i }));
+
+    await user.clear(partAmountBox(1));
+    await user.type(partAmountBox(1), '70');
+    await user.type(partAmountBox(2), '30');
+    await choose(user, /Part 1 account/i, 'Current');
+    await choose(user, /Part 2 account/i, 'Savings');
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    const saved = dispatch.mock.calls
+      .filter((c) => c[0].type === 'add-transaction')
+      .map((c) => c[0].transaction);
+
+    expect(saved).toHaveLength(2);
+    expect(saved[0]).toMatchObject({ accountId: 'acc-1', amount: 70 });
+    expect(saved[1]).toMatchObject({ accountId: 'acc-2', amount: 30 });
+    // One payment, so one group — and no category parts hanging off either half.
+    expect(saved[0].splitGroupId).toBe(saved[1].splitGroupId);
+    expect(saved[0].splitGroupId).toBeTruthy();
+    expect(saved[0].splits).toBeUndefined();
+  });
+
+  it('clears the chosen targets when the kind changes, rather than keeping ids that mean nothing', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('100');
+    await startSplit(user);
+    await user.click(screen.getByRole('radio', { name: /by account/i }));
+
+    // Both pickers are back to "choose one" rather than showing a category
+    // name against an account field.
+    expect(screen.getAllByText(/choose an account/i).length).toBeGreaterThan(0);
+  });
+});

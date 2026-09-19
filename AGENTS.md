@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 519 tests
+npm run test         # vitest — 540 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -79,6 +79,8 @@ Vocabulary that is easy to get wrong:
 | **A transfer rule** | A standing order between two of your own accounts. `account_id` is the source, `to_account_id` the destination. |
 | **`interval`** | Every N of whatever `frequency` counts in. Monthly with 3 is quarterly, weekly with 2 is fortnightly. It multiplies the named cadence rather than replacing it, so stored rules keep meaning what they meant. Absent is 1. |
 | **`weekendMode`** | What a Saturday or Sunday does to one occurrence: `none`, `previous` (how a salary behaves), `next` (how most direct debits behave), `nearest`, `skip`. It never moves the schedule — only the day the payment shows on. |
+| **A category split** | One payment, one account, filed under several headings. Rows in `transaction_splits`, which must total the payment — a deferred trigger enforces it. |
+| **An account split** | One payment taken out of several accounts. Ordinary sibling transactions sharing `split_group_id`, never a side table: each part genuinely moves its own account's balance, and the trigger works off `account_id`. |
 | **An occurrence** | One date a recurring rule produces. `transactions.recurring_date` says which one a row stands in for; `recurring_skips` says one does not happen. |
 | **The register** | The transactions page's default view: every line with the balance of its account afterwards, history behind and projections ahead. |
 
@@ -326,6 +328,21 @@ Each of these has already cost real time here.
   not `to_account_id`, not `recurring_id`, because those are exactly what a
   cascade nulls, and a lock that blocks a cascade is the mistake above wearing a
   different hat. Un-reconciling is always allowed; it is the way back.
+- **The split total check is deferred, and has to be.** A split is written as
+  several rows and is only coherent once they are all in; checked eagerly, the
+  first row of a 60/40 split is rejected for not being 100 on its own. Which
+  also means a test cannot catch it in an exception block — it surfaces at
+  COMMIT — so `supabase/tests/splits.sql` writes the coherent rows while it is
+  deferred and then `set constraints all immediate` for the cases that must
+  fail.
+- **Splits come off before the payment changes.** `update-transaction` deletes
+  the parts, then updates the row, then writes the new parts. The other way
+  round, changing the amount while the old parts still total the old amount is
+  rejected by the database.
+- **Turning an existing payment into an account split is not an edit.** It is a
+  delete and two writes, so the editor only offers account splitting on a new
+  payment. Category splitting is offered either way, because it genuinely is
+  an edit.
 - **The weekend rule is applied to what comes out, never to the cursor.**
   `expandRecurrence` walks the rule's own anchors and adjusts each date on the
   way out. Feeding an adjusted date back in drags the anchor a little further

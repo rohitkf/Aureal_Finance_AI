@@ -105,6 +105,7 @@ export interface TransactionSplitRow {
   transaction_id: string;
   category_id: string | null;
   amount: number;
+  note: string | null;
 }
 
 export interface TransactionRow {
@@ -126,6 +127,7 @@ export interface TransactionRow {
   tax_deductible: boolean;
   created_at: string;
   updated_at: string;
+  split_group_id: string | null;
   transaction_splits?: TransactionSplitRow[] | null;
 }
 

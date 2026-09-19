@@ -64,9 +64,18 @@ export type TransactionType = 'expense' | 'income' | 'transfer';
  */
 export type TransactionStatus = 'scheduled' | 'none' | 'cleared' | 'reconciled' | 'void';
 
+/**
+ * One part of a payment filed under its own heading.
+ *
+ * The parts must total the payment — the database enforces it with a deferred
+ * trigger, deferred because a split is written as several rows and is only
+ * coherent once they are all in.
+ */
 export interface TransactionSplit {
   categoryId: string;
   amount: number;
+  /** "£14 of it" is rarely self-explanatory a month later. */
+  note?: string;
 }
 
 export interface Transaction {
@@ -96,6 +105,15 @@ export interface Transaction {
    */
   recurringDate?: string;
   splits?: TransactionSplit[];
+  /**
+   * Siblings of one payment split across several accounts.
+   *
+   * Not a side table, because each part genuinely moves a different account's
+   * balance and the trigger works off `accountId`. So the parts are ordinary
+   * transactions that happen to share this id, and every total, the register
+   * and the balance trigger stay correct without knowing splits exist.
+   */
+  splitGroupId?: string;
   receiptName?: string;
   taxDeductible?: boolean;
 }
