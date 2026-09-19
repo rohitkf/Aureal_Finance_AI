@@ -1,16 +1,16 @@
 import { useMemo } from 'react';
-import { formatMonthYear, monthKey } from '@/lib/date';
 import { accountNamer, isReminder, ledgerRows, ledgerWindow, type LedgerRow } from '@/lib/ledger';
 import { useAppState, useSettings, useToday } from '@/lib/store';
 import { EmptyState } from './ui/States';
-import { LedgerLine } from './LedgerLine';
+import { DayHeading, LedgerLine } from './LedgerLine';
+import { byDay, labelNamer, namerFor } from './ledgerGrouping';
 
 /**
  * The register: a statement, not a feed.
  *
- * Four columns — when, what, how much, and what the account held afterwards —
- * because that last one is the question a list of transactions never answers
- * and the one people actually open a statement for.
+ * Every line with what the account held afterwards, because that is the
+ * question a list of transactions never answers and the one people open a
+ * statement for.
  *
  * It runs newest first, the way a bank app does and the way anybody scanning
  * for "what did I just spend" reads it, and it holds everything: scrolling is
@@ -34,25 +34,19 @@ export const Register = ({
   const state = useAppState();
   const today = useToday();
   const { maskBalances, accents } = useSettings();
+
   const { from, to } = useMemo(() => ledgerWindow(today), [today]);
   const rows = useMemo(
     () => ledgerRows(state, today, from, to).filter((row) => !isReminder(row)),
     [state, today, from, to],
   );
 
-  /** Grouped by month, newest first, and newest first within each month. */
-  const months = useMemo(() => {
-    const map = new Map<string, LedgerRow[]>();
-    for (const row of rows) {
-      const key = monthKey(row.date);
-      const list = map.get(key) ?? [];
-      list.push(row);
-      map.set(key, list);
-    }
-    return [...map.entries()].reverse().map(([month, lines]) => [month, [...lines].reverse()] as const);
-  }, [rows]);
+  /** Grouped by day, newest day first, and newest first within each day. */
+  const days = useMemo(() => byDay(rows, 'desc'), [rows]);
 
   const accountName = useMemo(() => accountNamer(state.accounts), [state.accounts]);
+  const categoryName = useMemo(() => namerFor(state.categories, 'Uncategorised'), [state.categories]);
+  const labelsFor = useMemo(() => labelNamer(state.labels), [state.labels]);
 
   if (state.accounts.length === 0) {
     return (
@@ -64,41 +58,41 @@ export const Register = ({
     );
   }
 
-  return (
-    <div className="space-y-3">
-      {months.length === 0 ? (
-        <EmptyState
-          icon="receipt"
-          title="Nothing recorded yet"
-          description="Anything you have actually spent or received shows here, newest first, with the balance that followed it. What is still to come is on Reminders."
-        />
-      ) : (
-        months.map(([month, lines]) => (
-          <section key={month} aria-label={formatMonthYear(`${month}-01`)}>
-            {/* Sticky, so you always know which month you are looking at
-                however far down the column you have scrolled. */}
-            <h3 className="sticky top-[72px] z-10 -mx-1 bg-[rgb(var(--surface-base))]/85 px-4 py-2 text-label-md text-muted backdrop-blur-xl">
-              {formatMonthYear(`${month}-01`)}
-            </h3>
+  if (days.length === 0) {
+    return (
+      <EmptyState
+        icon="receipt"
+        title="Nothing recorded yet"
+        description="Anything you have actually spent or received shows here, newest first, with the balance that followed it. What is still to come is on Reminders."
+      />
+    );
+  }
 
-            <ul className="space-y-0.5">
-              {lines.map((row) => (
-                <li key={row.id}>
-                  <LedgerLine
-                    row={row}
-                    today={today}
-                    masked={maskBalances}
-                    accents={accents}
-                    accountName={accountName(row.accountId)}
-                    onOpen={() => onOpen(row)}
-                    onSkip={() => onSkip(row)}
-                  />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))
-      )}
+  return (
+    <div className="space-y-4">
+      {days.map((day) => (
+        <section key={day.date} aria-label={day.date}>
+          <DayHeading date={day.date} total={day.total} masked={maskBalances} today={today} />
+
+          <ul className="mt-1 space-y-0.5">
+            {day.rows.map((row) => (
+              <li key={row.id}>
+                <LedgerLine
+                  row={row}
+                  today={today}
+                  masked={maskBalances}
+                  accents={accents}
+                  accountName={accountName(row.accountId)}
+                  categoryName={categoryName(row.categoryId)}
+                  labels={labelsFor(row)}
+                  onOpen={() => onOpen(row)}
+                  onSkip={() => onSkip(row)}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 };

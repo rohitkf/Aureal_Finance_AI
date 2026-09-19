@@ -272,6 +272,14 @@ export interface Settings {
   theme: 'light' | 'dark' | 'system';
   /** Which colour each kind of line is drawn in. Merged over the defaults. */
   accents: Record<LedgerKind, AccentName>;
+  /**
+   * How far ahead a reminder is described as a distance rather than a date.
+   *
+   * Within it: "Due today", "Due tomorrow", "Due in 4 days". Beyond it, only
+   * the date, because "due in 143 days" is a number nobody converts back into
+   * March. 0 turns the labels off.
+   */
+  dueHorizonDays: number;
 }
 
 /** One occurrence of a rule that should not be projected at all. */

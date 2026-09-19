@@ -11,6 +11,15 @@ import {
   KIND_LABELS,
   LEDGER_KINDS,
 } from '@/lib/accents';
+
+/** The horizons worth offering. Anything beyond a fortnight stops helping. */
+const DUE_HORIZONS = [
+  { days: 0, label: 'Never' },
+  { days: 1, label: 'Today only' },
+  { days: 2, label: 'Today & tomorrow' },
+  { days: 7, label: 'A week' },
+  { days: 14, label: 'A fortnight' },
+];
 import {
   TABLE_LABELS,
   buildBackup,
@@ -484,6 +493,47 @@ export const Settings = () => {
         >
           Back to the defaults
         </Button>
+      </Card>
+
+      {/* ---------------- Reminders ---------------- */}
+      <Card className="space-y-6" id="reminders">
+        <CardHeader
+          title="Reminders"
+          description="How far ahead a reminder is described as a distance rather than a date."
+        />
+
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Say “due” within">
+            {DUE_HORIZONS.map((option) => {
+              const chosen = state.settings.dueHorizonDays === option.days;
+              return (
+                <button
+                  key={option.days}
+                  type="button"
+                  role="radio"
+                  aria-checked={chosen}
+                  onClick={() =>
+                    dispatch({ type: 'update-settings', settings: { dueHorizonDays: option.days } })
+                  }
+                  className={cn(
+                    'rounded-full px-3.5 py-1.5 text-[12.5px] transition-all duration-400 ease-fluid active:scale-[0.97]',
+                    chosen
+                      ? 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.3)]'
+                      : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)] hover:text-text',
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="text-[12.5px] leading-relaxed text-faint">
+            {state.settings.dueHorizonDays === 0
+              ? 'Every reminder shows its date and nothing else.'
+              : `Anything due within ${state.settings.dueHorizonDays === 1 ? 'a day' : `${state.settings.dueHorizonDays} days`} says so — “Due today”, “Due tomorrow”, “Due in 4 days”. Further out, only the date, because “due in 143 days” is a number nobody converts back into March.`}
+          </p>
+        </div>
       </Card>
 
       {/* ---------------- Backup ---------------- */}

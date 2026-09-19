@@ -193,6 +193,7 @@ export const toSettings = (row: ProfileRow): Settings => ({
   maskBalances: row.mask_balances,
   theme: row.theme,
   accents: resolveAccents(row.row_accents),
+  dueHorizonDays: row.due_horizon_days ?? 2,
 });
 
 /* ------------------------------------------------------------------ */

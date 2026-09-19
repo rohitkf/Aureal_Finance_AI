@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
-import { formatFullDate, formatMediumDate, monthKey, relativeDayLabel } from '@/lib/date';
+import { formatFullDate, formatMediumDate, formatTime, monthKey, relativeDayLabel } from '@/lib/date';
 import { downloadCsv } from '@/lib/csv';
 import { Register } from '@/components/Register';
 import { Reminders } from '@/components/Reminders';
@@ -29,11 +29,28 @@ const STATUS_BADGE: Record<
   TransactionStatus,
   { label: string; tone: 'success' | 'neutral' | 'warning'; icon: IconName }
 > = {
-  none: { label: 'Recorded', tone: 'neutral', icon: 'receipt' },
+  // "Recorded" read as a kind of transaction rather than as a degree of
+  // certainty, which is what these four actually are.
+  none: { label: 'Not checked', tone: 'neutral', icon: 'receipt' },
   cleared: { label: 'Cleared', tone: 'success', icon: 'check-circle' },
   reconciled: { label: 'Reconciled', tone: 'success', icon: 'lock' },
   void: { label: 'Void', tone: 'warning', icon: 'close' },
   scheduled: { label: 'Scheduled', tone: 'neutral', icon: 'calendar' },
+};
+
+/** What each status actually means for the money, in one line. */
+const STATUS_MEANING: Record<TransactionStatus, string> = {
+  none: 'It counts in full. Nobody has checked it against the account yet.',
+  cleared: 'It counts in full, and you have seen it go through.',
+  reconciled: 'It matched your statement. The amount, date and type are locked.',
+  void: 'Cancelled. The record is kept, but it moves no money.',
+  scheduled: 'It hasn’t happened yet, so your balance is untouched.',
+};
+
+const TYPE_WORD: Record<TransactionType, string> = {
+  expense: 'Expense',
+  income: 'Income',
+  transfer: 'Transfer',
 };
 
 const TYPE_FILTERS: Array<{ value: TypeFilter; label: string }> = [
@@ -587,6 +604,17 @@ const TransactionDetail = ({
   const body = (
     <div className="space-y-4">
       <div className="well p-5 text-center">
+        {/* What sort of thing this is, said plainly. The amount's sign and
+            colour imply it; a panel explaining a transaction should not make
+            anybody infer it. */}
+        <div className="mb-3 flex items-center justify-center gap-2.5">
+          <CategoryIcon categoryId={transaction.categoryId} size="sm" />
+          <span className="text-label-md text-muted">
+            {transaction.isOpening ? 'Opening balance' : TYPE_WORD[transaction.type]}
+            {transaction.isOpening && ' · what the account already held'}
+          </span>
+        </div>
+
         <Eyebrow>{transaction.status === 'scheduled' ? 'Scheduled amount' : 'Amount'}</Eyebrow>
         <p
           className={cn(
@@ -602,10 +630,16 @@ const TransactionDetail = ({
             {STATUS_BADGE[transaction.status].label}
           </Badge>
         </div>
+        {/* A status is a degree of certainty, and the word alone does not say
+            which. This is the sentence that does. */}
+        <p className="mx-auto mt-2 max-w-[38ch] text-[12.5px] leading-relaxed text-faint">
+          {STATUS_MEANING[transaction.status]}
+        </p>
       </div>
 
       <dl className="space-y-0.5">
-        <Row label="Date" value={formatFullDate(transaction.date)} />
+        <Row label="Date" value={transaction.time ? `${formatFullDate(transaction.date)}, ${formatTime(transaction.time)}` : formatFullDate(transaction.date)} />
+        <Row label="Type" value={transaction.isOpening ? 'Opening balance' : TYPE_WORD[transaction.type]} />
         <Row label="Category" value={category.name} />
         <Row label="Account" value={account?.name ?? '—'} />
         {transaction.toAccountId && (
@@ -613,6 +647,7 @@ const TransactionDetail = ({
         )}
         {transaction.receiptName && <Row label="Receipt" value={transaction.receiptName} />}
         <Row label="Recurring" value={transaction.recurringId ? 'Part of a schedule' : 'One-off'} />
+        {transaction.notes && <Row label="Notes" value={transaction.notes} />}
         {transaction.labelIds?.length ? (
           <div className="flex items-baseline justify-between gap-4 py-2">
             <dt className="text-label-sm text-faint">Labels</dt>

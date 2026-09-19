@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 619 tests
+npm run test         # vitest — 635 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -342,6 +342,18 @@ Each of these has already cost real time here.
 - **`creditUtilisation` uses `totalCardDebt`, never `totalDebt`.** A mortgage
   has no credit limit, and dividing it by the card limit produces a number
   that means nothing and looks alarming.
+- **Today is due, not overdue.** `LedgerRow.overdue` counts today, because
+  money due today and not yet cleared is still owed and Safe to Spend has to
+  hold it back. The *word* on screen is stricter: the Overdue badge and the
+  Overdue group are for a date already gone by. Today gets its own day heading
+  saying "Due today".
+- **`dueHorizonDays` counts days including today.** 1 is today alone, 2 is
+  today and tomorrow, 0 is off — so the comparison is `<`, not `<=`. With
+  `<=`, a horizon of none still labels today.
+- **A row's second line is one string.** Built with `join(' · ')`, not several
+  spans: split across elements it reads identically and is unfindable — a
+  test, a screen reader and the browser's own find all see two texts with a
+  separator between them and match neither.
 - **A Tailwind class is never interpolated.** Tailwind scans the source for
   whole class names at build time, so `text-${accent}` is simply absent from
   the stylesheet and the colour never appears. `accents.ts` writes all six out

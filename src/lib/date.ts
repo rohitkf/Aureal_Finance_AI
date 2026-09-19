@@ -143,6 +143,15 @@ export const formatMonthYear = (iso: string): string => format({ month: 'long', 
 export const formatShortMonth = (iso: string): string =>
   format({ month: 'short' }, `${iso.slice(0, 7)}-01`);
 
+/**
+ * "Fri 18 September 2026" — the heading a day's transactions sit under.
+ *
+ * The weekday earns its place: people remember spending on a Saturday far
+ * more reliably than they remember spending on the 18th.
+ */
+export const formatDayHeader = (iso: string): string =>
+  format({ weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }, iso);
+
 /** "Today", "Yesterday", "Tomorrow" or a normal date — for transaction groups. */
 export const relativeDayLabel = (iso: string, today: string): string => {
   if (!isValidISO(iso) || !isValidISO(today)) return EMPTY;

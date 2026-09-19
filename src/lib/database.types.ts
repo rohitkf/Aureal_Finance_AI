@@ -15,6 +15,7 @@ export interface ProfileRow {
   mask_balances: boolean;
   theme: 'light' | 'dark' | 'system';
   row_accents: Record<string, string> | null;
+  due_horizon_days: number;
   created_at: string;
   updated_at: string;
 }

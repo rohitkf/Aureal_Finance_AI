@@ -189,12 +189,20 @@ export const AddTransactionSheet = ({
   // which is the rule the ledger is built on; an existing one needs to be
   // changeable, because a scheduled payment that has gone through is the only
   // way to tell the app it is no longer owed.
-  const [status, setStatus] = useState<TransactionStatus>('none');
+  const [status, setStatus] = useState<TransactionStatus>('scheduled');
   /**
    * The status to go back to when "hasn't happened yet" is unticked — the one
    * that was showing before, not a guess.
    */
   const [lastSettledStatus, setLastSettledStatus] = useState<TransactionStatus>('none');
+  /**
+   * Whether the person has answered the has-it-happened question themselves.
+   *
+   * Until they do, the date answers it, and keeps answering it as the date
+   * changes. Once they have, the date stops overruling them — picking a day
+   * last week should not silently undo "this has already happened".
+   */
+  const [statusTouched, setStatusTouched] = useState(false);
   const [dateMode, setDateMode] = useState<DateMode>('today');
   const [repeats, setRepeats] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>('monthly');
@@ -224,7 +232,16 @@ export const AddTransactionSheet = ({
     setNotes(editing?.notes ?? '');
     setDate(editing?.date ?? today);
     setTime(editing?.time ?? nowTime());
-    setStatus(editing?.status ?? 'none');
+    /**
+     * A new transaction starts as something that has not happened.
+     *
+     * Entering it is how you say it is coming, not that it is done — so today
+     * and every day after it opens as `scheduled` and waits on Reminders until
+     * you tick it off. Backdating is the exception: a date already gone by is
+     * something you are recording after the fact, so it counts immediately.
+     */
+    setStatus(editing?.status ?? ((editing?.date ?? today) >= today ? 'scheduled' : 'none'));
+    setStatusTouched(false);
     setLastSettledStatus(editing && editing.status !== 'scheduled' ? editing.status : 'none');
     setDateMode(editing ? 'custom' : 'today');
     setRepeats(false);
@@ -255,6 +272,19 @@ export const AddTransactionSheet = ({
       if (editing.toAccountId) setToAccountId(editing.toAccountId);
     }
   }, [open, initialType, today, editing]);
+
+  /**
+   * A new transaction's status follows its date, until it is answered by hand.
+   *
+   * Written as an effect rather than folded into the date handlers because the
+   * date is set from four places — the picker, the Today chip, the month-end
+   * chip, and the reset when the sheet opens — and one of them would have been
+   * forgotten.
+   */
+  useEffect(() => {
+    if (!open || editing || statusTouched) return;
+    setStatus(date >= today ? 'scheduled' : 'none');
+  }, [open, editing, statusTouched, date, today]);
 
   // Keep the selections valid as the available options change.
   useEffect(() => {
@@ -423,7 +453,7 @@ export const AddTransactionSheet = ({
       // A date in the future is a plan, not a fact — it lands in the forecast.
       // On an edit the person says which it is, because only they know whether
       // a payment that was due last week actually went out.
-      status: editing ? status : date > today ? 'scheduled' : 'none',
+      status,
       notes: notes.trim() || undefined,
       recurringId: editing?.recurringId ?? rule?.id,
       // The occurrence this stands in for, kept even when the date is moved —
@@ -710,6 +740,22 @@ export const AddTransactionSheet = ({
               )}
             </div>
           </div>
+
+          {/* On a new transaction this is the only status question worth
+              asking, and the default answers it: entering something is how you
+              say it is coming. Untick it the moment it goes through — or right
+              now, if you are recording something you have just done. */}
+          {!editing && (
+            <CheckboxField
+              checked={status === 'scheduled'}
+              onChange={(on) => {
+                setStatus(on ? 'scheduled' : 'none');
+                setStatusTouched(true);
+              }}
+              label="This hasn’t happened yet"
+              description="Keeps it on Reminders and out of your balance until you record it. Ticked by default for today and any date ahead; untick it if the money has already moved."
+            />
+          )}
 
           {editing && (
             <div className="space-y-4">

@@ -147,9 +147,9 @@ describe('Add transaction', () => {
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(dispatch.mock.calls[0][0]).toMatchObject({
       type: 'add-transaction',
-      // Recorded, not checked off: nobody has verified it yet, and it counts
-      // in full either way.
-      transaction: { amount: 42.5, type: 'expense', accountId: 'acc-1', status: 'none' },
+      // Today, so it has not happened yet: entering something is how you say
+      // it is coming, and it waits on Reminders until it is ticked off.
+      transaction: { amount: 42.5, type: 'expense', accountId: 'acc-1', status: 'scheduled' },
     });
   });
 
@@ -700,5 +700,54 @@ describe('splitting a payment', () => {
     // Both pickers are back to "choose one" rather than showing a category
     // name against an account field.
     expect(screen.getAllByText(/choose an account/i).length).toBeGreaterThan(0);
+  });
+});
+
+describe('whether a new transaction has happened yet', () => {
+  it('assumes today has not, so it waits on Reminders', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('12');
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    expect(dispatch.mock.calls[0][0].transaction.status).toBe('scheduled');
+  });
+
+  it('assumes a date ahead has not either', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('12');
+    await pickDate(user, 'Date', '2026-04-20');
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    expect(dispatch.mock.calls[0][0].transaction.status).toBe('scheduled');
+  });
+
+  it('assumes a date already gone by has, because that is recording it after the fact', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('12');
+    await pickDate(user, 'Date', '2026-03-01');
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    expect(dispatch.mock.calls[0][0].transaction.status).toBe('none');
+  });
+
+  it('can be told otherwise in one tap, without a second trip to edit it', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('12');
+    // Recording a coffee bought five minutes ago: today's date, already done.
+    await user.click(screen.getByRole('checkbox', { name: /hasn.t happened yet/i }));
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    expect(dispatch.mock.calls[0][0].transaction.status).toBe('none');
+  });
+
+  it('does not put the four statuses in the way of a new one', () => {
+    open();
+    // How thoroughly something has been checked is a question about a
+    // transaction that exists. On a new one there is only the one question.
+    expect(screen.queryByRole('radio', { name: 'Reconciled' })).not.toBeInTheDocument();
   });
 });

@@ -205,6 +205,8 @@ describe('toSettings', () => {
       // A profile with no stored accents reads as "as designed", not as no
       // colour at all.
       accents: DEFAULT_ACCENTS,
+      // Absent on an old profile row; today and tomorrow is the default.
+      dueHorizonDays: 2,
     });
   });
 });
@@ -218,6 +220,8 @@ describe('emptyAppState', () => {
       mask_balances: false,
       theme: 'system',
       accents: DEFAULT_ACCENTS,
+      // Absent on an old profile row; today and tomorrow is the default.
+      dueHorizonDays: 2,
     } as unknown as ProfileRow);
     const state = emptyAppState(settings);
     expect(state.accounts).toEqual([]);
