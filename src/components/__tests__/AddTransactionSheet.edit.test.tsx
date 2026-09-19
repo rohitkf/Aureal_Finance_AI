@@ -163,3 +163,46 @@ describe('splitting a payment that already exists', () => {
     expect(screen.getByText(/it all adds up/i)).toBeInTheDocument();
   });
 });
+
+/**
+ * Deleting from the sheet.
+ *
+ * There was no way to delete a transaction from the register or the reminders
+ * list at all. Both open a row in this sheet, and the sheet had no delete — the
+ * only one in the app lived in the detail panel on the list view, which is one
+ * of three views and not the one the app opens on. So a transaction entered by
+ * mistake was permanent unless you happened to find the other tab.
+ */
+describe('removing a transaction', () => {
+  it('offers a delete when an existing transaction is open', () => {
+    render(<AddTransactionSheet open onClose={vi.fn()} editing={OVERDUE} onDelete={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /^delete$/i })).toBeInTheDocument();
+  });
+
+  it('asks the page to delete rather than doing it itself', async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    render(<AddTransactionSheet open onClose={vi.fn()} editing={OVERDUE} onDelete={onDelete} />);
+
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+
+    // The sheet raises the question; the page owns the confirmation and the
+    // dispatch, so one transaction is never deleted by two different paths.
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('offers nothing to delete when the transaction is new', () => {
+    render(<AddTransactionSheet open onClose={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument();
+  });
+
+  it('offers nothing to delete on a line drawn from a rule', () => {
+    // `create` means the row does not exist yet — the register projected it.
+    // Deleting it would delete nothing; skipping is what that line supports.
+    render(
+      <AddTransactionSheet open onClose={vi.fn()} editing={OVERDUE} mode="create" onDelete={vi.fn()} />,
+    );
+    expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument();
+  });
+});

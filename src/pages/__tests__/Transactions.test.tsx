@@ -4,7 +4,7 @@
  * Export CSV, Edit and Make recurring were all rendered enabled, with no
  * handler attached. Pressing them was indistinguishable from the app freezing.
  */
-import { render as rtlRender, screen } from '@testing-library/react';
+import { render as rtlRender, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
@@ -321,5 +321,64 @@ describe('searching by label', () => {
     await user.type(screen.getByPlaceholderText(/#label/i), '#flat');
 
     expect(screen.queryByText('Dunn, Baker & Co')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Deleting a transaction, from the view the page actually opens on.
+ *
+ * The only delete in the app lived in the detail panel on the List view. The
+ * page opens on the Register, and both the Register and Reminders open a row
+ * in the edit sheet — which had no delete at all. So for anyone who never
+ * found the third tab, a transaction entered by mistake was permanent.
+ */
+describe('deleting a transaction', () => {
+  /** The confirmation's own Delete — the sheet behind it has one too. */
+  const confirmation = () => within(screen.getByRole('dialog', { name: /delete transaction\?/i }));
+
+  it('can be done from the register, without finding the list first', async () => {
+    const user = userEvent.setup();
+    render();
+
+    // Straight to a register row — no view switch, which is the point.
+    await user.click(screen.getByText('Dunn, Baker & Co'));
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+
+    // It asks first, and says what it is about to remove.
+    expect(confirmation().getByText('Dunn, Baker & Co')).toBeInTheDocument();
+    await user.click(confirmation().getByRole('button', { name: /^delete$/i }));
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'delete-transaction', id: 'txn-1' });
+  });
+
+  it('deletes the row that was opened, not whichever one was last selected', async () => {
+    const user = userEvent.setup();
+    render();
+
+    // Select one on the list, then go and open a different one elsewhere. A
+    // flag would delete the selected one; only the row itself gets this right.
+    await showList(user);
+    await user.click(screen.getByText('Dunn, Baker & Co'));
+    await user.click(screen.getByRole('radio', { name: /^Reminders/ }));
+    await user.click(screen.getByText('Rent'));
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    await user.click(confirmation().getByRole('button', { name: /^delete$/i }));
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'delete-transaction', id: 'txn-2' });
+  });
+
+  it('deletes nothing when the confirmation is refused', async () => {
+    const user = userEvent.setup();
+    render();
+
+    await user.click(screen.getByText('Dunn, Baker & Co'));
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    await user.click(confirmation().getByRole('button', { name: /cancel/i }));
+
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'delete-transaction' }),
+    );
+    // And the sheet it was opened from is still there, with the edits intact.
+    expect(screen.getByRole('dialog', { name: /edit transaction/i })).toBeInTheDocument();
   });
 });
