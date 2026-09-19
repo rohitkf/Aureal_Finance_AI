@@ -33,7 +33,7 @@ export const Register = ({
 }) => {
   const state = useAppState();
   const today = useToday();
-  const { maskBalances } = useSettings();
+  const { maskBalances, accents } = useSettings();
   const { from, to } = useMemo(() => ledgerWindow(today), [today]);
   const rows = useMemo(
     () => ledgerRows(state, today, from, to).filter((row) => !isReminder(row)),
@@ -88,6 +88,7 @@ export const Register = ({
                     row={row}
                     today={today}
                     masked={maskBalances}
+                    accents={accents}
                     accountName={accountName(row.accountId)}
                     onOpen={() => onOpen(row)}
                     onSkip={() => onSkip(row)}

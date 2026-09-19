@@ -7,6 +7,7 @@
  * kind nobody notices for a month.
  */
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import { counts, monthIncome, monthSpend, spendByCategory } from '../finance';
 import { forecastEvents } from '../finance';
 import { ledgerRows } from '../ledger';
@@ -19,6 +20,7 @@ const SETTINGS: Settings = {
   userName: 'T',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const TODAY = '2026-09-18';

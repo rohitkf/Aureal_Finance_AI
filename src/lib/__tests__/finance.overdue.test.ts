@@ -13,6 +13,7 @@
  * These are the assertions that make that impossible to reintroduce.
  */
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import { buildForecast, forecastEvents, isOverdue, safeToSpend } from '@/lib/finance';
 import { emptyAppState } from '@/lib/mappers';
 import type { Account, AppState, RecurringPayment, Settings, Transaction } from '@/lib/types';
@@ -24,6 +25,7 @@ const SETTINGS: Settings = {
   userName: 'Test',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const TODAY = '2026-09-18';

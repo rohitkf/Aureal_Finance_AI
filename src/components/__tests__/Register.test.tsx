@@ -9,6 +9,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import type { Account, AppState, RecurringPayment, Settings, Transaction } from '@/lib/types';
 
 const SETTINGS: Settings = {
@@ -18,6 +19,7 @@ const SETTINGS: Settings = {
   userName: 'Test',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const TODAY = '2026-09-18';
@@ -211,5 +213,61 @@ describe('with no accounts', () => {
     state = { ...state, accounts: [], recurring: [] };
     show();
     expect(screen.getByText(/No accounts yet/)).toBeInTheDocument();
+  });
+});
+
+describe('telling the kinds apart by colour', () => {
+  /** The row's own element, which is where the accent bar lives. */
+  const rowBox = (name: string) =>
+    screen.getByText(name).closest('div.group') as HTMLElement;
+
+  const amountIn = (name: string) =>
+    within(rowBox(name)).getByText((text) => /^[+−]£/.test(text));
+
+  beforeEach(() => {
+    state = {
+      ...state,
+      recurring: [],
+      transactions: [
+        { ...cleared('t-in', '2026-09-10', 'Salary'), type: 'income' } as Transaction,
+        cleared('t-out', '2026-09-11', 'Tesco'),
+        {
+          ...cleared('t-open', '2026-09-12', 'Opening balance'),
+          type: 'income',
+          isOpening: true,
+        } as Transaction,
+      ],
+    };
+  });
+
+  it('draws money in green and money out red', () => {
+    show();
+    expect(amountIn('Salary')).toHaveClass('text-success');
+    expect(amountIn('Tesco')).toHaveClass('text-danger');
+  });
+
+  it('does not draw an opening balance as income, whatever it is written as', () => {
+    show();
+    // It is stored as an income because the database derives balances from
+    // transactions. It is not money that arrived, and the colour must not
+    // claim it was.
+    expect(amountIn('Opening balance')).not.toHaveClass('text-success');
+    expect(amountIn('Opening balance')).toHaveClass('text-primary');
+  });
+
+  it('puts a bar down the left of every row in its own colour', () => {
+    show();
+    expect(rowBox('Salary').className).toContain('border-l-[rgb(var(--success))]');
+    expect(rowBox('Tesco').className).toContain('border-l-[rgb(var(--danger))]');
+    expect(rowBox('Opening balance').className).toContain('border-l-[rgb(var(--primary))]');
+  });
+
+  it('uses whatever colours the person chose, not the defaults', () => {
+    SETTINGS.accents = { ...DEFAULT_ACCENTS, expense: 'warning', income: 'neutral' };
+    show();
+
+    expect(amountIn('Tesco')).toHaveClass('text-warning');
+    expect(amountIn('Salary')).toHaveClass('text-muted');
+    SETTINGS.accents = DEFAULT_ACCENTS;
   });
 });

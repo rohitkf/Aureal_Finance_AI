@@ -8,6 +8,7 @@ import { render as rtlRender, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import type { Account, AppState, Category, RecurringPayment, Settings } from '@/lib/types';
 
 const dispatch = vi.fn();
@@ -20,6 +21,7 @@ const SETTINGS: Settings = {
   userName: 'Test',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const ACCOUNTS: Account[] = [

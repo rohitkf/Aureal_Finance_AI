@@ -14,6 +14,7 @@ export interface ProfileRow {
   minimum_balance: number;
   mask_balances: boolean;
   theme: 'light' | 'dark' | 'system';
+  row_accents: Record<string, string> | null;
   created_at: string;
   updated_at: string;
 }
@@ -149,6 +150,7 @@ export interface TransactionRow {
   created_at: string;
   updated_at: string;
   split_group_id: string | null;
+  is_opening: boolean;
   transaction_splits?: TransactionSplitRow[] | null;
   transaction_labels?: TransactionLabelRow[] | null;
 }

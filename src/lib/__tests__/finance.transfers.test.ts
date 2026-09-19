@@ -17,6 +17,7 @@
  * either way, because the person planned it.
  */
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import { buildForecast, forecastEvents, monthlyCommitments, monthlyTransfers, safeToSpend } from '@/lib/finance';
 import { emptyAppState } from '@/lib/mappers';
 import type { Account, AccountType, AppState, RecurringPayment, Settings, Transaction } from '@/lib/types';
@@ -28,6 +29,7 @@ const SETTINGS: Settings = {
   userName: 'Test',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const TODAY = '2026-09-18';

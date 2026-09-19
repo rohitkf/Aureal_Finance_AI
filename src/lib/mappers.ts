@@ -1,3 +1,4 @@
+import { resolveAccents } from './accents';
 import type {
   Account,
   AppState,
@@ -140,6 +141,7 @@ export const toTransaction = (row: TransactionRow): Transaction => ({
   recurringId: row.recurring_id ?? undefined,
   recurringDate: row.recurring_date ?? undefined,
   splitGroupId: row.split_group_id ?? undefined,
+  isOpening: row.is_opening || undefined,
   receiptName: row.receipt_name ?? undefined,
   taxDeductible: row.tax_deductible,
   labelIds: row.transaction_labels?.length
@@ -190,6 +192,7 @@ export const toSettings = (row: ProfileRow): Settings => ({
   userName: row.display_name,
   maskBalances: row.mask_balances,
   theme: row.theme,
+  accents: resolveAccents(row.row_accents),
 });
 
 /* ------------------------------------------------------------------ */
@@ -211,6 +214,7 @@ export const transactionToRow = (t: Omit<Transaction, 'id'>) => ({
   // Only meaningful alongside a rule, and the database says so too.
   recurring_date: t.recurringId ? (t.recurringDate ?? null) : null,
   split_group_id: t.splitGroupId ?? null,
+  is_opening: t.isOpening ?? false,
   receipt_name: t.receiptName ?? null,
   tax_deductible: t.taxDeductible ?? false,
 });

@@ -8,6 +8,7 @@
  * or move today".
  */
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import {
   availableNow,
   balanceHistory,
@@ -29,6 +30,7 @@ const SETTINGS: Settings = {
   userName: 'Test',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const account = (type: AccountType, balance: number, id = type): Account => ({

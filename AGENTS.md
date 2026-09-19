@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 572 tests
+npm run test         # vitest — 619 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -81,6 +81,8 @@ Vocabulary that is easy to get wrong:
 | **`weekendMode`** | What a Saturday or Sunday does to one occurrence: `none`, `previous` (how a salary behaves), `next` (how most direct debits behave), `nearest`, `skip`. It never moves the schedule — only the day the payment shows on. |
 | **An account group** | A group of accounts you named yourself. It decides which side of the balance sheet its accounts are counted on. `sideOf()` resolves it; the group wins, the type is the fallback. |
 | **`asset` / `liability`** | Account types for a thing you own that is not money (a house) and a thing you owe that is not a card (a loan). |
+| **An opening balance** | What an account held when it was added. Written as an income (or an expense on something you owe) because balances are derived from transactions — and marked `is_opening`, because it is not money that arrived and must not be coloured as if it were. |
+| **An accent** | Which of the six semantic colours a kind of line is drawn in. `DEFAULT_ACCENTS` is the design; `profiles.row_accents` is the person's override, merged over it by `resolveAccents`. |
 | **A label** | A tag that cuts across categories — which holiday, which flat, which client. A transaction has exactly one category and any number of labels. Case-insensitively unique per person: two spellings of one label is how a set of tags rots. |
 | **A category split** | One payment, one account, filed under several headings. Rows in `transaction_splits`, which must total the payment — a deferred trigger enforces it. |
 | **An account split** | One payment taken out of several accounts. Ordinary sibling transactions sharing `split_group_id`, never a side table: each part genuinely moves its own account's balance, and the trigger works off `account_id`. |
@@ -340,6 +342,18 @@ Each of these has already cost real time here.
 - **`creditUtilisation` uses `totalCardDebt`, never `totalDebt`.** A mortgage
   has no credit limit, and dividing it by the card limit produces a number
   that means nothing and looks alarming.
+- **A Tailwind class is never interpolated.** Tailwind scans the source for
+  whole class names at build time, so `text-${accent}` is simply absent from
+  the stylesheet and the colour never appears. `accents.ts` writes all six out
+  in full, and a test asserts no value in those maps contains `${`.
+- **The accent bar is a border, not a shadow.** Every `shadow-*` utility sets
+  the same `box-shadow`, and these rows already carry a selected ring, a
+  scheduled outline and an overdue ring. Two shadow classes do not merge — one
+  wins, depending on the order Tailwind emitted them.
+- **A backup restores accounts at zero.** The database derives balance from
+  transactions, and those transactions are in the same file. Writing the stored
+  figure *and* replaying them counts every penny twice; `supabase/tests/backup_restore.sql`
+  demonstrates the double count on purpose so nobody re-introduces it.
 - **`#` searches labels and nothing else.** Without the prefix a label is one
   more thing the free-text search looks at, which is right until the label is a
   word that also appears in half your merchant names. Both paths are live, and

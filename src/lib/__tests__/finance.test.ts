@@ -13,6 +13,7 @@ import {
   totalDebt,
 } from '../finance';
 import type { AppState, Category, Transaction } from '../types';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 
 /** Fixed reference date, so every expectation below is deterministic. */
 const TODAY = '2026-09-16';
@@ -69,6 +70,7 @@ const minimal = (): AppState => ({
     userName: 'Test',
     maskBalances: false,
     theme: 'dark',
+    accents: DEFAULT_ACCENTS,
   },
 });
 

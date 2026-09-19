@@ -10,6 +10,7 @@
  * makes the column reconcile against a real bank statement.
  */
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_ACCENTS } from '@/lib/accents';
 import { ledgerRows, ledgerWindow } from '@/lib/ledger';
 import { emptyAppState } from '@/lib/mappers';
 import type { Account, AppState, RecurringPayment, Settings, Transaction } from '@/lib/types';
@@ -21,6 +22,7 @@ const SETTINGS: Settings = {
   userName: 'Test',
   maskBalances: false,
   theme: 'system',
+  accents: DEFAULT_ACCENTS,
 };
 
 const TODAY = '2026-09-18';
