@@ -144,6 +144,16 @@ interface AddTransactionSheetProps {
    * spoken for and stops projecting it.
    */
   mode?: 'update' | 'create';
+  /**
+   * Remove this transaction altogether.
+   *
+   * The sheet is where every screen lands when a real row is opened — the
+   * register, the reminders, the list, the dashboard — so it is the one place
+   * a delete is reachable from all of them. Left out for a new transaction
+   * (there is nothing yet) and for a projected occurrence (there is no row
+   * behind it; that one is skipped, not deleted).
+   */
+  onDelete?: () => void;
 }
 
 /**
@@ -156,6 +166,7 @@ export const AddTransactionSheet = ({
   initialType = 'expense',
   editing = null,
   mode = 'update',
+  onDelete,
 }: AddTransactionSheetProps) => {
   const { accounts } = useAppState();
   const { dispatch } = useStore();
@@ -568,6 +579,13 @@ export const AddTransactionSheet = ({
         }
         footer={
           <>
+            {/* Away on its own at the far end, because the button next to
+                Cancel is the one a thumb reaches for by mistake. */}
+            {onDelete && editing && mode === 'update' && (
+              <Button variant="danger" icon="trash" onClick={onDelete} className="mr-auto">
+                Delete
+              </Button>
+            )}
             <Button onClick={onClose}>Cancel</Button>
             <Button variant="primary" icon="check" onClick={submit} disabled={!valid}>
               {editing ? (mode === 'create' ? 'Save this one' : 'Save changes') : 'Save transaction'}

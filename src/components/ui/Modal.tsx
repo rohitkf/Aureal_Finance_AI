@@ -15,6 +15,20 @@ const FOCUSABLE =
  */
 const FIELDS = 'input:not([disabled]),select:not([disabled]),textarea:not([disabled])';
 
+/**
+ * Every dialog currently open, oldest first.
+ *
+ * Two can be open at once — a confirmation over the form that raised it — and
+ * both listen on `document`, so without a stack one Escape dismisses the pair
+ * and the inner one's Tab trap fights the outer one's. The scroll lock has the
+ * same problem from the other end: the inner dialog's cleanup would hand the
+ * page back its scrollbar while the outer one is still covering it.
+ *
+ * So the stack answers two questions, and only those: am I the one on top, and
+ * am I the last one out.
+ */
+const openDialogs: symbol[] = [];
+
 interface ModalProps {
   open: boolean;
   onClose: () => void;
@@ -35,6 +49,12 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreTo = useRef<HTMLElement | null>(null);
 
+  // This dialog's identity in the stack. A symbol rather than a counter so two
+  // dialogs can never collide, and held in a ref so it survives re-renders.
+  const idRef = useRef<symbol | null>(null);
+  idRef.current ??= Symbol('dialog');
+  const id = idRef.current;
+
   // Every caller writes `onClose={() => setThing(false)}` inline, so the
   // function is a new one on each of the parent's renders. Held in a ref, that
   // churn cannot invalidate the effects below; as a dependency it re-ran them
@@ -49,6 +69,7 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
   // Keyed on `open` alone, so it runs exactly twice per visit.
   useEffect(() => {
     if (!open) return;
+    openDialogs.push(id);
     restoreTo.current = document.activeElement as HTMLElement | null;
     document.body.style.overflow = 'hidden';
 
@@ -60,16 +81,25 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
     target?.focus();
 
     return () => {
-      document.body.style.overflow = '';
+      const at = openDialogs.indexOf(id);
+      if (at !== -1) openDialogs.splice(at, 1);
+      // Only the last one out gives the page back its scroll. A confirmation
+      // closing over a form that is still open must not unlock it.
+      if (openDialogs.length === 0) document.body.style.overflow = '';
       restoreTo.current?.focus();
     };
-  }, [open]);
+  }, [open, id]);
 
   // Escape to dismiss, Tab to cycle within the dialog.
   useEffect(() => {
     if (!open) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
+      // Only the dialog on top answers the keyboard. Every open one is
+      // listening on `document`, so otherwise Escape in a confirmation also
+      // dismisses the form behind it.
+      if (openDialogs[openDialogs.length - 1] !== id) return;
+
       if (e.key === 'Escape') {
         e.preventDefault();
         onCloseRef.current();
@@ -94,7 +124,7 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open]);
+  }, [open, id]);
 
   if (!open) return null;
 

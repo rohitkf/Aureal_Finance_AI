@@ -91,7 +91,14 @@ export const Transactions = () => {
   /** A line drawn from a rule, opened for editing before any row exists. */
   const [occurrence, setOccurrence] = useState<Transaction | null>(null);
   const [skipping, setSkipping] = useState<LedgerRow | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  /**
+   * The transaction a confirmation is currently asking about.
+   *
+   * It holds the row rather than a flag because the question now comes from
+   * two places — the detail panel on the list, and the edit sheet the register
+   * and reminders open — and a flag can only ever mean "the selected one".
+   */
+  const [confirmDelete, setConfirmDelete] = useState<Transaction | null>(null);
   const categories = useCategories();
 
   useEffect(() => {
@@ -459,7 +466,7 @@ export const Transactions = () => {
             {selected ? (
               <TransactionDetail
                 transaction={selected}
-                onDelete={() => setConfirmDelete(true)}
+                onDelete={() => setConfirmDelete(selected)}
                 onClose={() => setSelected(null)}
                 onEdit={() => setEditing(selected)}
                 onMakeRecurring={() => makeRecurring(selected)}
@@ -483,7 +490,7 @@ export const Transactions = () => {
           {selected && (
             <TransactionDetail
               transaction={selected}
-              onDelete={() => setConfirmDelete(true)}
+              onDelete={() => setConfirmDelete(selected)}
               onClose={() => setSelected(null)}
               onEdit={() => setEditing(selected)}
               onMakeRecurring={() => makeRecurring(selected)}
@@ -500,6 +507,7 @@ export const Transactions = () => {
         open={Boolean(editing)}
         onClose={() => setEditing(null)}
         editing={editing}
+        onDelete={() => setConfirmDelete(editing)}
       />
       {/* A line the register drew from a rule: prefilled like an edit, but
           saving writes the first row rather than changing one. */}
@@ -547,22 +555,25 @@ export const Transactions = () => {
       />
 
       <ConfirmDialog
-        open={confirmDelete}
-        onClose={() => setConfirmDelete(false)}
+        open={Boolean(confirmDelete)}
+        onClose={() => setConfirmDelete(null)}
         onConfirm={() => {
-          if (!selected) return;
-          dispatch({ type: 'delete-transaction', id: selected.id });
-          toast({ tone: 'info', title: 'Transaction deleted', description: selected.merchant });
+          if (!confirmDelete) return;
+          dispatch({ type: 'delete-transaction', id: confirmDelete.id });
+          toast({ tone: 'info', title: 'Transaction deleted', description: confirmDelete.merchant });
+          // Whichever of the two raised the question is now looking at a row
+          // that no longer exists, so both go.
           setSelected(null);
+          setEditing(null);
         }}
         title="Delete transaction?"
         subject={
-          selected && (
+          confirmDelete && (
             <div className="flex items-center gap-3">
-              <CategoryIcon categoryId={selected.categoryId} />
+              <CategoryIcon categoryId={confirmDelete.categoryId} />
               <div>
-                <p className="text-body-md font-semibold text-text">{selected.merchant}</p>
-                <p className="tnum text-body-sm text-muted">{money(selected.amount)}</p>
+                <p className="text-body-md font-semibold text-text">{confirmDelete.merchant}</p>
+                <p className="tnum text-body-sm text-muted">{money(confirmDelete.amount)}</p>
               </div>
             </div>
           )
