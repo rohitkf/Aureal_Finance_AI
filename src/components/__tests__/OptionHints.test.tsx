@@ -85,14 +85,29 @@ describe('the transaction type', () => {
 });
 
 describe('the weekend rule', () => {
-  it('says which way it moves, and that the schedule does not', async () => {
+  it('says which way the payment moves, in the words of the payment', async () => {
     const user = userEvent.setup();
     open();
     await user.click(screen.getByRole('checkbox', { name: /this repeats/i }));
 
-    const text = screen.getByRole('checkbox', { name: /pay early/i }).textContent ?? '';
-    expect(text).toMatch(/Friday/);
-    expect(text).toMatch(/schedule itself doesn.t move/i);
+    // The default is how a salary behaves, and the hint says so.
+    expect(screen.getByText(/shows on the Friday before/i)).toBeInTheDocument();
+  });
+
+  it('offers all four things a weekend can do to it, plus leaving it alone', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(screen.getByRole('checkbox', { name: /this repeats/i }));
+    await user.click(screen.getByRole('combobox', { name: /lands at a weekend/i }));
+
+    const offered = screen.getAllByRole('option').map((o) => o.textContent);
+    expect(offered).toEqual([
+      'Leave it where it falls',
+      'Move to the previous weekday',
+      'Move to the next weekday',
+      'Move to the nearest weekday',
+      'Skip it',
+    ]);
   });
 });
 

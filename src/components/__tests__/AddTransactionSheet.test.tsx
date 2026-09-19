@@ -391,7 +391,7 @@ describe('repeating a transaction', () => {
     // The payment landed on the 29th, but the rule means month-end. Anchoring
     // to 29 would pay on the 29th of every month for ever.
     expect(rule.anchorDay).toBe(31);
-    expect(rule.adjustToWorkingDay).toBe(true);
+    expect(rule.weekendMode).toBe('previous');
     expect(rule.startDate).toBe('2026-05-29');
     expect(rule.direction).toBe('in');
     expect(rule.frequency).toBe('monthly');

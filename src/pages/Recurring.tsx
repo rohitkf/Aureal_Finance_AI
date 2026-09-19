@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
 import { formatMediumDate, relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
-import { FREQUENCY_LABELS, monthlyEquivalent, previewOccurrences } from '@/lib/recurrence';
+import { FREQUENCY_LABELS, WEEKEND_LABELS, monthlyEquivalent, previewOccurrences } from '@/lib/recurrence';
 import { monthlyCommitments, monthlyTransfers } from '@/lib/finance';
 import { newId, useAppState, useCategories, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
@@ -25,7 +25,20 @@ import { Icon } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { EmptyState, SkeletonRows } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
-import type { Frequency, RecurringPayment, RecurringStatus } from '@/lib/types';
+import type { Frequency, RecurringPayment, RecurringStatus, WeekendMode } from '@/lib/types';
+
+/**
+ * What each weekend rule actually does, in the words somebody would use to
+ * describe the payment. A row of five verbs explains nothing on its own.
+ */
+const WEEKEND_HINTS: Record<WeekendMode, string> = {
+  none: 'It shows on the day it falls, weekend or not. Right for anything that is not a bank payment.',
+  previous:
+    'A payment due on a Saturday or Sunday shows on the Friday before, the way a salary actually arrives.',
+  next: 'It shows on the Monday after, which is when most direct debits are actually taken.',
+  nearest: 'Saturday goes back to Friday, Sunday forward to Monday — whichever weekday is nearer.',
+  skip: 'That period simply does not happen. The one after is unaffected.',
+};
 
 const STATUS_TABS: Array<{ value: RecurringStatus | 'all'; label: string }> = [
   { value: 'all', label: 'All' },
@@ -46,16 +59,36 @@ const emptyDraft = (today: string, accountId: string, toAccountId = ''): DraftRu
   accountId,
   toAccountId,
   frequency: 'monthly',
+  interval: '1',
   customIntervalDays: '30',
   anchorDay: String(Number(today.slice(8, 10))),
   startDate: today,
   endMode: 'never',
   endDate: '',
   occurrences: '',
-  adjustToWorkingDay: false,
+  weekendMode: 'none',
   isSubscription: false,
   notes: '',
 });
+
+/** "Every 3rd month" said the way a person would read it back. */
+const intervalHint = (draft: DraftRule): string => {
+  const n = Number(draft.interval) || 1;
+  const unit: Partial<Record<Frequency, string>> = {
+    daily: 'day',
+    weekly: 'week',
+    fortnightly: 'fortnight',
+    monthly: 'month',
+    bimonthly: 'two months',
+    quarterly: 'quarter',
+    semiannual: 'six months',
+    yearly: 'year',
+    custom: 'cycle',
+  };
+  const word = unit[draft.frequency] ?? 'period';
+  if (n <= 1) return `Every ${word}.`;
+  return `Every ${n} ${word}${word.endsWith('s') ? '' : 's'} — so ${n} times less often than ${FREQUENCY_LABELS[draft.frequency].toLowerCase()}.`;
+};
 
 const toRule = (draft: DraftRule): RecurringPayment => ({
   id: draft.id ?? newId(),
@@ -68,13 +101,14 @@ const toRule = (draft: DraftRule): RecurringPayment => ({
   // else, so a rule switched away from transfer must not keep its old target.
   toAccountId: draft.direction === 'transfer' ? draft.toAccountId || undefined : undefined,
   frequency: draft.frequency,
+  interval: Math.min(Math.max(Number(draft.interval) || 1, 1), 99),
   customIntervalDays: draft.frequency === 'custom' ? Number(draft.customIntervalDays) || 30 : undefined,
   anchorDay: Number(draft.anchorDay) || 1,
   startDate: draft.startDate,
   endDate: draft.endMode === 'date' && draft.endDate ? draft.endDate : undefined,
   occurrences: draft.endMode === 'count' && draft.occurrences ? Number(draft.occurrences) : undefined,
   status: 'active',
-  adjustToWorkingDay: draft.adjustToWorkingDay,
+  weekendMode: draft.weekendMode,
   isSubscription: draft.isSubscription,
   notes: draft.notes.trim() || undefined,
 });
@@ -303,13 +337,14 @@ export const Recurring = () => {
                           accountId: rule.accountId,
                           toAccountId: rule.toAccountId ?? '',
                           frequency: rule.frequency,
+                          interval: String(rule.interval ?? 1),
                           customIntervalDays: String(rule.customIntervalDays ?? 30),
                           anchorDay: String(rule.anchorDay),
                           startDate: rule.startDate,
                           endMode: rule.endDate ? 'date' : rule.occurrences ? 'count' : 'never',
                           endDate: rule.endDate ?? '',
                           occurrences: String(rule.occurrences ?? ''),
-                          adjustToWorkingDay: Boolean(rule.adjustToWorkingDay),
+                          weekendMode: rule.weekendMode ?? 'none',
                           isSubscription: Boolean(rule.isSubscription),
                           notes: rule.notes ?? '',
                         })
@@ -534,6 +569,17 @@ const RecurringForm = ({
             ))}
           </SelectField>
 
+          {/* Every-N on top of the frequency, so anything between the named
+              cadences is reachable: monthly every 3 is quarterly, weekly every
+              2 is fortnightly, yearly every 2 is a thing that exists. */}
+          <TextField
+            label="Repeat every"
+            inputMode="numeric"
+            value={draft.interval}
+            onChange={(e) => setDraft({ ...draft, interval: e.target.value.replace(/\D/g, '').slice(0, 2) })}
+            hint={intervalHint(draft)}
+          />
+
           {draft.frequency === 'custom' && (
             <TextField
               label="Repeat every (days)"
@@ -613,12 +659,18 @@ const RecurringForm = ({
           )}
         </div>
 
-        <CheckboxField
-          checked={draft.adjustToWorkingDay}
-          onChange={(adjustToWorkingDay) => setDraft({ ...draft, adjustToWorkingDay })}
-          label="Pay early if it lands at a weekend"
-          description="A payment due on a Saturday or Sunday shows on the Friday before, the way a salary actually arrives. The schedule itself doesn't move, so the month after is unaffected."
-        />
+        <SelectField
+          label="If it lands at a weekend"
+          value={draft.weekendMode}
+          onChange={(value) => setDraft({ ...draft, weekendMode: value as WeekendMode })}
+          hint={WEEKEND_HINTS[draft.weekendMode]}
+        >
+          {(Object.keys(WEEKEND_LABELS) as WeekendMode[]).map((mode) => (
+            <option key={mode} value={mode}>
+              {WEEKEND_LABELS[mode]}
+            </option>
+          ))}
+        </SelectField>
 
         {/* A standing order into your own savings is not something you
             subscribe to, so the option is not offered for one. */}

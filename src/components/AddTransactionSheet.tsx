@@ -11,7 +11,7 @@ import {
 } from '@/lib/date';
 import { evaluateExpression, isPlainNumber, stripToExpression } from '@/lib/calc';
 import { money } from '@/lib/format';
-import { FREQUENCY_LABELS, previewOccurrences } from '@/lib/recurrence';
+import { FREQUENCY_LABELS, WEEKEND_LABELS, previewOccurrences } from '@/lib/recurrence';
 import { newId, useAppState, useCategories, useStore, useToday } from '@/lib/store';
 import type {
   Account,
@@ -21,7 +21,17 @@ import type {
   Transaction,
   TransactionStatus,
   TransactionType,
+  WeekendMode,
 } from '@/lib/types';
+
+/** What each weekend rule does, said as the payment rather than as the rule. */
+const WEEKEND_HINTS: Record<WeekendMode, string> = {
+  none: 'It shows on the day it falls, weekend or not.',
+  previous: 'A payment due on a Saturday or Sunday shows on the Friday before, the way a salary arrives.',
+  next: 'It shows on the Monday after, which is when most direct debits are taken.',
+  nearest: 'Saturday goes back to Friday, Sunday forward to Monday — whichever weekday is nearer.',
+  skip: 'That period simply does not happen. The one after is unaffected.',
+};
 import { Button } from './ui/Button';
 import {
   AmountField,
@@ -180,7 +190,11 @@ export const AddTransactionSheet = ({
   const [dateMode, setDateMode] = useState<DateMode>('today');
   const [repeats, setRepeats] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>('monthly');
-  const [adjustToWorkingDay, setAdjustToWorkingDay] = useState(true);
+  const [interval, setInterval] = useState('1');
+  const [weekendMode, setWeekendMode] = useState<WeekendMode>('previous');
+  const [endMode, setEndMode] = useState<'never' | 'date' | 'count'>('never');
+  const [endDate, setEndDate] = useState('');
+  const [occurrences, setOccurrences] = useState('');
   const [isSubscription, setIsSubscription] = useState(false);
 
   const categories = useMemo(
@@ -190,6 +204,9 @@ export const AddTransactionSheet = ({
 
   // The handful people reach for most, so the common case is one tap.
   const quickCategories = useMemo(() => categories.slice(0, 6), [categories]);
+
+  /** The interval, clamped the way the database clamps it. */
+  const everyN = Math.min(Math.max(Number(interval) || 1, 1), 99);
 
   useEffect(() => {
     if (!open) return;
@@ -204,7 +221,11 @@ export const AddTransactionSheet = ({
     setDateMode(editing ? 'custom' : 'today');
     setRepeats(false);
     setFrequency('monthly');
-    setAdjustToWorkingDay(true);
+    setInterval('1');
+    setWeekendMode('previous');
+    setEndMode('never');
+    setEndDate('');
+    setOccurrences('');
     setIsSubscription(false);
     setError(undefined);
     if (editing) {
@@ -264,17 +285,34 @@ export const AddTransactionSheet = ({
         categoryId,
         accountId,
         frequency,
+        interval: everyN,
         anchorDay: anchorFor(frequency, date),
         startDate: date,
+        endDate: endMode === 'date' && endDate ? endDate : undefined,
+        occurrences: endMode === 'count' && occurrences ? Number(occurrences) : undefined,
         status: 'active',
-        adjustToWorkingDay,
+        weekendMode,
       },
       date,
       3,
     );
     // `anchorFor` reads dateMode, which is in the dependency list below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [repeats, canRepeat, date, dateMode, type, categoryId, accountId, frequency, adjustToWorkingDay]);
+  }, [
+    repeats,
+    canRepeat,
+    date,
+    dateMode,
+    type,
+    categoryId,
+    accountId,
+    frequency,
+    everyN,
+    weekendMode,
+    endMode,
+    endDate,
+    occurrences,
+  ]);
 
   /**
    * The amount field takes a sum, not only a number: `12.40+3.60` while the
@@ -322,10 +360,13 @@ export const AddTransactionSheet = ({
             accountId,
             toAccountId: type === 'transfer' ? toAccountId : undefined,
             frequency,
+            interval: everyN,
             anchorDay: anchorFor(frequency, date),
             startDate: date,
+            endDate: endMode === 'date' && endDate ? endDate : undefined,
+            occurrences: endMode === 'count' && occurrences ? Number(occurrences) : undefined,
             status: 'active',
-            adjustToWorkingDay,
+            weekendMode,
             // Money moved between your own accounts is not something you subscribe to.
             isSubscription: type === 'transfer' ? false : isSubscription,
           }
@@ -647,12 +688,60 @@ export const AddTransactionSheet = ({
                     ))}
                   </SelectField>
 
-                  <CheckboxField
-                    checked={adjustToWorkingDay}
-                    onChange={setAdjustToWorkingDay}
-                    label="Pay early if it lands at a weekend"
-                    description="A payment due on a Saturday or Sunday shows on the Friday before, the way a salary actually arrives. The schedule itself doesn't move."
+                  <TextField
+                    label="Repeat every"
+                    inputMode="numeric"
+                    value={interval}
+                    onChange={(e) => setInterval(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                    hint={
+                      everyN <= 1
+                        ? `Every ${FREQUENCY_LABELS[frequency].toLowerCase().replace(/ly$/, '')} period — leave it at 1 unless you want it less often.`
+                        : `${everyN} times less often than ${FREQUENCY_LABELS[frequency].toLowerCase()}.`
+                    }
                   />
+
+                  <SelectField
+                    label="If it lands at a weekend"
+                    value={weekendMode}
+                    onChange={(value) => setWeekendMode(value as WeekendMode)}
+                    hint={WEEKEND_HINTS[weekendMode]}
+                  >
+                    {(Object.keys(WEEKEND_LABELS) as WeekendMode[]).map((mode) => (
+                      <option key={mode} value={mode}>
+                        {WEEKEND_LABELS[mode]}
+                      </option>
+                    ))}
+                  </SelectField>
+
+                  <SelectField
+                    label="Ends"
+                    value={endMode}
+                    onChange={(value) => setEndMode(value as typeof endMode)}
+                    hint={
+                      {
+                        never: 'Keeps going, and keeps appearing on Reminders, until you pause or delete it.',
+                        date: 'Stops after the date you choose. Nothing after it is ever projected.',
+                        count: 'Stops once it has been paid the number of times you set.',
+                      }[endMode]
+                    }
+                  >
+                    <option value="never">Never</option>
+                    <option value="date">On a date</option>
+                    <option value="count">After a number of payments</option>
+                  </SelectField>
+
+                  {endMode === 'date' && (
+                    <DateField label="End date" value={endDate} onChange={setEndDate} placeholder="Choose a date" />
+                  )}
+                  {endMode === 'count' && (
+                    <TextField
+                      label="Number of payments"
+                      inputMode="numeric"
+                      value={occurrences}
+                      onChange={(e) => setOccurrences(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      hint="Counted from this one, which is the first."
+                    />
+                  )}
 
                   {type !== 'transfer' && (
                     <CheckboxField

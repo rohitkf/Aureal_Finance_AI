@@ -88,7 +88,8 @@ export interface RecurringRow {
     | 'custom';
   custom_interval_days: number | null;
   anchor_day: number;
-  adjust_to_working_day: boolean;
+  interval: number;
+  weekend_mode: 'none' | 'previous' | 'next' | 'nearest' | 'skip';
   start_date: string;
   end_date: string | null;
   occurrences: number | null;

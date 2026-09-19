@@ -191,7 +191,7 @@ export const Transactions = () => {
       anchorDay: Number(t.date.slice(8, 10)),
       startDate: t.date,
       status: 'active',
-      adjustToWorkingDay: false,
+      weekendMode: 'none',
     };
     dispatch({ type: 'add-recurring', recurring: rule });
     // Tie the transaction to the rule it just produced. Left unlinked, a

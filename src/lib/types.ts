@@ -114,6 +114,15 @@ export type Frequency =
 export type RecurringStatus = 'active' | 'paused' | 'ended';
 
 /**
+ * What to do with an occurrence that falls at a weekend.
+ *
+ * `previous` is how a salary behaves — an employer paying on the last day of
+ * the month pays on the Friday when the 31st is a Sunday. `next` is how most
+ * direct debits behave. `skip` means that period simply does not happen.
+ */
+export type WeekendMode = 'none' | 'previous' | 'next' | 'nearest' | 'skip';
+
+/**
  * Which way a recurring rule moves money. `transfer` is the standing-order
  * case: out of `accountId` and into `toAccountId`, both the user's own.
  */
@@ -129,6 +138,14 @@ export interface RecurringPayment {
   /** Destination, for a transfer. Nothing else carries one. */
   toAccountId?: string;
   frequency: Frequency;
+  /**
+   * Repeat every N of whatever `frequency` counts in: `monthly` with an
+   * interval of 3 is quarterly, `weekly` with 2 is fortnightly.
+   *
+   * It multiplies the frequency rather than replacing it, so the named
+   * cadences already in use keep meaning what they meant. Absent is 1.
+   */
+  interval?: number;
   /** Only for `custom`: repeat every N days. */
   customIntervalDays?: number;
   /** Day of month (monthly+) or 0-6 weekday (weekly/fortnightly). */
@@ -138,11 +155,12 @@ export interface RecurringPayment {
   occurrences?: number;
   status: RecurringStatus;
   /**
-   * Move an occurrence back to the previous weekday when it lands on one of
-   * the two days nobody is paid. An employer paying on the last day of the
-   * month pays on the Friday when the 31st is a Sunday.
+   * What happens when an occurrence lands on a Saturday or a Sunday.
+   *
+   * Never moves the schedule itself — only the day the payment is shown on —
+   * so the period after is unaffected either way.
    */
-  adjustToWorkingDay?: boolean;
+  weekendMode?: WeekendMode;
   isSubscription?: boolean;
   notes?: string;
 }

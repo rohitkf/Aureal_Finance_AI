@@ -74,6 +74,30 @@ export const previousWorkingDay = (iso: string): string => {
 };
 
 /**
+ * The given day, or the next working day after it.
+ *
+ * The other half of the pair. A direct debit is usually taken the Monday after
+ * a weekend rather than the Friday before, which is the opposite of how a
+ * salary behaves — hence both, and a choice.
+ */
+export const nextWorkingDay = (iso: string): string => {
+  if (!isValidISO(iso)) return iso;
+  let out = iso;
+  while (!isWorkingDay(out)) out = addDays(out, 1);
+  return out;
+};
+
+/**
+ * The nearer working day: Saturday goes back to Friday, Sunday forward to
+ * Monday. Never more than one day either way, which is what "nearest" means
+ * to anybody who says it.
+ */
+export const nearestWorkingDay = (iso: string): string => {
+  if (!isValidISO(iso) || isWorkingDay(iso)) return iso;
+  return parseISO(iso).getDay() === 6 ? addDays(iso, -1) : addDays(iso, 1);
+};
+
+/**
  * When a salary paid "at the end of the month" actually lands.
  *
  * September 2026 ends on Wednesday the 30th, so that is the answer. If it
