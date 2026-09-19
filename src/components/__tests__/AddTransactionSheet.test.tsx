@@ -51,6 +51,8 @@ const FALLBACK_CATEGORY: Category = {
 vi.mock('@/lib/store', () => ({
   useAppState: () => ({ accounts, categories: CATEGORIES }),
   useStore: () => ({ dispatch }),
+  useLabels: () => [],
+  useLabelLookup: () => () => undefined,
   useCategories: () => CATEGORIES,
   useCategoryLookup: () => (id: string) =>
     CATEGORIES.find((c) => c.id === id) ?? { ...FALLBACK_CATEGORY, id },

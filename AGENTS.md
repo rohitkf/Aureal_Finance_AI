@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 540 tests
+npm run test         # vitest — 556 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -79,6 +79,7 @@ Vocabulary that is easy to get wrong:
 | **A transfer rule** | A standing order between two of your own accounts. `account_id` is the source, `to_account_id` the destination. |
 | **`interval`** | Every N of whatever `frequency` counts in. Monthly with 3 is quarterly, weekly with 2 is fortnightly. It multiplies the named cadence rather than replacing it, so stored rules keep meaning what they meant. Absent is 1. |
 | **`weekendMode`** | What a Saturday or Sunday does to one occurrence: `none`, `previous` (how a salary behaves), `next` (how most direct debits behave), `nearest`, `skip`. It never moves the schedule — only the day the payment shows on. |
+| **A label** | A tag that cuts across categories — which holiday, which flat, which client. A transaction has exactly one category and any number of labels. Case-insensitively unique per person: two spellings of one label is how a set of tags rots. |
 | **A category split** | One payment, one account, filed under several headings. Rows in `transaction_splits`, which must total the payment — a deferred trigger enforces it. |
 | **An account split** | One payment taken out of several accounts. Ordinary sibling transactions sharing `split_group_id`, never a side table: each part genuinely moves its own account's balance, and the trigger works off `account_id`. |
 | **An occurrence** | One date a recurring rule produces. `transactions.recurring_date` says which one a row stands in for; `recurring_skips` says one does not happen. |
@@ -328,6 +329,11 @@ Each of these has already cost real time here.
   not `to_account_id`, not `recurring_id`, because those are exactly what a
   cascade nulls, and a lock that blocks a cascade is the mistake above wearing a
   different hat. Un-reconciling is always allowed; it is the way back.
+- **`#` searches labels and nothing else.** Without the prefix a label is one
+  more thing the free-text search looks at, which is right until the label is a
+  word that also appears in half your merchant names. Both paths are live, and
+  both are tested against a fixture where one transaction has the word as a
+  *note* and another has it as a *label*.
 - **The split total check is deferred, and has to be.** A split is written as
   several rows and is only coherent once they are all in; checked eagerly, the
   first row of a 60/40 split is rejected for not being 100 on its own. Which

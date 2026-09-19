@@ -49,6 +49,7 @@ const stateWith = (transactions: Transaction[]): AppState => ({
   accounts: [ACCOUNT],
   virtualAccounts: [],
   categories: [],
+  labels: [],
   transactions,
   recurring: [],
   budgets: [],

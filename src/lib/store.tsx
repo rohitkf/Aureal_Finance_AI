@@ -15,6 +15,7 @@ import type {
   Budget,
   Category,
   Goal,
+  Label,
   RecurringPayment,
   Settings,
   Transaction,
@@ -33,6 +34,7 @@ import {
   toAccount,
   toBudget,
   toCategory,
+  toLabel,
   toGoal,
   toNetWorthPoint,
   toRecurring,
@@ -47,6 +49,7 @@ import {
 type Slice =
   | 'profile'
   | 'categories'
+  | 'labels'
   | 'accounts'
   | 'virtualAccounts'
   | 'recurring'
@@ -60,6 +63,9 @@ export type Action =
   | { type: 'add-transaction'; transaction: Transaction }
   | { type: 'update-transaction'; transaction: Transaction }
   | { type: 'delete-transaction'; id: string }
+  | { type: 'add-label'; label: Label }
+  | { type: 'update-label'; label: Label }
+  | { type: 'delete-label'; id: string }
   | { type: 'add-recurring'; recurring: RecurringPayment }
   | { type: 'update-recurring'; recurring: RecurringPayment }
   | { type: 'delete-recurring'; id: string }
@@ -207,6 +213,18 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             }),
         );
       }
+      if (wanted.has('labels')) {
+        jobs.push(
+          supabase
+            .from('labels')
+            .select('*')
+            .order('name')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.labels = (data ?? []).map(toLabel);
+            }),
+        );
+      }
       if (wanted.has('accounts')) {
         jobs.push(
           supabase
@@ -248,7 +266,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         jobs.push(
           supabase
             .from('transactions')
-            .select('*, transaction_splits(*)')
+            .select('*, transaction_splits(*), transaction_labels(transaction_id, label_id)')
             .order('occurred_on', { ascending: false })
             .order('occurred_at', { ascending: false, nullsFirst: false })
             .limit(2000)
@@ -315,6 +333,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     () => [
       'profile',
       'categories',
+      'labels',
       'accounts',
       'virtualAccounts',
       'recurring',
@@ -479,6 +498,13 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                 ),
               );
             }
+            if (t.labelIds?.length) {
+              check(
+                await supabase
+                  .from('transaction_labels')
+                  .insert(t.labelIds.map((labelId) => ({ transaction_id: t.id, label_id: labelId }))),
+              );
+            }
             return ['transactions', 'accounts'];
           });
           break;
@@ -503,6 +529,17 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                 ),
               );
             }
+            // Labels live in a join table, so they are replaced wholesale
+            // rather than diffed: at the handful a transaction ever carries,
+            // working out which ones changed costs more than rewriting them.
+            check(await supabase.from('transaction_labels').delete().eq('transaction_id', t.id));
+            if (t.labelIds?.length) {
+              check(
+                await supabase
+                  .from('transaction_labels')
+                  .insert(t.labelIds.map((labelId) => ({ transaction_id: t.id, label_id: labelId }))),
+              );
+            }
             return ['transactions', 'accounts'];
           });
           break;
@@ -519,6 +556,40 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                 : await supabase.from('transactions').delete().eq('id', action.id),
             );
             return ['transactions', 'accounts'];
+          });
+          break;
+
+        case 'add-label':
+          run('save that label', async () => {
+            check(
+              await supabase.from('labels').insert({
+                id: action.label.id,
+                name: action.label.name,
+                accent: action.label.accent,
+              }),
+            );
+            return ['labels'];
+          });
+          break;
+
+        case 'update-label':
+          run('update that label', async () => {
+            check(
+              await supabase
+                .from('labels')
+                .update({ name: action.label.name, accent: action.label.accent })
+                .eq('id', action.label.id),
+            );
+            return ['labels'];
+          });
+          break;
+
+        case 'delete-label':
+          run('delete that label', async () => {
+            // The join rows cascade, so this takes it off everything rather
+            // than leaving transactions pointing at a label that is gone.
+            check(await supabase.from('labels').delete().eq('id', action.id));
+            return ['labels', 'transactions'];
           });
           break;
 
@@ -895,6 +966,18 @@ export const useCategoryLookup = (): ((id: string) => Category) => {
 };
 
 /** Categories of a given kind, in display order. */
+/** Every label, in the order the database returns them, which is by name. */
+export const useLabels = (): Label[] => useAppState().labels;
+
+/** A label by id, for drawing one on a row that only knows the id. */
+export const useLabelLookup = () => {
+  const { labels } = useAppState();
+  return useMemo(() => {
+    const byId = new Map(labels.map((l) => [l.id, l]));
+    return (id: string): Label | undefined => byId.get(id);
+  }, [labels]);
+};
+
 export const useCategories = (kind?: Category['kind']): Category[] => {
   const { categories } = useAppState();
   return useMemo(

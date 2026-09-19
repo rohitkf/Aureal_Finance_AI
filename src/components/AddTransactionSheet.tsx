@@ -48,6 +48,7 @@ import { useToast } from './ui/Toast';
 import { CategoryIcon } from './CategoryIcon';
 import { NewCategoryDialog } from './NewCategoryDialog';
 import { AccountDialog } from './AccountDialog';
+import { LabelPicker } from './LabelPicker';
 import { SplitEditor } from './SplitEditor';
 import { partAmount, splitIsValid, splitTotals, type SplitKind, type SplitPart } from '@/lib/splits';
 
@@ -179,6 +180,7 @@ export const AddTransactionSheet = ({
    */
   const [newAccountFor, setNewAccountFor] = useState<'from' | 'to' | null>(null);
   /** Off until Split is pressed; the kind is chosen inside the editor. */
+  const [labelIds, setLabelIds] = useState<string[]>([]);
   const [splitting, setSplitting] = useState(false);
   const [splitKind, setSplitKind] = useState<SplitKind>('category');
   const [parts, setParts] = useState<SplitPart[]>([]);
@@ -234,6 +236,7 @@ export const AddTransactionSheet = ({
     setOccurrences('');
     setIsSubscription(false);
     setError(undefined);
+    setLabelIds(editing?.labelIds ?? []);
     setSplitting(Boolean(editing?.splits?.length));
     setSplitKind('category');
     setParts(
@@ -439,6 +442,7 @@ export const AddTransactionSheet = ({
             ? undefined
             : editing?.splits,
       splitGroupId: editing?.splitGroupId,
+      labelIds: labelIds.length ? labelIds : undefined,
       receiptName: editing?.receiptName,
       taxDeductible: editing?.taxDeductible,
     };
@@ -897,6 +901,8 @@ export const AddTransactionSheet = ({
               )}
             </div>
           )}
+
+          <LabelPicker value={labelIds} onChange={setLabelIds} />
 
           <TextAreaField
             label="Notes"

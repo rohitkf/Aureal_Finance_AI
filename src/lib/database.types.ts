@@ -100,6 +100,18 @@ export interface RecurringRow {
   updated_at: string;
 }
 
+export interface LabelRow {
+  id: string;
+  user_id: string;
+  name: string;
+  accent: 'primary' | 'success' | 'secondary' | 'warning' | 'danger' | 'neutral';
+}
+
+export interface TransactionLabelRow {
+  transaction_id: string;
+  label_id: string;
+}
+
 export interface TransactionSplitRow {
   id: string;
   transaction_id: string;
@@ -129,6 +141,7 @@ export interface TransactionRow {
   updated_at: string;
   split_group_id: string | null;
   transaction_splits?: TransactionSplitRow[] | null;
+  transaction_labels?: TransactionLabelRow[] | null;
 }
 
 export interface BudgetRow {

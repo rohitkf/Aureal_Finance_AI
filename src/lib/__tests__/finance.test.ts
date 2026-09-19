@@ -54,6 +54,7 @@ const minimal = (): AppState => ({
   ],
   virtualAccounts: [],
   categories: CATEGORIES,
+  labels: [],
   transactions: [],
   recurring: [],
   budgets: [],

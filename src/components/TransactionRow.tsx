@@ -1,7 +1,8 @@
 import { cn } from '@/lib/cn';
 import { relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
-import { useAppState, useCategoryLookup, useSettings, useToday } from '@/lib/store';
+import { useAppState, useCategoryLookup, useLabelLookup, useSettings, useToday } from '@/lib/store';
+import { LabelChip } from './LabelPicker';
 import type { Transaction } from '@/lib/types';
 import { CategoryIcon } from './CategoryIcon';
 import { Icon } from './ui/Icon';
@@ -24,6 +25,7 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
   const { maskBalances } = useSettings();
   const today = useToday();
   const lookupCategory = useCategoryLookup();
+  const lookupLabel = useLabelLookup();
   const category = lookupCategory(transaction.categoryId);
   const account = accounts.find((a) => a.id === transaction.accountId);
   const scheduled = transaction.status === 'scheduled';
@@ -69,6 +71,12 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
           <span className={cn('truncate text-body-md font-semibold text-text', voided && 'line-through')}>
             {transaction.merchant}
           </span>
+          {/* Labels sit with the name rather than in a column of their own:
+              they are part of what the thing is, not a separate fact. */}
+          {transaction.labelIds?.map((id) => {
+            const label = lookupLabel(id);
+            return label ? <LabelChip key={id} label={label} className="shrink-0" /> : null;
+          })}
           {transaction.recurringId && (
             <Icon name="repeat" size={13} className="shrink-0 text-faint" title="Recurring" />
           )}

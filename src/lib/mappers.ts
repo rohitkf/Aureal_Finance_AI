@@ -4,6 +4,7 @@ import type {
   Budget,
   Category,
   Goal,
+  Label,
   NetWorthPoint,
   RecurringPayment,
   RecurringSkip,
@@ -16,6 +17,7 @@ import type {
   BudgetRow,
   CategoryRow,
   GoalRow,
+  LabelRow,
   NetWorthRow,
   RecurringSkipRow,
   ProfileRow,
@@ -47,6 +49,12 @@ const optionalNum = (value: number | string | null | undefined): number | undefi
 /** `14:32:00` → `14:32`, which is all the UI ever shows. */
 const shortTime = (value: string | null): string | undefined =>
   value ? value.slice(0, 5) : undefined;
+
+export const toLabel = (row: LabelRow): Label => ({
+  id: row.id,
+  name: row.name,
+  accent: row.accent,
+});
 
 export const toCategory = (row: CategoryRow): Category => ({
   id: row.id,
@@ -124,6 +132,9 @@ export const toTransaction = (row: TransactionRow): Transaction => ({
   splitGroupId: row.split_group_id ?? undefined,
   receiptName: row.receipt_name ?? undefined,
   taxDeductible: row.tax_deductible,
+  labelIds: row.transaction_labels?.length
+    ? row.transaction_labels.map((l) => l.label_id)
+    : undefined,
   splits: row.transaction_splits?.length
     ? row.transaction_splits.map((s) => ({
         categoryId: s.category_id ?? '',
@@ -247,6 +258,7 @@ export const emptyAppState = (settings: Settings): AppState => ({
   accounts: [],
   virtualAccounts: [],
   categories: [],
+  labels: [],
   transactions: [],
   recurring: [],
   budgets: [],

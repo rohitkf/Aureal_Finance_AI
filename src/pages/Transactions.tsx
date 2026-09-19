@@ -7,9 +7,10 @@ import { Register } from '@/components/Register';
 import { Reminders } from '@/components/Reminders';
 import { isReminder, ledgerRows, reminderWindow, type LedgerRow } from '@/lib/ledger';
 import { money } from '@/lib/format';
-import { newId, useAppState, useCategories, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
+import { newId, useAppState, useCategories, useCategoryLookup, useLabelLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { LabelChip } from '@/components/LabelPicker';
 import { TransactionRow } from '@/components/TransactionRow';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
@@ -50,6 +51,7 @@ export const Transactions = () => {
   const { maskBalances } = useSettings();
   const loading = useLoading();
   const lookupCategory = useCategoryLookup();
+  const lookupLabel = useLabelLookup();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
 
@@ -98,15 +100,40 @@ export const Transactions = () => {
         if (typeFilter === 'scheduled' && t.status !== 'scheduled') return false;
         if (typeFilter !== 'all' && typeFilter !== 'scheduled' && t.type !== typeFilter) return false;
         if (!q) return true;
+        /**
+         * `#portugal` searches labels and nothing else.
+         *
+         * Without the prefix a label is just one more thing the free-text
+         * search looks at, which is right most of the time and useless when
+         * the label happens to be a word that also appears in half your
+         * merchant names.
+         */
+        if (q.startsWith('#')) {
+          const wanted = q.slice(1);
+          if (!wanted) return true;
+          return (t.labelIds ?? []).some((id) =>
+            (lookupLabel(id)?.name ?? '').toLowerCase().includes(wanted),
+          );
+        }
         return (
           t.merchant.toLowerCase().includes(q) ||
           lookupCategory(t.categoryId).name.toLowerCase().includes(q) ||
           t.amount.toFixed(2).includes(q) ||
-          (t.notes ?? '').toLowerCase().includes(q)
+          (t.notes ?? '').toLowerCase().includes(q) ||
+          (t.labelIds ?? []).some((id) => (lookupLabel(id)?.name ?? '').toLowerCase().includes(q))
         );
       })
       .sort((a, b) => (a.date === b.date ? (b.time ?? '').localeCompare(a.time ?? '') : b.date.localeCompare(a.date)));
-  }, [state.transactions, query, typeFilter, accountFilter, categoryFilter, monthFilter, lookupCategory]);
+  }, [
+    state.transactions,
+    query,
+    typeFilter,
+    accountFilter,
+    categoryFilter,
+    monthFilter,
+    lookupCategory,
+    lookupLabel,
+  ]);
 
   const groups = useMemo(() => {
     const map = new Map<string, Transaction[]>();
@@ -295,7 +322,7 @@ export const Transactions = () => {
           <TextField
             label="Search transactions"
             hideLabel
-            placeholder="Search by merchant, note or amount…"
+            placeholder="Search — or #label…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             containerClassName="flex-1"
@@ -548,6 +575,7 @@ const TransactionDetail = ({
   const state = useAppState();
   const { maskBalances } = useSettings();
   const lookupCategory = useCategoryLookup();
+  const lookupLabel = useLabelLookup();
   const category = lookupCategory(transaction.categoryId);
   const account = state.accounts.find((a) => a.id === transaction.accountId);
 
@@ -585,6 +613,17 @@ const TransactionDetail = ({
         )}
         {transaction.receiptName && <Row label="Receipt" value={transaction.receiptName} />}
         <Row label="Recurring" value={transaction.recurringId ? 'Part of a schedule' : 'One-off'} />
+        {transaction.labelIds?.length ? (
+          <div className="flex items-baseline justify-between gap-4 py-2">
+            <dt className="text-label-sm text-faint">Labels</dt>
+            <dd className="flex flex-wrap justify-end gap-1.5">
+              {transaction.labelIds.map((id) => {
+                const label = lookupLabel(id);
+                return label ? <LabelChip key={id} label={label} /> : null;
+              })}
+            </dd>
+          </div>
+        ) : null}
       </dl>
 
       {transaction.splits && transaction.splits.length > 1 && (

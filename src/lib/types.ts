@@ -42,6 +42,20 @@ export interface VirtualAccount {
   locked?: boolean;
 }
 
+/**
+ * A tag that cuts across categories.
+ *
+ * A category answers "what kind of spending is this" and there is exactly one.
+ * A label answers anything else you might want to ask later — which holiday,
+ * which flat, which client — and a transaction can carry several. A category
+ * hierarchy deep enough to hold "Portugal 2027" has stopped being categories.
+ */
+export interface Label {
+  id: string;
+  name: string;
+  accent: 'primary' | 'success' | 'secondary' | 'warning' | 'danger' | 'neutral';
+}
+
 export type CategoryKind = 'expense' | 'income' | 'transfer';
 
 export interface Category {
@@ -114,6 +128,8 @@ export interface Transaction {
    * and the balance trigger stay correct without knowing splits exist.
    */
   splitGroupId?: string;
+  /** Label ids. Order is not meaningful. */
+  labelIds?: string[];
   receiptName?: string;
   taxDeductible?: boolean;
 }
@@ -228,6 +244,7 @@ export interface AppState {
   accounts: Account[];
   virtualAccounts: VirtualAccount[];
   categories: Category[];
+  labels: Label[];
   transactions: Transaction[];
   recurring: RecurringPayment[];
   budgets: Budget[];

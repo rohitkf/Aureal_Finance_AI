@@ -32,6 +32,8 @@ const today = '2026-09-18';
 vi.mock('@/lib/store', () => ({
   useAppState: () => ({ accounts: ACCOUNTS, categories: CATEGORIES }),
   useStore: () => ({ dispatch }),
+  useLabels: () => [],
+  useLabelLookup: () => () => undefined,
   useCategories: () => CATEGORIES,
   useCategoryLookup: () => (id: string) =>
     CATEGORIES.find((c) => c.id === id) ?? { id, name: 'Uncategorised', kind: 'expense', icon: 'box', accent: 'neutral' },
