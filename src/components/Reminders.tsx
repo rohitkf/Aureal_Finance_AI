@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { formatMonthYear, monthKey } from '@/lib/date';
-import { accountNamer, isReminder, ledgerRows, reminderWindow, type LedgerRow } from '@/lib/ledger';
+import { accountNamer, isReminder, ledgerRows, ledgerWindow, type LedgerRow } from '@/lib/ledger';
 import { useAppState, useSettings, useToday } from '@/lib/store';
 import { EmptyState } from './ui/States';
 import { LedgerLine } from './LedgerLine';
@@ -30,7 +30,7 @@ export const Reminders = ({
   const today = useToday();
   const { maskBalances } = useSettings();
 
-  const { from, to } = useMemo(() => reminderWindow(today), [today]);
+  const { from, to } = useMemo(() => ledgerWindow(today), [today]);
   const rows = useMemo(
     () => ledgerRows(state, today, from, to).filter(isReminder),
     [state, today, from, to],

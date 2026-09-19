@@ -127,12 +127,19 @@ describe('what is on the page', () => {
     expect(within(rowFor('Moved across')).getByText('Rainy Day')).toBeInTheDocument();
   });
 
-  it('offers more history rather than loading a decade nobody asked for', async () => {
-    const user = userEvent.setup();
+  it('shows everything, however old, without being asked twice', () => {
+    // It used to load three months and offer a button for more, which made
+    // sense while the column ran oldest-first and you read down into the past.
+    // Newest-first, the far end is already the oldest thing there is.
+    state = {
+      ...state,
+      recurring: [],
+      transactions: [cleared('t-ancient', '2019-11-04', 'Very old thing')],
+    };
     show();
-    const earlier = screen.getByRole('button', { name: /earlier months/i });
-    await user.click(earlier);
-    expect(earlier).toBeInTheDocument();
+
+    expect(screen.getByText('Very old thing')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /earlier months/i })).not.toBeInTheDocument();
   });
 });
 

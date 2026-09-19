@@ -5,7 +5,7 @@ import { formatFullDate, formatMediumDate, monthKey, relativeDayLabel } from '@/
 import { downloadCsv } from '@/lib/csv';
 import { Register } from '@/components/Register';
 import { Reminders } from '@/components/Reminders';
-import { isReminder, ledgerRows, reminderWindow, type LedgerRow } from '@/lib/ledger';
+import { isReminder, ledgerRows, ledgerWindow, type LedgerRow } from '@/lib/ledger';
 import { money } from '@/lib/format';
 import { newId, useAppState, useCategories, useCategoryLookup, useLabelLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
@@ -159,7 +159,7 @@ export const Transactions = () => {
    * never be zero and would therefore never mean anything.
    */
   const dueCount = useMemo(() => {
-    const { from, to } = reminderWindow(today);
+    const { from, to } = ledgerWindow(today);
     return ledgerRows(state, today, from, to).filter((row) => isReminder(row) && row.date <= today).length;
   }, [state, today]);
 

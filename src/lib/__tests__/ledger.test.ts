@@ -254,12 +254,15 @@ describe('ordering', () => {
 
 describe('the window', () => {
   it('runs a year ahead of today', () => {
-    expect(ledgerWindow(TODAY, 1).to).toBe('2027-09-18');
+    expect(ledgerWindow(TODAY).to).toBe('2027-09-18');
   });
 
-  it('starts at the beginning of a month, so a month never opens part-way', () => {
-    expect(ledgerWindow(TODAY, 1).from).toBe('2026-08-01');
-    expect(ledgerWindow(TODAY, 6).from).toBe('2026-03-01');
+  it('does not stop going backwards', () => {
+    // The register runs newest-first, so the far end of the column is the
+    // oldest thing there is. Nothing below it to fetch, and nothing to hide.
+    const s = state({ transactions: [txn({ id: 'ancient', date: '2009-04-02' })] });
+    const { from, to } = ledgerWindow(TODAY);
+    expect(ledgerRows(s, TODAY, from, to).some((r) => r.id === 'ancient')).toBe(true);
   });
 
   it('keeps lines outside it out', () => {
