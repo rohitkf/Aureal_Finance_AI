@@ -47,6 +47,7 @@ export interface AccountRow {
   minimum_payment: number | null;
   aer: number | null;
   note: string | null;
+  group_id: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -98,6 +99,14 @@ export interface RecurringRow {
   notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AccountGroupRow {
+  id: string;
+  user_id: string;
+  name: string;
+  side: 'asset' | 'liability';
+  sort_order: number;
 }
 
 export interface LabelRow {

@@ -11,6 +11,7 @@ import {
 } from 'react';
 import type {
   Account,
+  AccountGroup,
   AppState,
   Budget,
   Category,
@@ -33,6 +34,7 @@ import {
   recurringToRow,
   toAccount,
   toBudget,
+  toAccountGroup,
   toCategory,
   toLabel,
   toGoal,
@@ -50,6 +52,7 @@ type Slice =
   | 'profile'
   | 'categories'
   | 'labels'
+  | 'accountGroups'
   | 'accounts'
   | 'virtualAccounts'
   | 'recurring'
@@ -63,6 +66,8 @@ export type Action =
   | { type: 'add-transaction'; transaction: Transaction }
   | { type: 'update-transaction'; transaction: Transaction }
   | { type: 'delete-transaction'; id: string }
+  | { type: 'upsert-account-group'; group: AccountGroup }
+  | { type: 'delete-account-group'; id: string }
   | { type: 'add-label'; label: Label }
   | { type: 'update-label'; label: Label }
   | { type: 'delete-label'; id: string }
@@ -225,6 +230,19 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             }),
         );
       }
+      if (wanted.has('accountGroups')) {
+        jobs.push(
+          supabase
+            .from('account_groups')
+            .select('*')
+            .order('sort_order')
+            .order('name')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.accountGroups = (data ?? []).map(toAccountGroup);
+            }),
+        );
+      }
       if (wanted.has('accounts')) {
         jobs.push(
           supabase
@@ -334,6 +352,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       'profile',
       'categories',
       'labels',
+      'accountGroups',
       'accounts',
       'virtualAccounts',
       'recurring',
@@ -556,6 +575,29 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                 : await supabase.from('transactions').delete().eq('id', action.id),
             );
             return ['transactions', 'accounts'];
+          });
+          break;
+
+        case 'upsert-account-group':
+          run('save that account group', async () => {
+            check(
+              await supabase.from('account_groups').upsert({
+                id: action.group.id,
+                name: action.group.name,
+                side: action.group.side,
+                sort_order: action.group.sortOrder,
+              }),
+            );
+            return ['accountGroups'];
+          });
+          break;
+
+        case 'delete-account-group':
+          run('delete that account group', async () => {
+            // The accounts stay exactly where they are, ungrouped. A group is
+            // a way of reading them, not a thing that owns them.
+            check(await supabase.from('account_groups').delete().eq('id', action.id));
+            return ['accountGroups', 'accounts'];
           });
           break;
 

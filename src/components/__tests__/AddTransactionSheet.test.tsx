@@ -49,7 +49,7 @@ const FALLBACK_CATEGORY: Category = {
 };
 
 vi.mock('@/lib/store', () => ({
-  useAppState: () => ({ accounts, categories: CATEGORIES }),
+  useAppState: () => ({ accounts, categories: CATEGORIES, accountGroups: [] }),
   useStore: () => ({ dispatch }),
   useLabels: () => [],
   useLabelLookup: () => () => undefined,

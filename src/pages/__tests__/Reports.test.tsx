@@ -63,6 +63,7 @@ beforeEach(() => {
     virtualAccounts: [],
     categories: CATEGORIES,
     labels: [],
+    accountGroups: [],
     transactions: [
       txn({ date: '2026-09-04', amount: 320 }),
       txn({ date: '2026-09-06', amount: 1200, type: 'income', categoryId: 'cat-pay' }),

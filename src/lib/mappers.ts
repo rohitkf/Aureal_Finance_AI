@@ -3,6 +3,7 @@ import type {
   AppState,
   Budget,
   Category,
+  AccountGroup,
   Goal,
   Label,
   NetWorthPoint,
@@ -16,6 +17,7 @@ import type {
   AccountRow,
   BudgetRow,
   CategoryRow,
+  AccountGroupRow,
   GoalRow,
   LabelRow,
   NetWorthRow,
@@ -50,6 +52,13 @@ const optionalNum = (value: number | string | null | undefined): number | undefi
 const shortTime = (value: string | null): string | undefined =>
   value ? value.slice(0, 5) : undefined;
 
+export const toAccountGroup = (row: AccountGroupRow): AccountGroup => ({
+  id: row.id,
+  name: row.name,
+  side: row.side,
+  sortOrder: row.sort_order,
+});
+
 export const toLabel = (row: LabelRow): Label => ({
   id: row.id,
   name: row.name,
@@ -80,6 +89,7 @@ export const toAccount = (row: AccountRow): Account => ({
   minimumPayment: optionalNum(row.minimum_payment),
   aer: optionalNum(row.aer),
   note: row.note ?? undefined,
+  groupId: row.group_id ?? undefined,
 });
 
 export const toVirtualAccount = (row: VirtualAccountRow): VirtualAccount => ({
@@ -251,6 +261,7 @@ export const accountToRow = (a: Omit<Account, 'id'>) => ({
   minimum_payment: a.minimumPayment ?? null,
   aer: a.aer ?? null,
   note: a.note ?? null,
+  group_id: a.groupId ?? null,
 });
 
 /** The shape every screen is written against. */
@@ -259,6 +270,7 @@ export const emptyAppState = (settings: Settings): AppState => ({
   virtualAccounts: [],
   categories: [],
   labels: [],
+  accountGroups: [],
   transactions: [],
   recurring: [],
   budgets: [],

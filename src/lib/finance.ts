@@ -1,5 +1,7 @@
 import type {
   Account,
+  AccountGroup,
+  BalanceSide,
   AppState,
   Budget,
   Forecast,
@@ -17,8 +19,33 @@ import { round2 } from './format';
 /* Balances                                                            */
 /* ------------------------------------------------------------------ */
 
-/** Anything that is not a credit facility, so it holds money rather than owing it. */
-export const isDepository = (a: Account): boolean => a.type !== 'credit';
+/**
+ * Whether the stored balance is something owed rather than something held.
+ *
+ * A credit card and a loan both work this way: spending increases the number,
+ * paying reduces it. This is about the account's *type* and nothing else —
+ * the group it is filed under decides which side of the balance sheet it is
+ * counted on, which is a different question with a different answer.
+ */
+export const owesMoney = (a: Pick<Account, 'type'>): boolean =>
+  a.type === 'credit' || a.type === 'liability';
+
+/** Anything that holds value rather than owing it. */
+export const isDepository = (a: Account): boolean => !owesMoney(a);
+
+/**
+ * Which side of the balance sheet an account is counted on.
+ *
+ * The group wins where there is one, because naming a group and saying what it
+ * is for is a more deliberate statement than picking a type from a list. With
+ * no group it falls back to the type, which is how every account behaved
+ * before groups existed.
+ */
+export const sideOf = (a: Pick<Account, 'type' | 'groupId'>, groups: AccountGroup[]): BalanceSide => {
+  const group = a.groupId ? groups.find((g) => g.id === a.groupId) : undefined;
+  if (group) return group.side;
+  return owesMoney(a) ? 'liability' : 'asset';
+};
 
 /**
  * Money that can be spent or moved today.
@@ -36,20 +63,46 @@ export const isSpendable = (a: Account): boolean =>
 export const availableNow = (accounts: Account[]): number =>
   round2(accounts.filter(isSpendable).reduce((sum, a) => sum + a.balance, 0));
 
-/** Everything held, spendable or not — investments included. */
-export const totalAssets = (accounts: Account[]): number =>
-  round2(accounts.filter(isDepository).reduce((sum, a) => sum + a.balance, 0));
+/**
+ * Everything held, spendable or not — investments and a house included.
+ *
+ * Takes the groups so a group marked `liability` moves its accounts to the
+ * other side. Called without them it behaves exactly as it always did, which
+ * is what every caller that has no groups to hand wants.
+ */
+export const totalAssets = (accounts: Account[], groups: AccountGroup[] = []): number =>
+  round2(
+    accounts
+      .filter((a) => sideOf(a, groups) === 'asset')
+      .reduce((sum, a) => sum + a.balance, 0),
+  );
 
-/** Everything owed on credit facilities (a positive number). */
-export const totalDebt = (accounts: Account[]): number =>
+/** Everything owed — cards, loans, and anything in a group marked liability. */
+export const totalDebt = (accounts: Account[], groups: AccountGroup[] = []): number =>
+  round2(
+    accounts
+      .filter((a) => sideOf(a, groups) === 'liability')
+      .reduce((sum, a) => sum + a.balance, 0),
+  );
+
+/** Owed on credit cards alone, which is not the same as owed altogether. */
+export const totalCardDebt = (accounts: Account[]): number =>
   round2(accounts.filter((a) => a.type === 'credit').reduce((sum, a) => sum + a.balance, 0));
 
 export const totalCreditLimit = (accounts: Account[]): number =>
   round2(accounts.filter((a) => a.type === 'credit').reduce((sum, a) => sum + (a.creditLimit ?? 0), 0));
 
+/**
+ * How much of the available credit is used, which is only ever about cards.
+ *
+ * Deliberately not `totalDebt`: that now includes loans and anything in a
+ * group marked liability, none of which has a credit limit. Dividing the
+ * mortgage by the card limit produces a number that means nothing and looks
+ * alarming.
+ */
 export const creditUtilisation = (accounts: Account[]): number => {
   const limit = totalCreditLimit(accounts);
-  return limit === 0 ? 0 : (totalDebt(accounts) / limit) * 100;
+  return limit === 0 ? 0 : (totalCardDebt(accounts) / limit) * 100;
 };
 
 export const accountUtilisation = (account: Account): number =>
@@ -58,8 +111,8 @@ export const accountUtilisation = (account: Account): number =>
 export const availableCredit = (account: Account): number =>
   round2((account.creditLimit ?? 0) - account.balance);
 
-export const netWorth = (accounts: Account[]): number =>
-  round2(totalAssets(accounts) - totalDebt(accounts));
+export const netWorth = (accounts: Account[], groups: AccountGroup[] = []): number =>
+  round2(totalAssets(accounts, groups) - totalDebt(accounts, groups));
 
 /* ------------------------------------------------------------------ */
 /* Transactions                                                        */

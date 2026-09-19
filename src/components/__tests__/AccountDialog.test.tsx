@@ -21,6 +21,7 @@ const toast = vi.fn();
 
 vi.mock('@/lib/store', () => ({
   useStore: () => ({ dispatch, today: '2026-09-18' }),
+  useAppState: () => ({ accountGroups: [] }),
   newId: () => 'generated-id',
 }));
 vi.mock('../ui/Toast', () => ({ useToast: () => toast }));

@@ -70,6 +70,7 @@ export type IconName =
   | 'sliders'
   | 'layers'
   | 'split'
+  | 'scale'
   | 'flag'
   | 'lightbulb'
   | 'user';
@@ -401,6 +402,16 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   // One line that becomes two: a payment going to more than one place.
+  // A balance: two pans on a beam. What a liability sits on the other side of.
+  scale: (
+    <>
+      <path d="M12 4v16M8 20h8" />
+      <path d="M5 8h14" />
+      <path d="M5 8l-2.5 6a2.5 2.5 0 0 0 5 0L5 8Z" />
+      <path d="M19 8l-2.5 6a2.5 2.5 0 0 0 5 0L19 8Z" />
+    </>
+  ),
+
   split: (
     <>
       <path d="M4 20V9a3 3 0 0 1 3-3h13" />

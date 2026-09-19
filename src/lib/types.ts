@@ -1,6 +1,34 @@
 /** Domain model for Aureal Finance AI. All money is stored in pounds as a number. */
 
-export type AccountType = 'current' | 'savings' | 'cash' | 'credit' | 'investment';
+export type AccountType =
+  | 'current'
+  | 'savings'
+  | 'cash'
+  | 'credit'
+  | 'investment'
+  /** Something you own that is not money: a house, a car, a painting. */
+  | 'asset'
+  /** Something you owe that is not a credit card: a loan, money owed to a person. */
+  | 'liability';
+
+/** Which side of the balance sheet something is counted on. */
+export type BalanceSide = 'asset' | 'liability';
+
+/**
+ * A group of accounts you named yourself.
+ *
+ * The group decides which side of the balance sheet its accounts count on.
+ * The account's *type* still decides which way spending moves its balance,
+ * which is a different question: putting a current account in a group called
+ * "Money I owe my brother" should change what it counts as, not invert every
+ * transaction against it.
+ */
+export interface AccountGroup {
+  id: string;
+  name: string;
+  side: BalanceSide;
+  sortOrder: number;
+}
 
 export type SyncStatus = 'live' | 'manual' | 'error' | 'reconnect';
 
@@ -24,6 +52,8 @@ export interface Account {
   aer?: number;
   colorKey?: 'primary' | 'success' | 'secondary' | 'warning';
   note?: string;
+  /** The group it is shown under and counted in. Absent means by its type. */
+  groupId?: string;
 }
 
 /**
@@ -245,6 +275,7 @@ export interface AppState {
   virtualAccounts: VirtualAccount[];
   categories: Category[];
   labels: Label[];
+  accountGroups: AccountGroup[];
   transactions: Transaction[];
   recurring: RecurringPayment[];
   budgets: Budget[];

@@ -30,7 +30,7 @@ const CATEGORIES: Category[] = [
 const today = '2026-09-18';
 
 vi.mock('@/lib/store', () => ({
-  useAppState: () => ({ accounts: ACCOUNTS, categories: CATEGORIES }),
+  useAppState: () => ({ accounts: ACCOUNTS, categories: CATEGORIES, accountGroups: [] }),
   useStore: () => ({ dispatch }),
   useLabels: () => [],
   useLabelLookup: () => () => undefined,

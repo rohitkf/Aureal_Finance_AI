@@ -27,7 +27,7 @@ const CATEGORIES: Category[] = [
 ];
 
 vi.mock('@/lib/store', () => ({
-  useAppState: () => ({ accounts: ACCOUNTS, categories: CATEGORIES }),
+  useAppState: () => ({ accounts: ACCOUNTS, categories: CATEGORIES, accountGroups: [] }),
   useStore: () => ({ dispatch }),
   useLabels: () => [],
   useLabelLookup: () => () => undefined,
