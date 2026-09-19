@@ -528,10 +528,19 @@ export const Transactions = () => {
             recurringId: skipping.recurringId,
             occurrenceDate: skipping.recurringDate,
           });
+          // Skipping is one click on the row, and the row it was on
+          // disappears — so if it was the wrong row, there is nothing left to
+          // click to find out. The way back has to come to you.
+          const { recurringId, recurringDate } = skipping;
           toast({
             tone: 'info',
             title: 'Payment skipped',
             description: `${skipping.name} on ${formatMediumDate(skipping.date)}. The schedule carries on.`,
+            action: {
+              label: 'Undo',
+              onClick: () =>
+                dispatch({ type: 'unskip-occurrence', recurringId, occurrenceDate: recurringDate }),
+            },
           });
           setSkipping(null);
         }}

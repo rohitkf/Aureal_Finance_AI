@@ -97,3 +97,71 @@ describe('editing an existing account', () => {
     expect(screen.queryByLabelText('Balance today')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Editing and deleting an account.
+ *
+ * This dialog has always taken an `editing` account, always filled its fields
+ * from one, and always titled itself "Edit account" — and nothing in the app
+ * ever passed one. An account could be created and then never corrected or
+ * removed: a typo in the name was permanent, and so was an account opened by
+ * mistake.
+ */
+describe('an account opened for editing', () => {
+  const EXISTING = {
+    id: 'acc-1',
+    name: 'Current',
+    type: 'current' as const,
+    institution: 'Monzo',
+    balance: 1200,
+    maskedNumber: '••1234',
+    syncStatus: 'manual' as const,
+  };
+
+  const openEditing = (props: Record<string, unknown> = {}) =>
+    render(<AccountDialog open onClose={vi.fn()} editing={EXISTING} {...props} />);
+
+  it('fills its fields from the account, so a name can be corrected', async () => {
+    const user = userEvent.setup();
+    openEditing();
+
+    expect(screen.getByLabelText('Account name')).toHaveValue('Current');
+    await user.clear(screen.getByLabelText('Account name'));
+    await user.type(screen.getByLabelText('Account name'), 'Everyday');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(sent()[0]).toMatchObject({
+      type: 'upsert-account',
+      account: { id: 'acc-1', name: 'Everyday' },
+    });
+  });
+
+  it('keeps the account id, so editing changes one rather than making another', async () => {
+    const user = userEvent.setup();
+    openEditing();
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(sent()[0].account.id).toBe('acc-1');
+    // And no opening balance: the ledger already holds this account's history,
+    // and sending one again would count it twice.
+    expect(sent()[0].openingBalance).toBeUndefined();
+  });
+
+  it('offers a delete, and leaves the confirming to the page', async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    openEditing({ onDelete });
+
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    // What goes with an account needs spelling out, and this dialog is not
+    // where that is said.
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('offers nothing to delete when the account is new', () => {
+    render(<AccountDialog open onClose={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument();
+  });
+});

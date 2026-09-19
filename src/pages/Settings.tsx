@@ -32,11 +32,13 @@ import { useDevMode } from '@/lib/devMode';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { money } from '@/lib/format';
-import { useAppState, useCategories, useStore } from '@/lib/store';
+import { useAppState, useCategories, useLabels, useStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/hooks/useTheme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { NewCategoryDialog } from '@/components/NewCategoryDialog';
+import { LabelDialog } from '@/components/LabelDialog';
+import { LabelChip } from '@/components/LabelPicker';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
@@ -45,7 +47,7 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { ConfirmDialog } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
-import type { Category } from '@/lib/types';
+import type { Category, Label as LabelType } from '@/lib/types';
 
 const THEMES: Array<{ value: 'light' | 'dark' | 'system'; label: string; icon: IconName }> = [
   { value: 'light', label: 'Light', icon: 'sun' },
@@ -66,6 +68,7 @@ export const Settings = () => {
   const { user, signOut } = useAuth();
   const { preference, setTheme } = useTheme();
   const categories = useCategories();
+  const labels = useLabels();
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -78,6 +81,8 @@ export const Settings = () => {
     editing: null,
   });
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const [editingLabel, setEditingLabel] = useState<LabelType | null>(null);
+  const [deletingLabel, setDeletingLabel] = useState<LabelType | null>(null);
   const [busy, setBusy] = useState<'sample' | 'clear' | 'backup' | null>(null);
 
   const grouped = useMemo(
@@ -283,6 +288,49 @@ export const Settings = () => {
               </div>
             ),
           )
+        )}
+      </Card>
+
+      {/* ---------------- Labels ---------------- */}
+      <Card className="space-y-6" id="labels">
+        <CardHeader
+          title="Labels"
+          description="The tags you put across categories — a holiday, a project, a person. Made while recording a transaction; renamed and recoloured here."
+        />
+
+        {labels.length === 0 ? (
+          <EmptyState
+            icon="bag"
+            title="No labels yet"
+            description="Type one into the Labels box while recording a transaction and it is made on the spot. It will appear here afterwards."
+          />
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {labels.map((label) => {
+              const used = state.transactions.filter((t) => t.labelIds?.includes(label.id)).length;
+              return (
+                <li key={label.id} className="well flex items-center gap-3 p-3">
+                  <LabelChip label={label} />
+                  <span className="min-w-0 flex-1" />
+                  {used > 0 && <span className="shrink-0 text-[11px] text-faint">{used}</span>}
+                  <IconButton
+                    icon="edit"
+                    label={`Edit ${label.name}`}
+                    size={14}
+                    className="h-8 w-8"
+                    onClick={() => setEditingLabel(label)}
+                  />
+                  <IconButton
+                    icon="trash"
+                    label={`Remove ${label.name}`}
+                    size={14}
+                    className="h-8 w-8"
+                    onClick={() => setDeletingLabel(label)}
+                  />
+                </li>
+              );
+            })}
+          </ul>
         )}
       </Card>
 
@@ -622,6 +670,30 @@ export const Settings = () => {
         open={categoryDialog.open}
         editing={categoryDialog.editing}
         onClose={() => setCategoryDialog({ open: false, editing: null })}
+      />
+
+      <LabelDialog
+        open={Boolean(editingLabel)}
+        onClose={() => setEditingLabel(null)}
+        editing={editingLabel}
+        onDelete={() => setDeletingLabel(editingLabel)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deletingLabel)}
+        onClose={() => setDeletingLabel(null)}
+        onConfirm={() => {
+          if (!deletingLabel) return;
+          dispatch({ type: 'delete-label', id: deletingLabel.id });
+          toast({ tone: 'info', title: 'Label removed', description: deletingLabel.name });
+          setDeletingLabel(null);
+          setEditingLabel(null);
+        }}
+        title="Remove this label?"
+        subject={deletingLabel ? <LabelChip label={deletingLabel} /> : ''}
+        consequence="It comes off every transaction carrying it, and searching for it finds nothing."
+        preserved="Worth saying plainly: removing a label does not remove any transaction, and no money moves. A label is only a name you put on things."
+        confirmLabel="Remove label"
       />
 
       <ConfirmDialog

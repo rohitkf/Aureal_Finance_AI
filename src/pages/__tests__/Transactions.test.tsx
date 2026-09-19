@@ -382,3 +382,50 @@ describe('deleting a transaction', () => {
     expect(screen.getByRole('dialog', { name: /edit transaction/i })).toBeInTheDocument();
   });
 });
+
+/**
+ * Putting a skipped payment back.
+ *
+ * The × on a recurring row skips that one occurrence, and the row then
+ * vanishes — so a mis-click leaves nothing on screen to correct. The store has
+ * had `unskip-occurrence` since the day it had `skip-occurrence`; nothing ever
+ * sent it.
+ */
+describe('undoing a skip', () => {
+  const RECURRING: Transaction = {
+    id: 'txn-3',
+    date: '2026-09-25',
+    merchant: 'Gym',
+    amount: 40,
+    type: 'expense',
+    accountId: 'acc-1',
+    categoryId: 'cat-food',
+    status: 'scheduled',
+    recurringId: 'rec-1',
+  };
+
+  it('offers the way back on the toast, and takes it', async () => {
+    const user = userEvent.setup();
+    state.transactions = [...TXNS, RECURRING];
+    render();
+
+    await user.click(screen.getByRole('radio', { name: /^Reminders/ }));
+    await user.click(screen.getByRole('button', { name: /skip gym/i }));
+    await user.click(screen.getByRole('button', { name: /skip it/i }));
+
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'skip-occurrence', recurringId: 'rec-1' }),
+    );
+
+    // The toast is the only thing left that knows which one it was.
+    const raised = toast.mock.calls.at(-1)?.[0];
+    expect(raised.action?.label).toBe('Undo');
+
+    raised.action.onClick();
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'unskip-occurrence',
+      recurringId: 'rec-1',
+      occurrenceDate: '2026-09-25',
+    });
+  });
+});
