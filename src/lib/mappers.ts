@@ -3,7 +3,9 @@ import type {
   AppState,
   Budget,
   Category,
+  AccountGroup,
   Goal,
+  Label,
   NetWorthPoint,
   RecurringPayment,
   RecurringSkip,
@@ -15,7 +17,9 @@ import type {
   AccountRow,
   BudgetRow,
   CategoryRow,
+  AccountGroupRow,
   GoalRow,
+  LabelRow,
   NetWorthRow,
   RecurringSkipRow,
   ProfileRow,
@@ -48,6 +52,19 @@ const optionalNum = (value: number | string | null | undefined): number | undefi
 const shortTime = (value: string | null): string | undefined =>
   value ? value.slice(0, 5) : undefined;
 
+export const toAccountGroup = (row: AccountGroupRow): AccountGroup => ({
+  id: row.id,
+  name: row.name,
+  side: row.side,
+  sortOrder: row.sort_order,
+});
+
+export const toLabel = (row: LabelRow): Label => ({
+  id: row.id,
+  name: row.name,
+  accent: row.accent,
+});
+
 export const toCategory = (row: CategoryRow): Category => ({
   id: row.id,
   name: row.name,
@@ -72,6 +89,7 @@ export const toAccount = (row: AccountRow): Account => ({
   minimumPayment: optionalNum(row.minimum_payment),
   aer: optionalNum(row.aer),
   note: row.note ?? undefined,
+  groupId: row.group_id ?? undefined,
 });
 
 export const toVirtualAccount = (row: VirtualAccountRow): VirtualAccount => ({
@@ -97,7 +115,8 @@ export const toRecurring = (row: RecurringRow): RecurringPayment => ({
   frequency: row.frequency,
   customIntervalDays: row.custom_interval_days ?? undefined,
   anchorDay: row.anchor_day,
-  adjustToWorkingDay: row.adjust_to_working_day ?? false,
+  interval: row.interval ?? 1,
+  weekendMode: row.weekend_mode ?? 'none',
   startDate: row.start_date,
   endDate: row.end_date ?? undefined,
   occurrences: row.occurrences ?? undefined,
@@ -120,10 +139,18 @@ export const toTransaction = (row: TransactionRow): Transaction => ({
   notes: row.notes ?? undefined,
   recurringId: row.recurring_id ?? undefined,
   recurringDate: row.recurring_date ?? undefined,
+  splitGroupId: row.split_group_id ?? undefined,
   receiptName: row.receipt_name ?? undefined,
   taxDeductible: row.tax_deductible,
+  labelIds: row.transaction_labels?.length
+    ? row.transaction_labels.map((l) => l.label_id)
+    : undefined,
   splits: row.transaction_splits?.length
-    ? row.transaction_splits.map((s) => ({ categoryId: s.category_id ?? '', amount: num(s.amount) }))
+    ? row.transaction_splits.map((s) => ({
+        categoryId: s.category_id ?? '',
+        amount: num(s.amount),
+        note: s.note ?? undefined,
+      }))
     : undefined,
 });
 
@@ -183,6 +210,7 @@ export const transactionToRow = (t: Omit<Transaction, 'id'>) => ({
   recurring_id: t.recurringId ?? null,
   // Only meaningful alongside a rule, and the database says so too.
   recurring_date: t.recurringId ? (t.recurringDate ?? null) : null,
+  split_group_id: t.splitGroupId ?? null,
   receipt_name: t.receiptName ?? null,
   tax_deductible: t.taxDeductible ?? false,
 });
@@ -199,7 +227,8 @@ export const recurringToRow = (r: Omit<RecurringPayment, 'id'>) => ({
   frequency: r.frequency,
   custom_interval_days: r.customIntervalDays ?? null,
   anchor_day: r.anchorDay,
-  adjust_to_working_day: r.adjustToWorkingDay ?? false,
+  interval: r.interval ?? 1,
+  weekend_mode: r.weekendMode ?? 'none',
   start_date: r.startDate,
   end_date: r.endDate ?? null,
   occurrences: r.occurrences ?? null,
@@ -232,6 +261,7 @@ export const accountToRow = (a: Omit<Account, 'id'>) => ({
   minimum_payment: a.minimumPayment ?? null,
   aer: a.aer ?? null,
   note: a.note ?? null,
+  group_id: a.groupId ?? null,
 });
 
 /** The shape every screen is written against. */
@@ -239,6 +269,8 @@ export const emptyAppState = (settings: Settings): AppState => ({
   accounts: [],
   virtualAccounts: [],
   categories: [],
+  labels: [],
+  accountGroups: [],
   transactions: [],
   recurring: [],
   budgets: [],

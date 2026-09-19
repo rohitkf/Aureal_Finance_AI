@@ -47,6 +47,7 @@ export interface AccountRow {
   minimum_payment: number | null;
   aer: number | null;
   note: string | null;
+  group_id: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -88,7 +89,8 @@ export interface RecurringRow {
     | 'custom';
   custom_interval_days: number | null;
   anchor_day: number;
-  adjust_to_working_day: boolean;
+  interval: number;
+  weekend_mode: 'none' | 'previous' | 'next' | 'nearest' | 'skip';
   start_date: string;
   end_date: string | null;
   occurrences: number | null;
@@ -99,11 +101,32 @@ export interface RecurringRow {
   updated_at: string;
 }
 
+export interface AccountGroupRow {
+  id: string;
+  user_id: string;
+  name: string;
+  side: 'asset' | 'liability';
+  sort_order: number;
+}
+
+export interface LabelRow {
+  id: string;
+  user_id: string;
+  name: string;
+  accent: 'primary' | 'success' | 'secondary' | 'warning' | 'danger' | 'neutral';
+}
+
+export interface TransactionLabelRow {
+  transaction_id: string;
+  label_id: string;
+}
+
 export interface TransactionSplitRow {
   id: string;
   transaction_id: string;
   category_id: string | null;
   amount: number;
+  note: string | null;
 }
 
 export interface TransactionRow {
@@ -117,7 +140,7 @@ export interface TransactionRow {
   merchant: string;
   amount: number;
   type: 'expense' | 'income' | 'transfer';
-  status: 'cleared' | 'pending' | 'scheduled';
+  status: 'scheduled' | 'none' | 'cleared' | 'reconciled' | 'void';
   notes: string | null;
   recurring_id: string | null;
   recurring_date: string | null;
@@ -125,7 +148,9 @@ export interface TransactionRow {
   tax_deductible: boolean;
   created_at: string;
   updated_at: string;
+  split_group_id: string | null;
   transaction_splits?: TransactionSplitRow[] | null;
+  transaction_labels?: TransactionLabelRow[] | null;
 }
 
 export interface BudgetRow {

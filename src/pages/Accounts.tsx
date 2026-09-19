@@ -13,7 +13,7 @@ import {
   totalDebt,
 } from '@/lib/finance';
 import { formatMediumDate } from '@/lib/date';
-import { money, percent } from '@/lib/format';
+import { money, percent, round2 } from '@/lib/format';
 import { useAppState, useLoading, useSettings, useToday } from '@/lib/store';
 import { Badge, StatusDot } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
@@ -22,12 +22,13 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { Progress, SegmentedBar } from '@/components/ui/Progress';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
 import { AccountDialog } from '@/components/AccountDialog';
+import { AccountGroupDialog } from '@/components/AccountGroupDialog';
 import { VirtualAccountDialog } from '@/components/VirtualAccountDialog';
 import { ConfirmDialog } from '@/components/ui/Modal';
 import { IconButton } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { useStore } from '@/lib/store';
-import type { Account, VirtualAccount } from '@/lib/types';
+import type { Account, AccountGroup, BalanceSide, VirtualAccount } from '@/lib/types';
 
 const TYPE_ICON: Record<Account['type'], IconName> = {
   current: 'bank',
@@ -35,7 +36,23 @@ const TYPE_ICON: Record<Account['type'], IconName> = {
   cash: 'wallet',
   credit: 'card',
   investment: 'trending-up',
+  asset: 'home',
+  liability: 'scale',
 };
+
+/** What each type is called when it is the heading of its own section. */
+const TYPE_SECTION: Record<Account['type'], string> = {
+  current: 'Current accounts',
+  savings: 'Savings',
+  cash: 'Cash',
+  credit: 'Credit cards',
+  investment: 'Investments',
+  asset: 'Assets',
+  liability: 'Owed',
+};
+
+/** The order sections appear in when they come from types rather than groups. */
+const TYPE_ORDER: Account['type'][] = ['current', 'savings', 'cash', 'investment', 'asset'];
 
 // Until bank connections exist every account is maintained by hand, and the
 // interface says so rather than implying a live feed.
@@ -60,6 +77,8 @@ export const Accounts = () => {
     editing: null,
   });
   const [deletingAllocation, setDeletingAllocation] = useState<VirtualAccount | null>(null);
+  const [editingGroup, setEditingGroup] = useState<AccountGroup | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<AccountGroup | null>(null);
 
   useEffect(() => {
     if (params.get('new') !== null) {
@@ -69,13 +88,79 @@ export const Accounts = () => {
     }
   }, [params, setParams]);
 
+  /**
+   * The page, in sections.
+   *
+   * A group you named comes first and keeps its own accounts whatever type
+   * they are — that is the whole point of naming it. What is left falls back
+   * to the arrangement this screen always had, one section per type, so
+   * somebody who has never made a group sees exactly what they saw before.
+   */
+  const sections = useMemo(() => {
+    const grouped = new Set<string>();
+    const out: Array<{
+      key: string;
+      title: string;
+      side: BalanceSide;
+      group?: AccountGroup;
+      accounts: Account[];
+      subtotal: number;
+    }> = [];
+
+    for (const group of state.accountGroups) {
+      const accounts = state.accounts.filter((a) => a.groupId === group.id);
+      accounts.forEach((a) => grouped.add(a.id));
+      if (accounts.length === 0) continue;
+      out.push({
+        key: group.id,
+        title: group.name,
+        side: group.side,
+        group,
+        accounts,
+        subtotal: round2(accounts.reduce((sum, a) => sum + a.balance, 0)),
+      });
+    }
+
+    for (const type of TYPE_ORDER) {
+      const accounts = state.accounts.filter((a) => a.type === type && !grouped.has(a.id));
+      if (accounts.length === 0) continue;
+      out.push({
+        key: `type-${type}`,
+        title: TYPE_SECTION[type],
+        side: 'asset',
+        accounts,
+        subtotal: round2(accounts.reduce((sum, a) => sum + a.balance, 0)),
+      });
+    }
+
+    // Loans that are not in a group of their own still have to appear.
+    const loans = state.accounts.filter((a) => a.type === 'liability' && !grouped.has(a.id));
+    if (loans.length > 0) {
+      out.push({
+        key: 'type-liability',
+        title: TYPE_SECTION.liability,
+        side: 'liability',
+        accounts: loans,
+        subtotal: round2(loans.reduce((sum, a) => sum + a.balance, 0)),
+      });
+    }
+
+    return out;
+  }, [state.accounts, state.accountGroups]);
+
+  /** Credit cards keep their own section, unless they have been given a group. */
+  const groupedIds = useMemo(
+    () => new Set(sections.filter((s) => s.group).flatMap((s) => s.accounts.map((a) => a.id))),
+    [sections],
+  );
+
   const depository = state.accounts.filter(isDepository);
   // The headline is spendable cash, so its count must be of the same accounts.
   // An investment sits in the list below but is not money you can spend today.
   const spendable = state.accounts.filter(isSpendable);
-  const credit = state.accounts.filter((a) => a.type === 'credit');
+  const credit = state.accounts.filter((a) => a.type === 'credit' && !groupedIds.has(a.id));
   const liquid = availableNow(state.accounts);
-  const debt = totalDebt(state.accounts);
+  const debt = totalDebt(state.accounts, state.accountGroups);
 
   const allocated = useMemo(
     () => state.virtualAccounts.reduce((s, v) => s + v.allocated, 0),
@@ -188,8 +273,51 @@ export const Accounts = () => {
             />
           </Card>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {depository.map((account) => (
+          <div className="space-y-6">
+            {sections.map((section) => (
+              <div key={section.key} className="space-y-3">
+                {/* A heading per section, with what is in it. The subtotal is
+                    the question a grouped list is being asked. */}
+                <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                  <div className="flex items-center gap-2.5">
+                    <h3 className="text-label-md text-muted">{section.title}</h3>
+                    {section.group && (
+                      <Badge tone={section.side === 'asset' ? 'success' : 'danger'}>
+                        {section.side === 'asset' ? 'Asset' : 'Liability'}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span
+                      className={cn(
+                        'tnum text-label-md',
+                        section.side === 'liability' ? 'text-danger' : 'text-muted',
+                      )}
+                    >
+                      {section.side === 'liability' && '−'}
+                      {money(section.subtotal, { masked: maskBalances })}
+                    </span>
+                    {section.group && (
+                      <>
+                        <IconButton
+                          icon="edit"
+                          label={`Edit the ${section.group.name} group`}
+                          size={14}
+                          onClick={() => setEditingGroup(section.group!)}
+                        />
+                        <IconButton
+                          icon="trash"
+                          label={`Delete the ${section.group.name} group`}
+                          size={14}
+                          onClick={() => setDeletingGroup(section.group!)}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {section.accounts.map((account) => (
               <Link
                 key={account.id}
                 to={`/accounts/${account.id}`}
@@ -224,6 +352,9 @@ export const Accounts = () => {
                   {account.note && <p className="mt-1 truncate text-label-sm text-muted">{account.note}</p>}
                 </div>
               </Link>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -413,6 +544,26 @@ export const Accounts = () => {
       </Card>
 
       <AccountDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
+
+      <AccountGroupDialog
+        open={editingGroup !== null}
+        onClose={() => setEditingGroup(null)}
+        editing={editingGroup}
+      />
+
+      <ConfirmDialog
+        open={deletingGroup !== null}
+        onClose={() => setDeletingGroup(null)}
+        title="Delete this group?"
+        subject={deletingGroup?.name ?? ''}
+        consequence="The grouping goes, and nothing else."
+        preserved="The accounts in it stay exactly as they are, with their balances and their history, and go back to being grouped by their type."
+        confirmLabel="Delete group"
+        onConfirm={() => {
+          if (deletingGroup) dispatch({ type: 'delete-account-group', id: deletingGroup.id });
+          setDeletingGroup(null);
+        }}
+      />
 
       <VirtualAccountDialog
         open={allocationDialog.open}

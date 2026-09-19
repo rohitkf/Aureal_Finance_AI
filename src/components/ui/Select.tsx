@@ -41,24 +41,36 @@ interface SelectProps {
   className?: string;
   /** Shown when the value matches no option. */
   placeholder?: string;
+  /**
+   * One more thing the list can do, pinned under the options.
+   *
+   * Making a category or an account is something you discover you need while
+   * choosing one, and a dropdown that can only offer what already exists sends
+   * you to another screen and loses everything typed so far. Choosing it closes
+   * the list and calls back; the caller opens whatever dialog it wants and
+   * selects the result.
+   */
+  action?: { label: string; onSelect: () => void };
 }
 
 interface Opt {
   value: string;
   label: string;
+  /** A second, quieter column — a balance, a count. Never the thing chosen. */
+  hint?: string;
 }
 
-/** Reads `<option value="x">Label</option>` children into a flat list. */
+/** Reads `<option value="x" data-hint="…">Label</option>` children into a flat list. */
 const readOptions = (children: ReactNode): Opt[] =>
   Children.toArray(children).flatMap((child) => {
     if (!isValidElement(child)) return [];
-    const props = child.props as { value?: string | number; children?: ReactNode };
+    const props = child.props as { value?: string | number; children?: ReactNode; 'data-hint'?: string };
     if (props.value === undefined) return [];
     const label = Children.toArray(props.children)
       .map((c) => (typeof c === 'string' || typeof c === 'number' ? String(c) : ''))
       .join('')
       .trim();
-    return [{ value: String(props.value), label: label || String(props.value) }];
+    return [{ value: String(props.value), label: label || String(props.value), hint: props['data-hint'] }];
   });
 
 export const Select = ({
@@ -71,6 +83,7 @@ export const Select = ({
   disabled,
   className,
   placeholder = 'Select…',
+  action,
 }: SelectProps) => {
   const options = useMemo(() => readOptions(children), [children]);
   const listId = useId();
@@ -105,13 +118,23 @@ export const Select = ({
     if (refocus) triggerRef.current?.focus();
   }, []);
 
+  /** The action sits one past the last option, so one index space covers both. */
+  const actionIndex = action ? options.length : -1;
+
   const commit = useCallback(
     (index: number) => {
+      if (action && index === options.length) {
+        // No refocus: the caller is about to open a dialog and take the focus
+        // itself, and pulling it back to the trigger first is a visible flinch.
+        close(false);
+        action.onSelect();
+        return;
+      }
       const option = options[index];
       if (option) onChange(option.value);
       close();
     },
-    [options, onChange, close],
+    [options, onChange, close, action],
   );
 
   // Clicking anywhere else closes it, without stealing focus back.
@@ -161,7 +184,7 @@ export const Select = ({
         return;
       case 'ArrowDown':
         e.preventDefault();
-        setActive((i) => Math.min(options.length - 1, i + 1));
+        setActive((i) => Math.min(options.length - (action ? 0 : 1), i + 1));
         return;
       case 'ArrowUp':
         e.preventDefault();
@@ -173,7 +196,7 @@ export const Select = ({
         return;
       case 'End':
         e.preventDefault();
-        setActive(options.length - 1);
+        setActive(options.length - (action ? 0 : 1));
         return;
       default:
         break;
@@ -278,10 +301,46 @@ export const Select = ({
                 )}
               >
                 <span className="truncate">{option.label}</span>
-                {isSelected && <Icon name="check" size={15} className="shrink-0" />}
+                <span className="flex shrink-0 items-center gap-2">
+                  {option.hint && <span className="tnum text-label-sm text-faint">{option.hint}</span>}
+                  {isSelected && <Icon name="check" size={15} />}
+                </span>
               </li>
             );
           })}
+
+          {action && (
+            <li
+              id={`${listId}-${actionIndex}`}
+              role="option"
+              aria-selected={false}
+              data-index={actionIndex}
+              onPointerDown={(e) => {
+                fromKeyboard.current = false;
+                if (e.pointerType !== 'mouse') return;
+                e.preventDefault();
+                commit(actionIndex);
+              }}
+              onClick={(e) => {
+                if (e.nativeEvent.detail === 0) return;
+                commit(actionIndex);
+              }}
+              onPointerEnter={(e) => {
+                if (e.pointerType !== 'mouse') return;
+                fromKeyboard.current = false;
+                setActive(actionIndex);
+              }}
+              className={cn(
+                'mt-1 flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-[13.5px] text-primary',
+                'shadow-[inset_0_1px_0_0_rgb(var(--hairline)/var(--hairline-alpha))]',
+                'transition-colors duration-200 ease-fluid',
+                active === actionIndex && 'bg-[rgb(var(--hairline)/0.08)]',
+              )}
+            >
+              <Icon name="plus" size={14} className="shrink-0" />
+              <span className="truncate">{action.label}</span>
+            </li>
+          )}
         </ul>
       )}
     </div>

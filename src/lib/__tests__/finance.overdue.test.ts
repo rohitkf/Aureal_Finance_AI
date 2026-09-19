@@ -72,7 +72,7 @@ describe('isOverdue', () => {
 
   it('is false once it has cleared, however long ago', () => {
     expect(isOverdue(txn({ date: '2026-09-10', status: 'cleared' }), TODAY)).toBe(false);
-    expect(isOverdue(txn({ date: '2026-09-10', status: 'pending' }), TODAY)).toBe(false);
+    expect(isOverdue(txn({ date: '2026-09-10', status: 'none' }), TODAY)).toBe(false);
   });
 });
 

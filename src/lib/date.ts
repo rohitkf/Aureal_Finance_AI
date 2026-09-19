@@ -74,6 +74,30 @@ export const previousWorkingDay = (iso: string): string => {
 };
 
 /**
+ * The given day, or the next working day after it.
+ *
+ * The other half of the pair. A direct debit is usually taken the Monday after
+ * a weekend rather than the Friday before, which is the opposite of how a
+ * salary behaves — hence both, and a choice.
+ */
+export const nextWorkingDay = (iso: string): string => {
+  if (!isValidISO(iso)) return iso;
+  let out = iso;
+  while (!isWorkingDay(out)) out = addDays(out, 1);
+  return out;
+};
+
+/**
+ * The nearer working day: Saturday goes back to Friday, Sunday forward to
+ * Monday. Never more than one day either way, which is what "nearest" means
+ * to anybody who says it.
+ */
+export const nearestWorkingDay = (iso: string): string => {
+  if (!isValidISO(iso) || isWorkingDay(iso)) return iso;
+  return parseISO(iso).getDay() === 6 ? addDays(iso, -1) : addDays(iso, 1);
+};
+
+/**
  * When a salary paid "at the end of the month" actually lands.
  *
  * September 2026 ends on Wednesday the 30th, so that is the answer. If it
@@ -146,3 +170,24 @@ export const greeting = (date = new Date()): string => {
   if (h < 18) return 'Good afternoon';
   return 'Good evening';
 };
+
+/**
+ * Times, as `HH:MM` strings.
+ *
+ * The same bargain the dates above make: a string the whole app agrees on,
+ * never a `Date`, so nothing drifts across a timezone on the way to storage.
+ */
+
+/** `14:32` → `2:32 pm`, which is how the time is read aloud in en-GB. */
+export const formatTime = (value: string): string => {
+  const [h, m] = value.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return '\u2014';
+  const hour = h! % 12 === 0 ? 12 : h! % 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${h! < 12 ? 'am' : 'pm'}`;
+};
+
+/** Whether a string is a 24-hour `HH:MM` this app can store. */
+export const isValidTime = (value: string): boolean => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+
+/** Now, as `HH:MM`. */
+export const nowTime = (): string => new Date().toTimeString().slice(0, 5);

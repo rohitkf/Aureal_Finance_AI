@@ -1,6 +1,34 @@
 /** Domain model for Aureal Finance AI. All money is stored in pounds as a number. */
 
-export type AccountType = 'current' | 'savings' | 'cash' | 'credit' | 'investment';
+export type AccountType =
+  | 'current'
+  | 'savings'
+  | 'cash'
+  | 'credit'
+  | 'investment'
+  /** Something you own that is not money: a house, a car, a painting. */
+  | 'asset'
+  /** Something you owe that is not a credit card: a loan, money owed to a person. */
+  | 'liability';
+
+/** Which side of the balance sheet something is counted on. */
+export type BalanceSide = 'asset' | 'liability';
+
+/**
+ * A group of accounts you named yourself.
+ *
+ * The group decides which side of the balance sheet its accounts count on.
+ * The account's *type* still decides which way spending moves its balance,
+ * which is a different question: putting a current account in a group called
+ * "Money I owe my brother" should change what it counts as, not invert every
+ * transaction against it.
+ */
+export interface AccountGroup {
+  id: string;
+  name: string;
+  side: BalanceSide;
+  sortOrder: number;
+}
 
 export type SyncStatus = 'live' | 'manual' | 'error' | 'reconnect';
 
@@ -24,6 +52,8 @@ export interface Account {
   aer?: number;
   colorKey?: 'primary' | 'success' | 'secondary' | 'warning';
   note?: string;
+  /** The group it is shown under and counted in. Absent means by its type. */
+  groupId?: string;
 }
 
 /**
@@ -42,6 +72,20 @@ export interface VirtualAccount {
   locked?: boolean;
 }
 
+/**
+ * A tag that cuts across categories.
+ *
+ * A category answers "what kind of spending is this" and there is exactly one.
+ * A label answers anything else you might want to ask later — which holiday,
+ * which flat, which client — and a transaction can carry several. A category
+ * hierarchy deep enough to hold "Portugal 2027" has stopped being categories.
+ */
+export interface Label {
+  id: string;
+  name: string;
+  accent: 'primary' | 'success' | 'secondary' | 'warning' | 'danger' | 'neutral';
+}
+
 export type CategoryKind = 'expense' | 'income' | 'transfer';
 
 export interface Category {
@@ -54,11 +98,28 @@ export interface Category {
 }
 
 export type TransactionType = 'expense' | 'income' | 'transfer';
-export type TransactionStatus = 'cleared' | 'pending' | 'scheduled';
+/**
+ * Where a transaction stands.
+ *
+ * `scheduled` is the odd one out and deliberately so: it is the only value
+ * that means the thing has not happened. The other four all describe
+ * something that did, and differ only in how sure you are of it — which is
+ * the whole of reconciling an account against a statement.
+ */
+export type TransactionStatus = 'scheduled' | 'none' | 'cleared' | 'reconciled' | 'void';
 
+/**
+ * One part of a payment filed under its own heading.
+ *
+ * The parts must total the payment — the database enforces it with a deferred
+ * trigger, deferred because a split is written as several rows and is only
+ * coherent once they are all in.
+ */
 export interface TransactionSplit {
   categoryId: string;
   amount: number;
+  /** "£14 of it" is rarely self-explanatory a month later. */
+  note?: string;
 }
 
 export interface Transaction {
@@ -88,6 +149,17 @@ export interface Transaction {
    */
   recurringDate?: string;
   splits?: TransactionSplit[];
+  /**
+   * Siblings of one payment split across several accounts.
+   *
+   * Not a side table, because each part genuinely moves a different account's
+   * balance and the trigger works off `accountId`. So the parts are ordinary
+   * transactions that happen to share this id, and every total, the register
+   * and the balance trigger stay correct without knowing splits exist.
+   */
+  splitGroupId?: string;
+  /** Label ids. Order is not meaningful. */
+  labelIds?: string[];
   receiptName?: string;
   taxDeductible?: boolean;
 }
@@ -106,6 +178,15 @@ export type Frequency =
 export type RecurringStatus = 'active' | 'paused' | 'ended';
 
 /**
+ * What to do with an occurrence that falls at a weekend.
+ *
+ * `previous` is how a salary behaves — an employer paying on the last day of
+ * the month pays on the Friday when the 31st is a Sunday. `next` is how most
+ * direct debits behave. `skip` means that period simply does not happen.
+ */
+export type WeekendMode = 'none' | 'previous' | 'next' | 'nearest' | 'skip';
+
+/**
  * Which way a recurring rule moves money. `transfer` is the standing-order
  * case: out of `accountId` and into `toAccountId`, both the user's own.
  */
@@ -121,6 +202,14 @@ export interface RecurringPayment {
   /** Destination, for a transfer. Nothing else carries one. */
   toAccountId?: string;
   frequency: Frequency;
+  /**
+   * Repeat every N of whatever `frequency` counts in: `monthly` with an
+   * interval of 3 is quarterly, `weekly` with 2 is fortnightly.
+   *
+   * It multiplies the frequency rather than replacing it, so the named
+   * cadences already in use keep meaning what they meant. Absent is 1.
+   */
+  interval?: number;
   /** Only for `custom`: repeat every N days. */
   customIntervalDays?: number;
   /** Day of month (monthly+) or 0-6 weekday (weekly/fortnightly). */
@@ -130,11 +219,12 @@ export interface RecurringPayment {
   occurrences?: number;
   status: RecurringStatus;
   /**
-   * Move an occurrence back to the previous weekday when it lands on one of
-   * the two days nobody is paid. An employer paying on the last day of the
-   * month pays on the Friday when the 31st is a Sunday.
+   * What happens when an occurrence lands on a Saturday or a Sunday.
+   *
+   * Never moves the schedule itself — only the day the payment is shown on —
+   * so the period after is unaffected either way.
    */
-  adjustToWorkingDay?: boolean;
+  weekendMode?: WeekendMode;
   isSubscription?: boolean;
   notes?: string;
 }
@@ -184,6 +274,8 @@ export interface AppState {
   accounts: Account[];
   virtualAccounts: VirtualAccount[];
   categories: Category[];
+  labels: Label[];
+  accountGroups: AccountGroup[];
   transactions: Transaction[];
   recurring: RecurringPayment[];
   budgets: Budget[];

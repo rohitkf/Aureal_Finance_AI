@@ -10,6 +10,7 @@ const draft = (over: Partial<DraftRule> = {}): DraftRule =>
     categoryId: '',
     accountId: 'a1',
     frequency: 'monthly' as Frequency,
+    interval: '1',
     customIntervalDays: '30',
     anchorDay: '15',
     // A Wednesday.
@@ -17,7 +18,7 @@ const draft = (over: Partial<DraftRule> = {}): DraftRule =>
     endMode: 'never',
     endDate: '',
     occurrences: '',
-    adjustToWorkingDay: false,
+    weekendMode: 'none',
     isSubscription: false,
     notes: '',
     ...over,

@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 436 tests
+npm run test         # vitest — 572 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -68,11 +68,22 @@ Vocabulary that is easy to get wrong:
 |---|---|
 | **Available now** | Cleared balances of the accounts money can actually be spent from — current, savings, cash. Credit is a debt and investments are not cash, so neither counts. |
 | **A credit account's `balance`** | What is **owed**, as a positive number. Spending increases it; a payment reduces it. |
-| **`cleared`** | It happened. It is in the balance. |
-| **`scheduled`** | It is a plan. It is in the forecast and moves no balance until it clears. |
+| **`scheduled`** | It has not happened. It is on Reminders and in the forecast, and moves no balance. The only status that means this. |
+| **`none`** | It happened and counts, and nobody has checked it. What a new transaction gets. |
+| **`cleared`** | It happened, and you have seen it go through. Counts exactly as `none` does. |
+| **`reconciled`** | It matched a statement. Counts the same again, and the row locks: amount, date and type cannot change until it is un-reconciled. |
+| **`void`** | Cancelled. The record stays, struck through, on the register; it moves no money and never appears on Reminders. |
+| **What counts** | `none`, `cleared`, `reconciled`. `finance.ts`'s `counts()` and the database's `apply_transaction_to_balances` must always agree on this, or the balance on screen drifts from the balance in the account. |
 | **A virtual account** | An allocation of money that already exists in a real account. It never adds to net worth. |
 | **A commitment** | A recurring payment that has not yet fallen due this month. A transfer is not one: the money is still yours. |
 | **A transfer rule** | A standing order between two of your own accounts. `account_id` is the source, `to_account_id` the destination. |
+| **`interval`** | Every N of whatever `frequency` counts in. Monthly with 3 is quarterly, weekly with 2 is fortnightly. It multiplies the named cadence rather than replacing it, so stored rules keep meaning what they meant. Absent is 1. |
+| **`weekendMode`** | What a Saturday or Sunday does to one occurrence: `none`, `previous` (how a salary behaves), `next` (how most direct debits behave), `nearest`, `skip`. It never moves the schedule — only the day the payment shows on. |
+| **An account group** | A group of accounts you named yourself. It decides which side of the balance sheet its accounts are counted on. `sideOf()` resolves it; the group wins, the type is the fallback. |
+| **`asset` / `liability`** | Account types for a thing you own that is not money (a house) and a thing you owe that is not a card (a loan). |
+| **A label** | A tag that cuts across categories — which holiday, which flat, which client. A transaction has exactly one category and any number of labels. Case-insensitively unique per person: two spellings of one label is how a set of tags rots. |
+| **A category split** | One payment, one account, filed under several headings. Rows in `transaction_splits`, which must total the payment — a deferred trigger enforces it. |
+| **An account split** | One payment taken out of several accounts. Ordinary sibling transactions sharing `split_group_id`, never a side table: each part genuinely moves its own account's balance, and the trigger works off `account_id`. |
 | **An occurrence** | One date a recurring rule produces. `transactions.recurring_date` says which one a row stands in for; `recurring_skips` says one does not happen. |
 | **The register** | The transactions page's default view: every line with the balance of its account afterwards, history behind and projections ahead. |
 
@@ -306,12 +317,56 @@ Each of these has already cost real time here.
   treated as money leaving — Aureal is a record of accounts, not the bank, and
   deleting one here does not cancel a real standing order.
 - **A check constraint cannot demand what `on delete set null` will take away.**
-  This has now bitten twice, both times caught only by a test that deleted the
-  parent. A constraint requiring `to_account_id` on a transfer made deleting the
-  far account fail; one requiring `recurring_id` beside `recurring_date` made
-  deleting a rule fail once an occurrence had been edited. Constrain the
-  *incoherent* (a destination on a non-transfer, a transfer pointing at itself),
-  never the merely orphaned — and write the delete-the-parent test.
+  Three times now, each caught only by a test that deleted the parent.
+  `transactions_transfer_target` requiring `to_account_id` made an account that
+  had ever *received* a transfer undeletable — shipped, and live for two days.
+  `recurring_transfer_target` did the same to an account named by a rule.
+  `transactions_recurring_date_needs_rule` made deleting a rule fail once an
+  occurrence had been edited. Constrain the *incoherent* (a transfer pointing at
+  its own account), never the merely orphaned; put the rule that a new row needs
+  a destination in a `before insert` trigger instead, where a cascade's UPDATE
+  will not meet it — and write the delete-the-parent test.
+- **The reconciled lock guards three fields and no more.** `amount`,
+  `occurred_on` and `type` — the ones that decide the money. Not `account_id`,
+  not `to_account_id`, not `recurring_id`, because those are exactly what a
+  cascade nulls, and a lock that blocks a cascade is the mistake above wearing a
+  different hat. Un-reconciling is always allowed; it is the way back.
+- **Which way a balance moves and which side it counts on are two questions.**
+  The *type* decides the first — `owesMoney()`, and the database trigger's
+  `type in ('credit','liability')`. The *group* decides the second —
+  `sideOf()`. Putting a current account in a group called "money I owe my
+  brother" must change what it counts as, not invert every transaction against
+  it.
+- **`creditUtilisation` uses `totalCardDebt`, never `totalDebt`.** A mortgage
+  has no credit limit, and dividing it by the card limit produces a number
+  that means nothing and looks alarming.
+- **`#` searches labels and nothing else.** Without the prefix a label is one
+  more thing the free-text search looks at, which is right until the label is a
+  word that also appears in half your merchant names. Both paths are live, and
+  both are tested against a fixture where one transaction has the word as a
+  *note* and another has it as a *label*.
+- **The split total check is deferred, and has to be.** A split is written as
+  several rows and is only coherent once they are all in; checked eagerly, the
+  first row of a 60/40 split is rejected for not being 100 on its own. Which
+  also means a test cannot catch it in an exception block — it surfaces at
+  COMMIT — so `supabase/tests/splits.sql` writes the coherent rows while it is
+  deferred and then `set constraints all immediate` for the cases that must
+  fail.
+- **Splits come off before the payment changes.** `update-transaction` deletes
+  the parts, then updates the row, then writes the new parts. The other way
+  round, changing the amount while the old parts still total the old amount is
+  rejected by the database.
+- **Turning an existing payment into an account split is not an edit.** It is a
+  delete and two writes, so the editor only offers account splitting on a new
+  payment. Category splitting is offered either way, because it genuinely is
+  an edit.
+- **The weekend rule is applied to what comes out, never to the cursor.**
+  `expandRecurrence` walks the rule's own anchors and adjusts each date on the
+  way out. Feeding an adjusted date back in drags the anchor a little further
+  every period, and a salary walks through the month — backwards under
+  `previous`, forwards under `next`. The window is scanned two days wider at
+  both ends for the same reason, and filtered on the date that actually
+  happens.
 - **A rule is never projected into the past.** `ledgerRows` starts projections at
   today. A prediction about a period we already have facts for invents history,
   and worse, the register's balance column would then count money that is not in

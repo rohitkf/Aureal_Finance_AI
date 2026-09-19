@@ -4,23 +4,37 @@ import { cn, pillClass } from '@/lib/cn';
 import { formatFullDate, formatMediumDate, monthKey, relativeDayLabel } from '@/lib/date';
 import { downloadCsv } from '@/lib/csv';
 import { Register } from '@/components/Register';
-import type { LedgerRow } from '@/lib/ledger';
+import { Reminders } from '@/components/Reminders';
+import { isReminder, ledgerRows, reminderWindow, type LedgerRow } from '@/lib/ledger';
 import { money } from '@/lib/format';
-import { newId, useAppState, useCategories, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
+import { newId, useAppState, useCategories, useCategoryLookup, useLabelLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { LabelChip } from '@/components/LabelPicker';
 import { TransactionRow } from '@/components/TransactionRow';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, CardHeader, Eyebrow } from '@/components/ui/Card';
 import { SegmentedControl, SelectField, TextField } from '@/components/ui/Field';
-import { Icon } from '@/components/ui/Icon';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { EmptyState, SkeletonRows } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
-import type { RecurringPayment, Transaction, TransactionType } from '@/lib/types';
+import type { RecurringPayment, Transaction, TransactionStatus, TransactionType } from '@/lib/types';
 
 type TypeFilter = 'all' | TransactionType | 'scheduled';
+
+/** How each status reads on a badge. One table, so every screen agrees. */
+const STATUS_BADGE: Record<
+  TransactionStatus,
+  { label: string; tone: 'success' | 'neutral' | 'warning'; icon: IconName }
+> = {
+  none: { label: 'Recorded', tone: 'neutral', icon: 'receipt' },
+  cleared: { label: 'Cleared', tone: 'success', icon: 'check-circle' },
+  reconciled: { label: 'Reconciled', tone: 'success', icon: 'lock' },
+  void: { label: 'Void', tone: 'warning', icon: 'close' },
+  scheduled: { label: 'Scheduled', tone: 'neutral', icon: 'calendar' },
+};
 
 const TYPE_FILTERS: Array<{ value: TypeFilter; label: string }> = [
   { value: 'all', label: 'All' },
@@ -37,6 +51,7 @@ export const Transactions = () => {
   const { maskBalances } = useSettings();
   const loading = useLoading();
   const lookupCategory = useCategoryLookup();
+  const lookupLabel = useLabelLookup();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
 
@@ -51,11 +66,11 @@ export const Transactions = () => {
   /**
    * How the page is being read.
    *
-   * The register answers "what did I have after that" and runs into the
-   * future; the list answers "find me the thing I am thinking of". They are
-   * two questions, not two pages — one destination, and a toggle.
+   * The register answers "what did I have after that"; reminders answer "what
+   * is still coming"; the list answers "find me the thing I am thinking of".
+   * Three questions, not three pages — one destination, and a toggle.
    */
-  const [view, setView] = useState<'register' | 'list'>('register');
+  const [view, setView] = useState<'register' | 'reminders' | 'list'>('register');
   /** A line drawn from a rule, opened for editing before any row exists. */
   const [occurrence, setOccurrence] = useState<Transaction | null>(null);
   const [skipping, setSkipping] = useState<LedgerRow | null>(null);
@@ -85,15 +100,40 @@ export const Transactions = () => {
         if (typeFilter === 'scheduled' && t.status !== 'scheduled') return false;
         if (typeFilter !== 'all' && typeFilter !== 'scheduled' && t.type !== typeFilter) return false;
         if (!q) return true;
+        /**
+         * `#portugal` searches labels and nothing else.
+         *
+         * Without the prefix a label is just one more thing the free-text
+         * search looks at, which is right most of the time and useless when
+         * the label happens to be a word that also appears in half your
+         * merchant names.
+         */
+        if (q.startsWith('#')) {
+          const wanted = q.slice(1);
+          if (!wanted) return true;
+          return (t.labelIds ?? []).some((id) =>
+            (lookupLabel(id)?.name ?? '').toLowerCase().includes(wanted),
+          );
+        }
         return (
           t.merchant.toLowerCase().includes(q) ||
           lookupCategory(t.categoryId).name.toLowerCase().includes(q) ||
           t.amount.toFixed(2).includes(q) ||
-          (t.notes ?? '').toLowerCase().includes(q)
+          (t.notes ?? '').toLowerCase().includes(q) ||
+          (t.labelIds ?? []).some((id) => (lookupLabel(id)?.name ?? '').toLowerCase().includes(q))
         );
       })
       .sort((a, b) => (a.date === b.date ? (b.time ?? '').localeCompare(a.time ?? '') : b.date.localeCompare(a.date)));
-  }, [state.transactions, query, typeFilter, accountFilter, categoryFilter, monthFilter, lookupCategory]);
+  }, [
+    state.transactions,
+    query,
+    typeFilter,
+    accountFilter,
+    categoryFilter,
+    monthFilter,
+    lookupCategory,
+    lookupLabel,
+  ]);
 
   const groups = useMemo(() => {
     const map = new Map<string, Transaction[]>();
@@ -112,6 +152,16 @@ export const Transactions = () => {
     }),
     [filtered],
   );
+
+  /**
+   * How many reminders have a date that has already gone by — the count worth
+   * putting on the toggle. A badge that also counted next March's salary would
+   * never be zero and would therefore never mean anything.
+   */
+  const dueCount = useMemo(() => {
+    const { from, to } = reminderWindow(today);
+    return ledgerRows(state, today, from, to).filter((row) => isReminder(row) && row.date <= today).length;
+  }, [state, today]);
 
   const activeFilters =
     (typeFilter !== 'all' ? 1 : 0) +
@@ -168,7 +218,7 @@ export const Transactions = () => {
       anchorDay: Number(t.date.slice(8, 10)),
       startDate: t.date,
       status: 'active',
-      adjustToWorkingDay: false,
+      weekendMode: 'none',
     };
     dispatch({ type: 'add-recurring', recurring: rule });
     // Tie the transaction to the rule it just produced. Left unlinked, a
@@ -243,6 +293,7 @@ export const Transactions = () => {
             onChange={setView}
             options={[
               { value: 'register', label: 'Register' },
+              { value: 'reminders', label: dueCount > 0 ? `Reminders · ${dueCount}` : 'Reminders' },
               { value: 'list', label: 'List' },
             ]}
           />
@@ -259,6 +310,10 @@ export const Transactions = () => {
         <Card className="p-2 sm:p-3">
           <Register onOpen={openLine} onSkip={setSkipping} />
         </Card>
+      ) : view === 'reminders' ? (
+        <Card className="p-2 sm:p-3">
+          <Reminders onOpen={openLine} onSkip={setSkipping} />
+        </Card>
       ) : (
         <>
       {/* ---------------- Filters ---------------- */}
@@ -267,7 +322,7 @@ export const Transactions = () => {
           <TextField
             label="Search transactions"
             hideLabel
-            placeholder="Search by merchant, note or amount…"
+            placeholder="Search — or #label…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             containerClassName="flex-1"
@@ -520,6 +575,7 @@ const TransactionDetail = ({
   const state = useAppState();
   const { maskBalances } = useSettings();
   const lookupCategory = useCategoryLookup();
+  const lookupLabel = useLabelLookup();
   const category = lookupCategory(transaction.categoryId);
   const account = state.accounts.find((a) => a.id === transaction.accountId);
 
@@ -542,8 +598,8 @@ const TransactionDetail = ({
           {money(transaction.amount, { masked: maskBalances })}
         </p>
         <div className="mt-2 flex justify-center">
-          <Badge tone={transaction.status === 'cleared' ? 'success' : 'neutral'} icon={transaction.status === 'cleared' ? 'check-circle' : 'calendar'}>
-            {transaction.status === 'cleared' ? 'Cleared' : transaction.status === 'pending' ? 'Pending' : 'Scheduled'}
+          <Badge tone={STATUS_BADGE[transaction.status].tone} icon={STATUS_BADGE[transaction.status].icon}>
+            {STATUS_BADGE[transaction.status].label}
           </Badge>
         </div>
       </div>
@@ -557,6 +613,17 @@ const TransactionDetail = ({
         )}
         {transaction.receiptName && <Row label="Receipt" value={transaction.receiptName} />}
         <Row label="Recurring" value={transaction.recurringId ? 'Part of a schedule' : 'One-off'} />
+        {transaction.labelIds?.length ? (
+          <div className="flex items-baseline justify-between gap-4 py-2">
+            <dt className="text-label-sm text-faint">Labels</dt>
+            <dd className="flex flex-wrap justify-end gap-1.5">
+              {transaction.labelIds.map((id) => {
+                const label = lookupLabel(id);
+                return label ? <LabelChip key={id} label={label} /> : null;
+              })}
+            </dd>
+          </div>
+        ) : null}
       </dl>
 
       {transaction.splits && transaction.splits.length > 1 && (

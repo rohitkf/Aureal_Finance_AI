@@ -69,6 +69,8 @@ beforeEach(() => {
     accounts: [],
     virtualAccounts: [],
     categories: CATEGORIES,
+    labels: [],
+    accountGroups: [],
     transactions: [],
     recurring: [],
     budgets: [],

@@ -11,10 +11,12 @@ import {
 } from 'react';
 import type {
   Account,
+  AccountGroup,
   AppState,
   Budget,
   Category,
   Goal,
+  Label,
   RecurringPayment,
   Settings,
   Transaction,
@@ -32,7 +34,9 @@ import {
   recurringToRow,
   toAccount,
   toBudget,
+  toAccountGroup,
   toCategory,
+  toLabel,
   toGoal,
   toNetWorthPoint,
   toRecurring,
@@ -47,6 +51,8 @@ import {
 type Slice =
   | 'profile'
   | 'categories'
+  | 'labels'
+  | 'accountGroups'
   | 'accounts'
   | 'virtualAccounts'
   | 'recurring'
@@ -60,6 +66,11 @@ export type Action =
   | { type: 'add-transaction'; transaction: Transaction }
   | { type: 'update-transaction'; transaction: Transaction }
   | { type: 'delete-transaction'; id: string }
+  | { type: 'upsert-account-group'; group: AccountGroup }
+  | { type: 'delete-account-group'; id: string }
+  | { type: 'add-label'; label: Label }
+  | { type: 'update-label'; label: Label }
+  | { type: 'delete-label'; id: string }
   | { type: 'add-recurring'; recurring: RecurringPayment }
   | { type: 'update-recurring'; recurring: RecurringPayment }
   | { type: 'delete-recurring'; id: string }
@@ -207,6 +218,31 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             }),
         );
       }
+      if (wanted.has('labels')) {
+        jobs.push(
+          supabase
+            .from('labels')
+            .select('*')
+            .order('name')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.labels = (data ?? []).map(toLabel);
+            }),
+        );
+      }
+      if (wanted.has('accountGroups')) {
+        jobs.push(
+          supabase
+            .from('account_groups')
+            .select('*')
+            .order('sort_order')
+            .order('name')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.accountGroups = (data ?? []).map(toAccountGroup);
+            }),
+        );
+      }
       if (wanted.has('accounts')) {
         jobs.push(
           supabase
@@ -248,7 +284,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         jobs.push(
           supabase
             .from('transactions')
-            .select('*, transaction_splits(*)')
+            .select('*, transaction_splits(*), transaction_labels(transaction_id, label_id)')
             .order('occurred_on', { ascending: false })
             .order('occurred_at', { ascending: false, nullsFirst: false })
             .limit(2000)
@@ -315,6 +351,8 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     () => [
       'profile',
       'categories',
+      'labels',
+      'accountGroups',
       'accounts',
       'virtualAccounts',
       'recurring',
@@ -474,8 +512,16 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                     transaction_id: t.id,
                     category_id: s.categoryId || null,
                     amount: s.amount,
+                    note: s.note ?? null,
                   })),
                 ),
+              );
+            }
+            if (t.labelIds?.length) {
+              check(
+                await supabase
+                  .from('transaction_labels')
+                  .insert(t.labelIds.map((labelId) => ({ transaction_id: t.id, label_id: labelId }))),
               );
             }
             return ['transactions', 'accounts'];
@@ -485,8 +531,11 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         case 'update-transaction':
           run('update that transaction', async () => {
             const t = action.transaction;
-            check(await supabase.from('transactions').update(transactionToRow(t)).eq('id', t.id));
+            // The parts come off first. They have to total the payment — the
+            // database checks it — so changing the amount while the old parts
+            // are still attached is rejected, and the order is the whole fix.
             check(await supabase.from('transaction_splits').delete().eq('transaction_id', t.id));
+            check(await supabase.from('transactions').update(transactionToRow(t)).eq('id', t.id));
             if (t.splits?.length) {
               check(
                 await supabase.from('transaction_splits').insert(
@@ -494,8 +543,20 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                     transaction_id: t.id,
                     category_id: s.categoryId || null,
                     amount: s.amount,
+                    note: s.note ?? null,
                   })),
                 ),
+              );
+            }
+            // Labels live in a join table, so they are replaced wholesale
+            // rather than diffed: at the handful a transaction ever carries,
+            // working out which ones changed costs more than rewriting them.
+            check(await supabase.from('transaction_labels').delete().eq('transaction_id', t.id));
+            if (t.labelIds?.length) {
+              check(
+                await supabase
+                  .from('transaction_labels')
+                  .insert(t.labelIds.map((labelId) => ({ transaction_id: t.id, label_id: labelId }))),
               );
             }
             return ['transactions', 'accounts'];
@@ -504,8 +565,73 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 
         case 'delete-transaction':
           run('delete that transaction', async () => {
-            check(await supabase.from('transactions').delete().eq('id', action.id));
+            // One part of a payment split across accounts is not a thing on its
+            // own: deleting it alone would leave the other half claiming to be
+            // the whole payment. The group goes together.
+            const group = stateRef.current.transactions.find((t) => t.id === action.id)?.splitGroupId;
+            check(
+              group
+                ? await supabase.from('transactions').delete().eq('split_group_id', group)
+                : await supabase.from('transactions').delete().eq('id', action.id),
+            );
             return ['transactions', 'accounts'];
+          });
+          break;
+
+        case 'upsert-account-group':
+          run('save that account group', async () => {
+            check(
+              await supabase.from('account_groups').upsert({
+                id: action.group.id,
+                name: action.group.name,
+                side: action.group.side,
+                sort_order: action.group.sortOrder,
+              }),
+            );
+            return ['accountGroups'];
+          });
+          break;
+
+        case 'delete-account-group':
+          run('delete that account group', async () => {
+            // The accounts stay exactly where they are, ungrouped. A group is
+            // a way of reading them, not a thing that owns them.
+            check(await supabase.from('account_groups').delete().eq('id', action.id));
+            return ['accountGroups', 'accounts'];
+          });
+          break;
+
+        case 'add-label':
+          run('save that label', async () => {
+            check(
+              await supabase.from('labels').insert({
+                id: action.label.id,
+                name: action.label.name,
+                accent: action.label.accent,
+              }),
+            );
+            return ['labels'];
+          });
+          break;
+
+        case 'update-label':
+          run('update that label', async () => {
+            check(
+              await supabase
+                .from('labels')
+                .update({ name: action.label.name, accent: action.label.accent })
+                .eq('id', action.label.id),
+            );
+            return ['labels'];
+          });
+          break;
+
+        case 'delete-label':
+          run('delete that label', async () => {
+            // The join rows cascade, so this takes it off everything rather
+            // than leaving transactions pointing at a label that is gone.
+            check(await supabase.from('labels').delete().eq('id', action.id));
+            return ['labels', 'transactions'];
           });
           break;
 
@@ -882,6 +1008,18 @@ export const useCategoryLookup = (): ((id: string) => Category) => {
 };
 
 /** Categories of a given kind, in display order. */
+/** Every label, in the order the database returns them, which is by name. */
+export const useLabels = (): Label[] => useAppState().labels;
+
+/** A label by id, for drawing one on a row that only knows the id. */
+export const useLabelLookup = () => {
+  const { labels } = useAppState();
+  return useMemo(() => {
+    const byId = new Map(labels.map((l) => [l.id, l]));
+    return (id: string): Label | undefined => byId.get(id);
+  }, [labels]);
+};
+
 export const useCategories = (kind?: Category['kind']): Category[] => {
   const { categories } = useAppState();
   return useMemo(

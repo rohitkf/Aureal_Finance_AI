@@ -48,6 +48,7 @@ export type IconName =
   | 'briefcase'
   | 'swap'
   | 'calendar'
+  | 'clock'
   | 'filter'
   | 'download'
   | 'edit'
@@ -68,6 +69,8 @@ export type IconName =
   | 'logout'
   | 'sliders'
   | 'layers'
+  | 'split'
+  | 'scale'
   | 'flag'
   | 'lightbulb'
   | 'user';
@@ -289,6 +292,12 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M3.5 10h17M8 3v4m8-4v4" />
     </>
   ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 1.8" />
+    </>
+  ),
   filter: <path d="M3.5 5.5h17l-6.5 7.5v6l-4 2v-8z" />,
   download: (
     <>
@@ -392,6 +401,25 @@ const PATHS: Record<IconName, JSX.Element> = {
       <circle cx="19" cy="8" r="2" />
     </>
   ),
+  // One line that becomes two: a payment going to more than one place.
+  // A balance: two pans on a beam. What a liability sits on the other side of.
+  scale: (
+    <>
+      <path d="M12 4v16M8 20h8" />
+      <path d="M5 8h14" />
+      <path d="M5 8l-2.5 6a2.5 2.5 0 0 0 5 0L5 8Z" />
+      <path d="M19 8l-2.5 6a2.5 2.5 0 0 0 5 0L19 8Z" />
+    </>
+  ),
+
+  split: (
+    <>
+      <path d="M4 20V9a3 3 0 0 1 3-3h13" />
+      <path d="M4 20V15a3 3 0 0 1 3-3h13" />
+      <path d="M17 3l3 3-3 3M17 9l3 3-3 3" />
+    </>
+  ),
+
   layers: (
     <>
       <path d="m12 3 8.5 4.5L12 12 3.5 7.5z" />

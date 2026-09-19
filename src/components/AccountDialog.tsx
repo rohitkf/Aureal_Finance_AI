@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { newId, useStore } from '@/lib/store';
-import type { Account, AccountType } from '@/lib/types';
+import { newId, useAppState, useStore } from '@/lib/store';
+import type { Account, AccountGroup, AccountType } from '@/lib/types';
 import { Button } from './ui/Button';
 import { AmountField, SelectField, TextField } from './ui/Field';
 import { Modal } from './ui/Modal';
 import { useToast } from './ui/Toast';
+import { AccountGroupDialog } from './AccountGroupDialog';
 
 const TYPES: Array<{ value: AccountType; label: string; hint: string }> = [
   { value: 'current', label: 'Current account', hint: 'Day-to-day banking' },
@@ -12,21 +13,31 @@ const TYPES: Array<{ value: AccountType; label: string; hint: string }> = [
   { value: 'cash', label: 'Cash', hint: 'Notes and coins' },
   { value: 'credit', label: 'Credit card', hint: 'A balance you owe' },
   { value: 'investment', label: 'Investment', hint: 'Stocks, funds, pensions' },
+  { value: 'asset', label: 'Asset', hint: 'Something you own: a house, a car' },
+  { value: 'liability', label: 'Liability', hint: 'Something you owe that is not a card' },
 ];
 
 interface AccountDialogProps {
   open: boolean;
   onClose: () => void;
   editing?: Account | null;
+  /**
+   * The account that was just made. Lets a form that sent you here get you
+   * back with it already chosen, rather than leaving you to find it.
+   */
+  onCreated?: (account: Account) => void;
 }
 
 /**
  * Add or edit an account by hand. Until bank connections exist this is the only
  * way accounts get into Aureal, so it is the first thing a new user needs.
  */
-export const AccountDialog = ({ open, onClose, editing }: AccountDialogProps) => {
+export const AccountDialog = ({ open, onClose, editing, onCreated }: AccountDialogProps) => {
   const { dispatch } = useStore();
+  const { accountGroups } = useAppState();
   const toast = useToast();
+  const [groupId, setGroupId] = useState('');
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
 
   const [name, setName] = useState('');
   const [type, setType] = useState<AccountType>('current');
@@ -49,6 +60,7 @@ export const AccountDialog = ({ open, onClose, editing }: AccountDialogProps) =>
     setApr(editing?.apr ? String(editing.apr) : '');
     setDueDay(editing?.paymentDueDay ? String(editing.paymentDueDay) : '');
     setAer(editing?.aer ? String(editing.aer) : '');
+    setGroupId(editing?.groupId ?? '');
   }, [open, editing]);
 
   const isCredit = type === 'credit';
@@ -72,6 +84,7 @@ export const AccountDialog = ({ open, onClose, editing }: AccountDialogProps) =>
       apr: isCredit ? Number.parseFloat(apr) || undefined : undefined,
       paymentDueDay: isCredit ? Number.parseInt(dueDay, 10) || undefined : undefined,
       aer: type === 'savings' ? Number.parseFloat(aer) || undefined : undefined,
+      groupId: groupId || undefined,
     };
 
     // One action, not two. Sent separately, the opening balance raced the
@@ -88,10 +101,17 @@ export const AccountDialog = ({ open, onClose, editing }: AccountDialogProps) =>
       title: editing ? 'Account updated' : 'Account added',
       description: account.name,
     });
+    if (!editing) onCreated?.(account);
     onClose();
   };
 
+  const onGroupCreated = (group: AccountGroup) => {
+    setGroupId(group.id);
+    setNewGroupOpen(false);
+  };
+
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
@@ -130,6 +150,23 @@ export const AccountDialog = ({ open, onClose, editing }: AccountDialogProps) =>
             autoFocus={Boolean(editing)}
             required
           />
+          {/* Which side of the balance sheet it lands on follows the group
+              where there is one, and the type otherwise. */}
+          <SelectField
+            label="Group"
+            value={groupId}
+            onChange={setGroupId}
+            action={{ label: 'New group…', onSelect: () => setNewGroupOpen(true) }}
+            hint="Optional. A group is how you think of the accounts — “the flat”, “joint” — rather than what kind they are."
+          >
+            <option value="">By its type</option>
+            {accountGroups.map((g) => (
+              <option key={g.id} value={g.id} data-hint={g.side === 'asset' ? 'asset' : 'liability'}>
+                {g.name}
+              </option>
+            ))}
+          </SelectField>
+
           <SelectField label="Type" value={type} onChange={(value) => setType(value as AccountType)}>
             {TYPES.map((t) => (
               <option key={t.value} value={t.value}>
@@ -194,5 +231,12 @@ export const AccountDialog = ({ open, onClose, editing }: AccountDialogProps) =>
         </div>
       </div>
     </Modal>
+
+    <AccountGroupDialog
+      open={newGroupOpen}
+      onClose={() => setNewGroupOpen(false)}
+      onCreated={onGroupCreated}
+    />
+    </>
   );
 };

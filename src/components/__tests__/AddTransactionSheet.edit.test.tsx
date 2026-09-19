@@ -30,8 +30,10 @@ const CATEGORIES: Category[] = [
 const today = '2026-09-18';
 
 vi.mock('@/lib/store', () => ({
-  useAppState: () => ({ accounts: ACCOUNTS, categories: CATEGORIES }),
+  useAppState: () => ({ accounts: ACCOUNTS, categories: CATEGORIES, accountGroups: [] }),
   useStore: () => ({ dispatch }),
+  useLabels: () => [],
+  useLabelLookup: () => () => undefined,
   useCategories: () => CATEGORIES,
   useCategoryLookup: () => (id: string) =>
     CATEGORIES.find((c) => c.id === id) ?? { id, name: 'Uncategorised', kind: 'expense', icon: 'box', accent: 'neutral' },
@@ -125,5 +127,39 @@ describe('editing a transaction', () => {
     render(<AddTransactionSheet open onClose={vi.fn()} />);
     expect(screen.getByRole('checkbox', { name: /this repeats/i })).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Cleared' })).not.toBeInTheDocument();
+  });
+});
+
+describe('splitting a payment that already exists', () => {
+  it('offers categories, because filing it differently is an ordinary edit', async () => {
+    const user = userEvent.setup();
+    openEditing();
+    await user.click(screen.getByRole('button', { name: /split this payment/i }));
+
+    expect(screen.getByLabelText('Part 1 amount')).toBeInTheDocument();
+  });
+
+  it('does not offer accounts, because that is a delete and two writes', async () => {
+    const user = userEvent.setup();
+    openEditing();
+    await user.click(screen.getByRole('button', { name: /split this payment/i }));
+
+    expect(screen.queryByRole('radio', { name: /by account/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/delete this one and enter it again/i)).toBeInTheDocument();
+  });
+
+  it('opens already split when the payment is, so the parts can be corrected', () => {
+    openEditing({
+      ...OVERDUE,
+      amount: 100,
+      splits: [
+        { categoryId: 'cat-food', amount: 60, note: 'the food' },
+        { categoryId: 'cat-fun', amount: 40 },
+      ],
+    });
+
+    expect(screen.getByLabelText('Part 1 amount')).toHaveValue('60');
+    expect(screen.getByLabelText('Part 1 note')).toHaveValue('the food');
+    expect(screen.getByText(/it all adds up/i)).toBeInTheDocument();
   });
 });

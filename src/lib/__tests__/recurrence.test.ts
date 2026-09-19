@@ -118,7 +118,7 @@ describe('monthlyEquivalent', () => {
   });
 });
 
-describe('adjustToWorkingDay', () => {
+describe('the weekend rule: previous', () => {
   const salary = (over: Partial<RecurringPayment> = {}): RecurringPayment =>
     rule({
       name: 'Salary',
@@ -128,7 +128,7 @@ describe('adjustToWorkingDay', () => {
       // month" means to a person.
       anchorDay: 31,
       startDate: '2026-01-01',
-      adjustToWorkingDay: true,
+      weekendMode: 'previous',
       ...over,
     });
 
@@ -168,17 +168,17 @@ describe('adjustToWorkingDay', () => {
     expect(dates[dates.length - 1]).toBe('2028-12-29'); // Sun 31st -> Fri
   });
 
-  it('leaves the schedule alone when the flag is off', () => {
-    expect(expandRecurrence(salary({ adjustToWorkingDay: false }), '2026-01-01', '2026-03-31')).toEqual([
+  it('leaves the schedule alone when the mode is none', () => {
+    expect(expandRecurrence(salary({ weekendMode: 'none' }), '2026-01-01', '2026-03-31')).toEqual([
       '2026-01-31',
       '2026-02-28',
       '2026-03-31',
     ]);
   });
 
-  it('treats an absent flag as off, so existing rules are untouched', () => {
+  it('treats an absent mode as leave-it-alone, so existing rules are untouched', () => {
     const withoutFlag = salary();
-    delete withoutFlag.adjustToWorkingDay;
+    delete withoutFlag.weekendMode;
     expect(expandRecurrence(withoutFlag, '2026-01-01', '2026-02-28')).toEqual([
       '2026-01-31',
       '2026-02-28',
@@ -203,7 +203,7 @@ describe('adjustToWorkingDay', () => {
       frequency: 'weekly',
       anchorDay: 6, // Saturday
       startDate: '2026-01-01',
-      adjustToWorkingDay: true,
+      weekendMode: 'previous',
     });
     expect(expandRecurrence(weekend, '2026-01-01', '2026-01-31')).toEqual([
       '2026-01-02',

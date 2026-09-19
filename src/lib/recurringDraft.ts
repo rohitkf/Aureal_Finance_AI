@@ -1,4 +1,4 @@
-import type { Frequency, RecurringDirection } from './types';
+import type { Frequency, RecurringDirection, WeekendMode } from './types';
 
 /**
  * The Recurring form's working copy of a rule. Everything is a string because
@@ -15,13 +15,15 @@ export interface DraftRule {
   /** Destination, used only when the direction is a transfer. */
   toAccountId: string;
   frequency: Frequency;
+  /** Every N of whatever the frequency counts in. '1' is every period. */
+  interval: string;
   customIntervalDays: string;
   anchorDay: string;
   startDate: string;
   endMode: 'never' | 'date' | 'count';
   endDate: string;
   occurrences: string;
-  adjustToWorkingDay: boolean;
+  weekendMode: WeekendMode;
   isSubscription: boolean;
   notes: string;
 }

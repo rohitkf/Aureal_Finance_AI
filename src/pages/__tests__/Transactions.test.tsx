@@ -41,6 +41,7 @@ const TXNS: Transaction[] = [
     categoryId: 'cat-food',
     status: 'cleared',
     notes: 'lunch',
+    labelIds: ['l-pt'],
   },
   {
     id: 'txn-2',
@@ -51,7 +52,16 @@ const TXNS: Transaction[] = [
     accountId: 'acc-1',
     categoryId: 'cat-food',
     status: 'scheduled',
+    labelIds: ['l-lunch'],
   },
+];
+
+const LABELS = [
+  { id: 'l-pt', name: 'Portugal 2027', accent: 'warning' as const },
+  { id: 'l-flat', name: 'Flat', accent: 'primary' as const },
+  // Deliberately the same word as a note on the *other* transaction, so the
+  // hashtag prefix has something real to distinguish.
+  { id: 'l-lunch', name: 'Lunch', accent: 'success' as const },
 ];
 
 let state: AppState;
@@ -62,6 +72,8 @@ vi.mock('@/lib/store', () => ({
   useToday: () => '2026-09-18',
   useSettings: () => SETTINGS,
   useLoading: () => false,
+  useLabels: () => LABELS,
+  useLabelLookup: () => (id: string) => LABELS.find((l) => l.id === id),
   useCategories: () => CATEGORIES,
   useCategoryLookup: () => (id: string) =>
     CATEGORIES.find((c) => c.id === id) ?? { id, name: 'Uncategorised', kind: 'expense' as const, icon: 'box', accent: 'neutral' as const },
@@ -80,6 +92,8 @@ beforeEach(() => {
     accounts: ACCOUNTS,
     virtualAccounts: [],
     categories: CATEGORIES,
+    labels: LABELS,
+    accountGroups: [],
     transactions: TXNS,
     recurring: [],
     budgets: [],
@@ -253,5 +267,56 @@ describe('the two views', () => {
     render();
     await showList(user);
     expect(screen.getByLabelText('Search transactions')).toBeInTheDocument();
+  });
+});
+
+describe('searching by label', () => {
+  it('draws a label on the row that carries it', async () => {
+    const user = userEvent.setup();
+    render();
+    await showList(user);
+
+    expect(screen.getByText('Portugal 2027')).toBeInTheDocument();
+  });
+
+  it('finds a transaction by a label it carries', async () => {
+    const user = userEvent.setup();
+    render();
+    await showList(user);
+    await user.type(screen.getByPlaceholderText(/#label/i), 'Portugal');
+
+    expect(screen.getByText('Dunn, Baker & Co')).toBeInTheDocument();
+  });
+
+  it('finds a word wherever it appears when there is no #', async () => {
+    const user = userEvent.setup();
+    render();
+    await showList(user);
+    await user.type(screen.getByPlaceholderText(/#label/i), 'lunch');
+
+    // One has it as a note, the other as a label. A plain search wants both.
+    expect(screen.getByText('Dunn, Baker & Co')).toBeInTheDocument();
+    expect(screen.getByText('Rent')).toBeInTheDocument();
+  });
+
+  it('searches labels and nothing else behind a #', async () => {
+    const user = userEvent.setup();
+    render();
+    await showList(user);
+    await user.type(screen.getByPlaceholderText(/#label/i), '#lunch');
+
+    // Only the one actually labelled Lunch. The note that happens to say the
+    // same word is not a label, which is the whole point of the prefix.
+    expect(screen.getByText('Rent')).toBeInTheDocument();
+    expect(screen.queryByText('Dunn, Baker & Co')).not.toBeInTheDocument();
+  });
+
+  it('finds nothing for a label nobody carries, rather than everything', async () => {
+    const user = userEvent.setup();
+    render();
+    await showList(user);
+    await user.type(screen.getByPlaceholderText(/#label/i), '#flat');
+
+    expect(screen.queryByText('Dunn, Baker & Co')).not.toBeInTheDocument();
   });
 });

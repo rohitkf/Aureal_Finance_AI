@@ -1,5 +1,7 @@
 import type {
   Account,
+  AccountGroup,
+  BalanceSide,
   AppState,
   Budget,
   Forecast,
@@ -17,8 +19,33 @@ import { round2 } from './format';
 /* Balances                                                            */
 /* ------------------------------------------------------------------ */
 
-/** Anything that is not a credit facility, so it holds money rather than owing it. */
-export const isDepository = (a: Account): boolean => a.type !== 'credit';
+/**
+ * Whether the stored balance is something owed rather than something held.
+ *
+ * A credit card and a loan both work this way: spending increases the number,
+ * paying reduces it. This is about the account's *type* and nothing else —
+ * the group it is filed under decides which side of the balance sheet it is
+ * counted on, which is a different question with a different answer.
+ */
+export const owesMoney = (a: Pick<Account, 'type'>): boolean =>
+  a.type === 'credit' || a.type === 'liability';
+
+/** Anything that holds value rather than owing it. */
+export const isDepository = (a: Account): boolean => !owesMoney(a);
+
+/**
+ * Which side of the balance sheet an account is counted on.
+ *
+ * The group wins where there is one, because naming a group and saying what it
+ * is for is a more deliberate statement than picking a type from a list. With
+ * no group it falls back to the type, which is how every account behaved
+ * before groups existed.
+ */
+export const sideOf = (a: Pick<Account, 'type' | 'groupId'>, groups: AccountGroup[]): BalanceSide => {
+  const group = a.groupId ? groups.find((g) => g.id === a.groupId) : undefined;
+  if (group) return group.side;
+  return owesMoney(a) ? 'liability' : 'asset';
+};
 
 /**
  * Money that can be spent or moved today.
@@ -36,20 +63,46 @@ export const isSpendable = (a: Account): boolean =>
 export const availableNow = (accounts: Account[]): number =>
   round2(accounts.filter(isSpendable).reduce((sum, a) => sum + a.balance, 0));
 
-/** Everything held, spendable or not — investments included. */
-export const totalAssets = (accounts: Account[]): number =>
-  round2(accounts.filter(isDepository).reduce((sum, a) => sum + a.balance, 0));
+/**
+ * Everything held, spendable or not — investments and a house included.
+ *
+ * Takes the groups so a group marked `liability` moves its accounts to the
+ * other side. Called without them it behaves exactly as it always did, which
+ * is what every caller that has no groups to hand wants.
+ */
+export const totalAssets = (accounts: Account[], groups: AccountGroup[] = []): number =>
+  round2(
+    accounts
+      .filter((a) => sideOf(a, groups) === 'asset')
+      .reduce((sum, a) => sum + a.balance, 0),
+  );
 
-/** Everything owed on credit facilities (a positive number). */
-export const totalDebt = (accounts: Account[]): number =>
+/** Everything owed — cards, loans, and anything in a group marked liability. */
+export const totalDebt = (accounts: Account[], groups: AccountGroup[] = []): number =>
+  round2(
+    accounts
+      .filter((a) => sideOf(a, groups) === 'liability')
+      .reduce((sum, a) => sum + a.balance, 0),
+  );
+
+/** Owed on credit cards alone, which is not the same as owed altogether. */
+export const totalCardDebt = (accounts: Account[]): number =>
   round2(accounts.filter((a) => a.type === 'credit').reduce((sum, a) => sum + a.balance, 0));
 
 export const totalCreditLimit = (accounts: Account[]): number =>
   round2(accounts.filter((a) => a.type === 'credit').reduce((sum, a) => sum + (a.creditLimit ?? 0), 0));
 
+/**
+ * How much of the available credit is used, which is only ever about cards.
+ *
+ * Deliberately not `totalDebt`: that now includes loans and anything in a
+ * group marked liability, none of which has a credit limit. Dividing the
+ * mortgage by the card limit produces a number that means nothing and looks
+ * alarming.
+ */
 export const creditUtilisation = (accounts: Account[]): number => {
   const limit = totalCreditLimit(accounts);
-  return limit === 0 ? 0 : (totalDebt(accounts) / limit) * 100;
+  return limit === 0 ? 0 : (totalCardDebt(accounts) / limit) * 100;
 };
 
 export const accountUtilisation = (account: Account): number =>
@@ -58,8 +111,8 @@ export const accountUtilisation = (account: Account): number =>
 export const availableCredit = (account: Account): number =>
   round2((account.creditLimit ?? 0) - account.balance);
 
-export const netWorth = (accounts: Account[]): number =>
-  round2(totalAssets(accounts) - totalDebt(accounts));
+export const netWorth = (accounts: Account[], groups: AccountGroup[] = []): number =>
+  round2(totalAssets(accounts, groups) - totalDebt(accounts, groups));
 
 /* ------------------------------------------------------------------ */
 /* Transactions                                                        */
@@ -72,20 +125,35 @@ export const signedAmount = (t: Transaction): number => {
   return 0; // transfers move money, they don't create or destroy it
 };
 
+/**
+ * Whether a transaction is part of the money.
+ *
+ * Two statuses are not: `scheduled`, which has not happened, and `void`,
+ * which was cancelled. Everything else counts in full — `none`, `cleared`
+ * and `reconciled` differ only in how thoroughly it has been checked, and
+ * how sure you are of a payment has never changed what it cost.
+ *
+ * This is the client's copy of the rule in `apply_transaction_to_balances`.
+ * The two must agree or the balance on screen drifts from the balance in the
+ * database, which is the worst bug this app can have.
+ */
+export const counts = (t: Pick<Transaction, 'status'>): boolean =>
+  t.status !== 'scheduled' && t.status !== 'void';
+
 export const confirmedTransactions = (state: AppState, today: string): Transaction[] =>
-  state.transactions.filter((t) => t.status !== 'scheduled' && t.date <= today);
+  state.transactions.filter((t) => counts(t) && t.date <= today);
 
 export const monthSpend = (state: AppState, month: string): number =>
   round2(
     state.transactions
-      .filter((t) => t.type === 'expense' && t.status !== 'scheduled' && monthKey(t.date) === month)
+      .filter((t) => t.type === 'expense' && counts(t) && monthKey(t.date) === month)
       .reduce((sum, t) => sum + t.amount, 0),
   );
 
 export const monthIncome = (state: AppState, month: string): number =>
   round2(
     state.transactions
-      .filter((t) => t.type === 'income' && t.status !== 'scheduled' && monthKey(t.date) === month)
+      .filter((t) => t.type === 'income' && counts(t) && monthKey(t.date) === month)
       .reduce((sum, t) => sum + t.amount, 0),
   );
 
@@ -96,7 +164,7 @@ export const monthIncome = (state: AppState, month: string): number =>
 export const spendByCategory = (state: AppState, month: string): Map<string, number> => {
   const out = new Map<string, number>();
   for (const t of state.transactions) {
-    if (t.type !== 'expense' || t.status === 'scheduled' || monthKey(t.date) !== month) continue;
+    if (t.type !== 'expense' || !counts(t) || monthKey(t.date) !== month) continue;
     if (t.splits?.length) {
       for (const s of t.splits) out.set(s.categoryId, round2((out.get(s.categoryId) ?? 0) + s.amount));
     } else {
@@ -169,6 +237,8 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
   const claimed = new Set<string>();
 
   for (const t of state.transactions) {
+    // Cancelled. It is still a record, but it is not money coming.
+    if (t.status === 'void') continue;
     const overdue = isOverdue(t, today);
     // Anything on or before today has already moved the balance, unless it is
     // still only scheduled — in which case it has not, and still counts.
@@ -281,7 +351,7 @@ export const buildForecast = (state: AppState, today: string, horizonDays: numbe
  * full chart would be more furniture than the space deserves.
  */
 export const balanceHistory = (state: AppState, today: string, days = 30): number[] => {
-  const cleared = state.transactions.filter((t) => t.status !== 'scheduled' && t.date <= today);
+  const cleared = state.transactions.filter((t) => counts(t) && t.date <= today);
   const deltaOn = (date: string) =>
     cleared
       .filter((t) => t.date === date)
@@ -314,11 +384,11 @@ export const balanceHistory = (state: AppState, today: string, days = 30): numbe
  * This mirrors `apply_transaction_to_balances` in the database, which is the
  * only thing that actually moves a balance. On a credit account the stored
  * figure is the amount owed, so the signs invert: an expense increases it and
- * a payment reduces it. A scheduled transaction has not happened and moves
- * nothing, exactly as the trigger decides.
+ * a payment reduces it. A scheduled transaction has not happened and a void
+ * one was cancelled; neither moves anything, exactly as the trigger decides.
  */
 const balanceDelta = (t: Transaction, account: Account): number => {
-  if (t.status === 'scheduled') return 0;
+  if (!counts(t)) return 0;
   const credit = account.type === 'credit';
   if (account.id === t.accountId) {
     if (t.type === 'income') return credit ? -t.amount : t.amount;
