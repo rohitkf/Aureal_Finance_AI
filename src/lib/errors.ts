@@ -21,6 +21,21 @@ interface PostgrestLike {
   code?: string | null;
 }
 
+/**
+ * An error whose message is meant to be read by the person who hit it.
+ *
+ * `describeError` exists because a raw Postgres or fetch error is never worth
+ * showing — but some failures are raised by this app, about this app, with a
+ * sentence already chosen for the screen. Those need a way to say so, or the
+ * fallback swallows them.
+ */
+export class UserFacingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UserFacingError';
+  }
+}
+
 export interface DescribedError {
   /** Written for the person who hit it. Always safe to show. */
   message: string;
@@ -83,6 +98,13 @@ const BY_TEXT: Array<[RegExp, string]> = [
 export const describeError = (error: unknown, fallback = 'Something went wrong.'): DescribedError => {
   const detail = rawErrorText(error);
   const dev = isDevMode();
+
+  // Already written for the person who will read it, so it is shown as it is.
+  // Everything below exists to stop a raw error reaching a screen; an error
+  // raised deliberately with a sentence in it has already done that work, and
+  // running it through the fallback would replace the one useful thing it has
+  // to say with "Something went wrong."
+  if (error instanceof UserFacingError) return { message: error.message, detail: dev ? detail : undefined };
 
   const p = asPostgrest(error);
   const byCode = p?.code ? BY_CODE[p.code] : undefined;

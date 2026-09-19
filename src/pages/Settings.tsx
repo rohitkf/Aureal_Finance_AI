@@ -38,6 +38,8 @@ import { useTheme } from '@/hooks/useTheme';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { NewCategoryDialog } from '@/components/NewCategoryDialog';
 import { LabelDialog } from '@/components/LabelDialog';
+import { DeleteAccountDialog } from '@/components/DeleteAccountDialog';
+import { deleteAccount } from '@/lib/deleteAccount';
 import { LabelChip } from '@/components/LabelPicker';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
@@ -83,6 +85,7 @@ export const Settings = () => {
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [editingLabel, setEditingLabel] = useState<LabelType | null>(null);
   const [deletingLabel, setDeletingLabel] = useState<LabelType | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [busy, setBusy] = useState<'sample' | 'clear' | 'backup' | null>(null);
 
   const grouped = useMemo(
@@ -622,12 +625,26 @@ export const Settings = () => {
       <Card className="space-y-5 shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.3)]">
         <CardHeader
           title="Delete your account"
-          description="Account deletion is handled by support while the app is in early access — email us and we'll remove everything within 30 days."
+          description="Removes the account itself, not just what is in it. Everything goes at once and none of it can be recovered."
         />
-        <Button variant="danger" icon="trash" disabled>
+        <Button variant="danger" icon="trash" onClick={() => setDeletingAccount(true)}>
           Delete account
         </Button>
       </Card>
+
+      <DeleteAccountDialog
+        open={deletingAccount}
+        onClose={() => setDeletingAccount(false)}
+        email={user?.email ?? ''}
+        onConfirm={async () => {
+          await deleteAccount();
+          // The account is gone, so the session refers to nothing. Signing out
+          // clears what the browser is still holding; the redirect is what
+          // stops the app trying to load data for a user who no longer exists.
+          await signOut();
+          navigate('/login', { replace: true });
+        }}
+      />
 
       <ConfirmDialog
         open={pendingRestore !== null}
