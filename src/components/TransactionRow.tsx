@@ -27,6 +27,7 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
   const category = lookupCategory(transaction.categoryId);
   const account = accounts.find((a) => a.id === transaction.accountId);
   const scheduled = transaction.status === 'scheduled';
+  const voided = transaction.status === 'void';
   // Scheduled, and its date has been and gone. The money is still owed, and
   // until somebody says otherwise the app has to keep holding it back.
   const overdue = scheduled && transaction.date <= today;
@@ -50,6 +51,9 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
         // it has not happened yet.
         scheduled && 'bg-transparent shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.09)] hover:bg-[rgb(var(--hairline)/0.03)]',
         overdue && 'shadow-[inset_0_0_0_1px_rgb(var(--warning)/0.35)]',
+        // Cancelled. Kept, so the history is honest, and faded so it is never
+        // mistaken for money.
+        voided && 'opacity-55',
         className,
       )}
     >
@@ -62,7 +66,9 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
       */}
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate text-body-md font-semibold text-text">{transaction.merchant}</span>
+          <span className={cn('truncate text-body-md font-semibold text-text', voided && 'line-through')}>
+            {transaction.merchant}
+          </span>
           {transaction.recurringId && (
             <Icon name="repeat" size={13} className="shrink-0 text-faint" title="Recurring" />
           )}

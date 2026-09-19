@@ -145,7 +145,9 @@ describe('Add transaction', () => {
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(dispatch.mock.calls[0][0]).toMatchObject({
       type: 'add-transaction',
-      transaction: { amount: 42.5, type: 'expense', accountId: 'acc-1', status: 'cleared' },
+      // Recorded, not checked off: nobody has verified it yet, and it counts
+      // in full either way.
+      transaction: { amount: 42.5, type: 'expense', accountId: 'acc-1', status: 'none' },
     });
   });
 

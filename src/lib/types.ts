@@ -54,7 +54,15 @@ export interface Category {
 }
 
 export type TransactionType = 'expense' | 'income' | 'transfer';
-export type TransactionStatus = 'cleared' | 'pending' | 'scheduled';
+/**
+ * Where a transaction stands.
+ *
+ * `scheduled` is the odd one out and deliberately so: it is the only value
+ * that means the thing has not happened. The other four all describe
+ * something that did, and differ only in how sure you are of it — which is
+ * the whole of reconciling an account against a statement.
+ */
+export type TransactionStatus = 'scheduled' | 'none' | 'cleared' | 'reconciled' | 'void';
 
 export interface TransactionSplit {
   categoryId: string;

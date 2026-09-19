@@ -109,11 +109,11 @@ describe('what is on the page', () => {
     expect(screen.queryByText('Insurance')).not.toBeInTheDocument();
   });
 
-  it('counts a pending payment as having happened, because the balance already does', () => {
+  it('counts an unchecked payment as having happened, because the balance already does', () => {
     state = {
       ...state,
       recurring: [],
-      transactions: [{ ...cleared('t-p', '2026-09-16', 'Card machine'), status: 'pending' } as Transaction],
+      transactions: [{ ...cleared('t-p', '2026-09-16', 'Card machine'), status: 'none' } as Transaction],
     };
     show();
     expect(screen.getByText('Card machine')).toBeInTheDocument();

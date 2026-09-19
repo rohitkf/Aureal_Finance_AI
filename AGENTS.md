@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 436 tests
+npm run test         # vitest — 497 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -68,8 +68,12 @@ Vocabulary that is easy to get wrong:
 |---|---|
 | **Available now** | Cleared balances of the accounts money can actually be spent from — current, savings, cash. Credit is a debt and investments are not cash, so neither counts. |
 | **A credit account's `balance`** | What is **owed**, as a positive number. Spending increases it; a payment reduces it. |
-| **`cleared`** | It happened. It is in the balance. |
-| **`scheduled`** | It is a plan. It is in the forecast and moves no balance until it clears. |
+| **`scheduled`** | It has not happened. It is on Reminders and in the forecast, and moves no balance. The only status that means this. |
+| **`none`** | It happened and counts, and nobody has checked it. What a new transaction gets. |
+| **`cleared`** | It happened, and you have seen it go through. Counts exactly as `none` does. |
+| **`reconciled`** | It matched a statement. Counts the same again, and the row locks: amount, date and type cannot change until it is un-reconciled. |
+| **`void`** | Cancelled. The record stays, struck through, on the register; it moves no money and never appears on Reminders. |
+| **What counts** | `none`, `cleared`, `reconciled`. `finance.ts`'s `counts()` and the database's `apply_transaction_to_balances` must always agree on this, or the balance on screen drifts from the balance in the account. |
 | **A virtual account** | An allocation of money that already exists in a real account. It never adds to net worth. |
 | **A commitment** | A recurring payment that has not yet fallen due this month. A transfer is not one: the money is still yours. |
 | **A transfer rule** | A standing order between two of your own accounts. `account_id` is the source, `to_account_id` the destination. |
@@ -306,12 +310,20 @@ Each of these has already cost real time here.
   treated as money leaving — Aureal is a record of accounts, not the bank, and
   deleting one here does not cancel a real standing order.
 - **A check constraint cannot demand what `on delete set null` will take away.**
-  This has now bitten twice, both times caught only by a test that deleted the
-  parent. A constraint requiring `to_account_id` on a transfer made deleting the
-  far account fail; one requiring `recurring_id` beside `recurring_date` made
-  deleting a rule fail once an occurrence had been edited. Constrain the
-  *incoherent* (a destination on a non-transfer, a transfer pointing at itself),
-  never the merely orphaned — and write the delete-the-parent test.
+  Three times now, each caught only by a test that deleted the parent.
+  `transactions_transfer_target` requiring `to_account_id` made an account that
+  had ever *received* a transfer undeletable — shipped, and live for two days.
+  `recurring_transfer_target` did the same to an account named by a rule.
+  `transactions_recurring_date_needs_rule` made deleting a rule fail once an
+  occurrence had been edited. Constrain the *incoherent* (a transfer pointing at
+  its own account), never the merely orphaned; put the rule that a new row needs
+  a destination in a `before insert` trigger instead, where a cascade's UPDATE
+  will not meet it — and write the delete-the-parent test.
+- **The reconciled lock guards three fields and no more.** `amount`,
+  `occurred_on` and `type` — the ones that decide the money. Not `account_id`,
+  not `to_account_id`, not `recurring_id`, because those are exactly what a
+  cascade nulls, and a lock that blocks a cascade is the mistake above wearing a
+  different hat. Un-reconciling is always allowed; it is the way back.
 - **A rule is never projected into the past.** `ledgerRows` starts projections at
   today. A prediction about a period we already have facts for invents history,
   and worse, the register's balance column would then count money that is not in

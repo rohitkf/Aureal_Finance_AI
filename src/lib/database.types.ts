@@ -117,7 +117,7 @@ export interface TransactionRow {
   merchant: string;
   amount: number;
   type: 'expense' | 'income' | 'transfer';
-  status: 'cleared' | 'pending' | 'scheduled';
+  status: 'scheduled' | 'none' | 'cleared' | 'reconciled' | 'void';
   notes: string | null;
   recurring_id: string | null;
   recurring_date: string | null;

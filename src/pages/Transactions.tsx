@@ -15,13 +15,25 @@ import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, CardHeader, Eyebrow } from '@/components/ui/Card';
 import { SegmentedControl, SelectField, TextField } from '@/components/ui/Field';
-import { Icon } from '@/components/ui/Icon';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { EmptyState, SkeletonRows } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
-import type { RecurringPayment, Transaction, TransactionType } from '@/lib/types';
+import type { RecurringPayment, Transaction, TransactionStatus, TransactionType } from '@/lib/types';
 
 type TypeFilter = 'all' | TransactionType | 'scheduled';
+
+/** How each status reads on a badge. One table, so every screen agrees. */
+const STATUS_BADGE: Record<
+  TransactionStatus,
+  { label: string; tone: 'success' | 'neutral' | 'warning'; icon: IconName }
+> = {
+  none: { label: 'Recorded', tone: 'neutral', icon: 'receipt' },
+  cleared: { label: 'Cleared', tone: 'success', icon: 'check-circle' },
+  reconciled: { label: 'Reconciled', tone: 'success', icon: 'lock' },
+  void: { label: 'Void', tone: 'warning', icon: 'close' },
+  scheduled: { label: 'Scheduled', tone: 'neutral', icon: 'calendar' },
+};
 
 const TYPE_FILTERS: Array<{ value: TypeFilter; label: string }> = [
   { value: 'all', label: 'All' },
@@ -558,8 +570,8 @@ const TransactionDetail = ({
           {money(transaction.amount, { masked: maskBalances })}
         </p>
         <div className="mt-2 flex justify-center">
-          <Badge tone={transaction.status === 'cleared' ? 'success' : 'neutral'} icon={transaction.status === 'cleared' ? 'check-circle' : 'calendar'}>
-            {transaction.status === 'cleared' ? 'Cleared' : transaction.status === 'pending' ? 'Pending' : 'Scheduled'}
+          <Badge tone={STATUS_BADGE[transaction.status].tone} icon={STATUS_BADGE[transaction.status].icon}>
+            {STATUS_BADGE[transaction.status].label}
           </Badge>
         </div>
       </div>

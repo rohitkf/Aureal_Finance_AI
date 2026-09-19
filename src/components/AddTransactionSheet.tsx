@@ -39,11 +39,28 @@ import { CategoryIcon } from './CategoryIcon';
 import { NewCategoryDialog } from './NewCategoryDialog';
 import { AccountDialog } from './AccountDialog';
 
+/**
+ * The four a transaction that has happened can be in.
+ *
+ * `scheduled` is not among them on purpose: whether something has happened is
+ * a question about its date, asked by the checkbox under this control, not a
+ * fifth thing to pick from a row of four.
+ */
 const STATUS_OPTIONS: Array<{ value: TransactionStatus; label: string }> = [
+  { value: 'none', label: 'None' },
   { value: 'cleared', label: 'Cleared' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'reconciled', label: 'Reconciled' },
+  { value: 'void', label: 'Void' },
 ];
+
+const STATUS_HINTS: Record<TransactionStatus, string> = {
+  none: 'It happened and it counts — you just haven’t checked it off. The default for anything you enter yourself.',
+  cleared: 'You have seen it go through the account. Counts in full, same as None; this only records that you checked.',
+  reconciled:
+    'It matched your statement. Counts in full, and the row locks: the amount, the date and the type can’t change until you un-reconcile it.',
+  void: 'Cancelled. The record stays, struck through, so you can see it was there — but it moves no money at all.',
+  scheduled: 'It hasn’t happened yet. Your balance is untouched and it waits on Reminders until you record it.',
+};
 
 const TYPE_OPTIONS: Array<{ value: TransactionType; label: string }> = [
   { value: 'expense', label: 'Expense' },
@@ -154,7 +171,12 @@ export const AddTransactionSheet = ({
   // which is the rule the ledger is built on; an existing one needs to be
   // changeable, because a scheduled payment that has gone through is the only
   // way to tell the app it is no longer owed.
-  const [status, setStatus] = useState<TransactionStatus>('cleared');
+  const [status, setStatus] = useState<TransactionStatus>('none');
+  /**
+   * The status to go back to when "hasn't happened yet" is unticked — the one
+   * that was showing before, not a guess.
+   */
+  const [lastSettledStatus, setLastSettledStatus] = useState<TransactionStatus>('none');
   const [dateMode, setDateMode] = useState<DateMode>('today');
   const [repeats, setRepeats] = useState(false);
   const [frequency, setFrequency] = useState<Frequency>('monthly');
@@ -177,7 +199,8 @@ export const AddTransactionSheet = ({
     setNotes(editing?.notes ?? '');
     setDate(editing?.date ?? today);
     setTime(editing?.time ?? nowTime());
-    setStatus(editing?.status ?? 'cleared');
+    setStatus(editing?.status ?? 'none');
+    setLastSettledStatus(editing && editing.status !== 'scheduled' ? editing.status : 'none');
     setDateMode(editing ? 'custom' : 'today');
     setRepeats(false);
     setFrequency('monthly');
@@ -327,7 +350,7 @@ export const AddTransactionSheet = ({
       // A date in the future is a plan, not a fact — it lands in the forecast.
       // On an edit the person says which it is, because only they know whether
       // a payment that was due last week actually went out.
-      status: editing ? status : date > today ? 'scheduled' : 'cleared',
+      status: editing ? status : date > today ? 'scheduled' : 'none',
       notes: notes.trim() || undefined,
       recurringId: editing?.recurringId ?? rule?.id,
       // The occurrence this stands in for, kept even when the date is moved —
@@ -572,21 +595,29 @@ export const AddTransactionSheet = ({
           </div>
 
           {editing && (
-            <SegmentedControl
-              label="Status"
-              value={status}
-              onChange={setStatus}
-              options={STATUS_OPTIONS}
-              hint={
-                {
-                  cleared: 'It has happened. The money is already in your balance.',
-                  pending: 'It has happened but hasn’t settled. Counted in your balance all the same.',
-                  scheduled:
-                    'It hasn’t happened yet. Your balance is untouched, and the amount is held back from Safe to Spend until you mark it cleared.',
-                }[status]
-              }
-              className="w-full [&>button]:flex-1"
-            />
+            <div className="space-y-4">
+              <SegmentedControl
+                label="Status"
+                value={status === 'scheduled' ? lastSettledStatus : status}
+                onChange={(value) => {
+                  setStatus(value);
+                  setLastSettledStatus(value);
+                }}
+                options={STATUS_OPTIONS}
+                hint={STATUS_HINTS[status]}
+                className="w-full [&>button]:flex-1"
+              />
+
+              {/* Not a fifth status. Whether it has happened is one question,
+                  and how sure you are of it is another; a single row of five
+                  made you answer both with one press. */}
+              <CheckboxField
+                checked={status === 'scheduled'}
+                onChange={(on) => setStatus(on ? 'scheduled' : lastSettledStatus)}
+                label="This hasn’t happened yet"
+                description="Keeps it on Reminders and out of your balance until you come back and record it. Untick it the day it goes through."
+              />
+            </div>
           )}
 
           {/* Repeating lives here rather than only on the Recurring screen,

@@ -104,7 +104,7 @@ describe('what is on the page', () => {
       recurring: [],
       transactions: [
         { ...scheduled('t-done', '2026-09-15', 'Tesco'), status: 'cleared' } as Transaction,
-        { ...scheduled('t-pend', '2026-09-16', 'Card machine'), status: 'pending' } as Transaction,
+        { ...scheduled('t-pend', '2026-09-16', 'Card machine'), status: 'none' } as Transaction,
       ],
     };
     show();

@@ -29,6 +29,9 @@ export const LedgerLine = ({
 }) => {
   const incoming = row.direction === 'in';
   const isToday = row.date === today;
+  // Cancelled: still on the statement, because you want to see it was there,
+  // but struck through and drawn back so it never reads as money.
+  const voided = row.status === 'void';
 
   return (
     <div
@@ -54,7 +57,13 @@ export const LedgerLine = ({
         {/* What it is */}
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-body-md text-text">{row.name}</span>
+            <span className={cn('truncate text-body-md text-text', voided && 'line-through opacity-60')}>
+              {row.name}
+            </span>
+            {row.status === 'reconciled' && (
+              <Icon name="lock" size={11} className="shrink-0 text-faint" title="Reconciled — this row is locked" />
+            )}
+            {voided && <Badge tone="neutral">Void</Badge>}
             {row.projected && (
               <Icon name="repeat" size={12} className="shrink-0 text-faint" title="From a schedule" />
             )}
@@ -73,6 +82,7 @@ export const LedgerLine = ({
             'w-[86px] shrink-0 text-right tnum text-body-md font-medium sm:w-[104px]',
             incoming ? 'text-success' : 'text-text',
             !row.settled && 'opacity-70',
+            voided && 'line-through opacity-50',
           )}
         >
           {incoming ? '+' : '−'}
