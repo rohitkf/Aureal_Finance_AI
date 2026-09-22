@@ -98,6 +98,15 @@ export type Action =
        * before the account it belongs to exists.
        */
       openingBalance?: number;
+      /**
+       * The day that opening balance is dated.
+       *
+       * An account you have had for years did not start today, and dating its
+       * opening balance today puts every earlier transaction in front of the
+       * money that was supposed to be there. Defaults to today when the form
+       * does not say otherwise.
+       */
+      openedOn?: string;
     }
   | { type: 'delete-account'; id: string }
   | { type: 'upsert-virtual'; virtual: VirtualAccount }
@@ -848,7 +857,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                 await supabase.from('transactions').insert({
                   id: newId(),
                   account_id: a.id,
-                  occurred_on: ISO(new Date()),
+                  occurred_on: action.openedOn ?? ISO(new Date()),
                   merchant: 'Opening balance',
                   amount: opening,
                   // On a credit account the stored balance is what is owed, so

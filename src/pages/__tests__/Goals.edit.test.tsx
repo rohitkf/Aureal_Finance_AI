@@ -109,3 +109,54 @@ describe('changing a goal', () => {
     expect(saved().goal.linkedAccountId).toBeUndefined();
   });
 });
+
+/**
+ * Linking a goal to the account the money is actually in.
+ *
+ * `linkedAccountId` has been on the goal, in the database and in `goalToRow`
+ * since goals shipped, and nothing in the app could ever set it. A goal with
+ * no account behind it is a number you are trusted to remember; one with an
+ * account is a number that can be checked against a real balance.
+ */
+describe('the account behind a goal', () => {
+  beforeEach(() => {
+    state.accounts = [
+      { id: 'acc-1', name: 'Everyday', type: 'current', institution: 'Monzo', balance: 900, maskedNumber: '••1', syncStatus: 'manual' },
+      { id: 'acc-2', name: 'Savings', type: 'savings', institution: 'Chase', balance: 4000, maskedNumber: '••2', syncStatus: 'manual' },
+    ];
+  });
+
+  it('can be chosen when the goal is made', async () => {
+    const user = userEvent.setup();
+    render();
+
+    await user.click(screen.getAllByRole('button', { name: /new goal|add a goal/i })[0]!);
+    await user.type(screen.getByLabelText('Goal name'), 'Car');
+    await user.type(screen.getByLabelText('Target amount'), '5000');
+    await user.click(screen.getByRole('combobox', { name: /money for this is in/i }));
+    await user.click(screen.getByRole('option', { name: /savings/i }));
+    await user.click(screen.getByRole('button', { name: /save goal|save changes|save/i }));
+
+    expect(saved().goal.linkedAccountId).toBe('acc-2');
+  });
+
+  it('opens on the account the goal already names', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.click(screen.getByRole('button', { name: /edit wedding/i }));
+
+    expect(screen.getByRole('combobox', { name: /money for this is in/i })).toHaveTextContent('Savings');
+  });
+
+  it('can be left unset, because not every goal has an account', async () => {
+    const user = userEvent.setup();
+    render();
+
+    await user.click(screen.getAllByRole('button', { name: /new goal|add a goal/i })[0]!);
+    await user.type(screen.getByLabelText('Goal name'), 'Car');
+    await user.type(screen.getByLabelText('Target amount'), '5000');
+    await user.click(screen.getByRole('button', { name: /save goal|save changes|save/i }));
+
+    expect(saved().goal.linkedAccountId).toBeUndefined();
+  });
+});

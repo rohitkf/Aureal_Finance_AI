@@ -6,7 +6,8 @@ import { newId, useAppState, useLoading, useSettings, useStore, useToday } from 
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, Eyebrow } from '@/components/ui/Card';
-import { DateField, TextField } from '@/components/ui/Field';
+import { isDepository } from '@/lib/finance';
+import { DateField, SelectField, TextField } from '@/components/ui/Field';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { Progress } from '@/components/ui/Progress';
@@ -21,6 +22,8 @@ interface Draft {
   saved: string;
   targetDate: string;
   monthlyContribution: string;
+  /** Which account the money for this goal actually sits in. */
+  linkedAccountId: string;
   error?: string;
 }
 
@@ -82,6 +85,7 @@ export const Goals = () => {
       targetDate: draft.targetDate,
       monthlyContribution: Number.parseFloat(draft.monthlyContribution) || 0,
       icon: existing?.icon ?? 'target',
+      linkedAccountId: draft.linkedAccountId || undefined,
     };
     dispatch({ type: 'upsert-goal', goal });
     toast({ tone: 'success', title: draft.id ? 'Goal updated' : 'Goal created', description: goal.name });
@@ -111,7 +115,7 @@ export const Goals = () => {
           variant="primary"
           icon="plus"
           onClick={() =>
-            setDraft({ name: '', target: '', saved: '0', targetDate: '2027-12-01', monthlyContribution: '' })
+            setDraft({ name: '', target: '', saved: '0', targetDate: '2027-12-01', monthlyContribution: '', linkedAccountId: '' })
           }
         >
           New goal
@@ -158,7 +162,7 @@ export const Goals = () => {
             description="Set a target and a date, and Aureal will tell you whether you’re on track to reach it."
             action={{
               label: 'Create your first goal',
-              onClick: () => setDraft({ name: '', target: '', saved: '0', targetDate: '2027-12-01', monthlyContribution: '' }),
+              onClick: () => setDraft({ name: '', target: '', saved: '0', targetDate: '2027-12-01', monthlyContribution: '', linkedAccountId: '' }),
             }}
           />
         </Card>
@@ -249,6 +253,7 @@ export const Goals = () => {
                         saved: String(goal.saved),
                         targetDate: goal.targetDate,
                         monthlyContribution: String(goal.monthlyContribution),
+                        linkedAccountId: goal.linkedAccountId ?? '',
                       })
                     }
                   />
@@ -277,6 +282,25 @@ export const Goals = () => {
         {draft && (
           <div className="space-y-4">
             <TextField label="Goal name" placeholder="e.g. Wedding" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            {/* `linkedAccountId` has been on the goal, in the database and in
+                `goalToRow` since goals shipped, and nothing could ever set it.
+                A goal with no account behind it is a number you are trusted to
+                remember; one with an account is a number you can check. */}
+            <SelectField
+              label="Money for this is in"
+              value={draft.linkedAccountId}
+              onChange={(linkedAccountId) => setDraft({ ...draft, linkedAccountId })}
+              hint="Optional. Says where the money actually sits, so the goal can be checked against a real balance."
+            >
+              <option value="">Not linked to an account</option>
+              {state.accounts
+                .filter(isDepository)
+                .map((a) => (
+                  <option key={a.id} value={a.id} data-hint={money(a.balance, { compact: true })}>
+                    {a.name}
+                  </option>
+                ))}
+            </SelectField>
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField
                 label="Target amount"

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { newId, useAppState, useStore } from '@/lib/store';
+import { newId, useAppState, useStore, useToday } from '@/lib/store';
 import type { Account, AccountGroup, AccountType } from '@/lib/types';
 import { Button } from './ui/Button';
-import { AmountField, SelectField, TextField } from './ui/Field';
+import { AmountField, DateField, SelectField, TextAreaField, TextField } from './ui/Field';
 import { Modal } from './ui/Modal';
 import { useToast } from './ui/Toast';
 import { AccountGroupDialog } from './AccountGroupDialog';
@@ -40,6 +40,7 @@ interface AccountDialogProps {
  */
 export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: AccountDialogProps) => {
   const { dispatch } = useStore();
+  const today = useToday();
   const { accountGroups } = useAppState();
   const toast = useToast();
   const [groupId, setGroupId] = useState('');
@@ -54,6 +55,20 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
   const [apr, setApr] = useState('');
   const [dueDay, setDueDay] = useState('');
   const [aer, setAer] = useState('');
+  /**
+   * Three fields the app already knew about and could not be told.
+   *
+   * The note is printed on the account card, the statement day on the account
+   * screen ("15th of each month", "Next statement…"), and the minimum payment
+   * on Debts, Accounts and the account screen. All three were read from a row
+   * nothing could write. They arrived only from sample data, so a real account
+   * showed a blank where a number was promised.
+   */
+  const [note, setNote] = useState('');
+  const [statementDay, setStatementDay] = useState('');
+  const [minimumPayment, setMinimumPayment] = useState('');
+  /** When the opening balance is dated. Today unless it was opened earlier. */
+  const [openedOn, setOpenedOn] = useState(today);
 
   useEffect(() => {
     if (!open) return;
@@ -67,7 +82,11 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
     setDueDay(editing?.paymentDueDay ? String(editing.paymentDueDay) : '');
     setAer(editing?.aer ? String(editing.aer) : '');
     setGroupId(editing?.groupId ?? '');
-  }, [open, editing]);
+    setNote(editing?.note ?? '');
+    setStatementDay(editing?.statementDay ? String(editing.statementDay) : '');
+    setMinimumPayment(editing?.minimumPayment ? String(editing.minimumPayment) : '');
+    setOpenedOn(today);
+  }, [open, editing, today]);
 
   const isCredit = type === 'credit';
   const parsedBalance = Number.parseFloat(balance) || 0;
@@ -103,6 +122,9 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
       paymentDueDay: isCredit ? Number.parseInt(dueDay, 10) || undefined : undefined,
       aer: type === 'savings' ? Number.parseFloat(aer) || undefined : undefined,
       groupId: groupId || undefined,
+      note: note.trim() || undefined,
+      statementDay: isCredit ? Number.parseInt(statementDay, 10) || undefined : undefined,
+      minimumPayment: isCredit ? Number.parseFloat(minimumPayment) || undefined : undefined,
     };
 
     // One action, not two. Sent separately, the opening balance raced the
@@ -112,6 +134,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
       type: 'upsert-account',
       account,
       openingBalance: editing ? undefined : parsedBalance,
+      openedOn: editing ? undefined : openedOn,
     });
 
     toast({
@@ -199,6 +222,27 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
             onChange={(e) => setInstitution(e.target.value)}
           />
 
+          {/* Only on a new account: an existing one's opening balance is a
+              transaction already, with a date you change by editing it. */}
+          {!editing && (
+            <DateField
+              label="Opened on"
+              value={openedOn}
+              onChange={setOpenedOn}
+              hint="When the balance above was true. An account you have had for years did not start today."
+            />
+          )}
+
+          <TextAreaField
+            label="Note"
+            placeholder="Joint account with Sam"
+            value={note}
+            maxLength={200}
+            rows={2}
+            onChange={(e) => setNote(e.target.value)}
+            hint="Optional. Shown under the account on the Accounts page."
+          />
+
           {/* Below the things that decide what this account *is*, because it
               decides nothing — it only changes which heading the account is
               listed under. Most people never touch it. */}
@@ -250,6 +294,24 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
                 value={dueDay}
                 onChange={(e) => setDueDay(e.target.value.replace(/\D/g, ''))}
                 hint="Day of the month."
+              />
+              {/* Both of these were already printed on the account screen and
+                  on Debts, read from a row nothing could write. */}
+              <TextField
+                label="Statement day"
+                inputMode="numeric"
+                maxLength={2}
+                placeholder="12"
+                value={statementDay}
+                onChange={(e) => setStatementDay(e.target.value.replace(/\D/g, ''))}
+                hint="Day of the month the statement is issued."
+              />
+              <TextField
+                label="Minimum payment"
+                inputMode="decimal"
+                placeholder="25"
+                value={minimumPayment}
+                onChange={(e) => setMinimumPayment(e.target.value.replace(/[^0-9.]/g, ''))}
               />
             </>
           )}
