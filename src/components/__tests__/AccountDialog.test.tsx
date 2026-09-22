@@ -22,11 +22,22 @@ const toast = vi.fn();
 vi.mock('@/lib/store', () => ({
   useStore: () => ({ dispatch, today: '2026-09-18' }),
   useAppState: () => ({ accountGroups: [] }),
+  useToday: () => '2026-09-22',
   newId: () => 'generated-id',
 }));
 vi.mock('../ui/Toast', () => ({ useToast: () => toast }));
 
 const { AccountDialog } = await import('../AccountDialog');
+
+const EXISTING = {
+  id: 'acc-1',
+  name: 'Current',
+  type: 'current' as const,
+  institution: 'Monzo',
+  balance: 1200,
+  maskedNumber: '••1234',
+  syncStatus: 'manual' as const,
+};
 
 const open = () => render(<AccountDialog open onClose={vi.fn()} />);
 const sent = () => dispatch.mock.calls.map((c) => c[0]);
@@ -108,16 +119,6 @@ describe('editing an existing account', () => {
  * mistake.
  */
 describe('an account opened for editing', () => {
-  const EXISTING = {
-    id: 'acc-1',
-    name: 'Current',
-    type: 'current' as const,
-    institution: 'Monzo',
-    balance: 1200,
-    maskedNumber: '••1234',
-    syncStatus: 'manual' as const,
-  };
-
   const openEditing = (props: Record<string, unknown> = {}) =>
     render(<AccountDialog open onClose={vi.fn()} editing={EXISTING} {...props} />);
 
@@ -177,11 +178,14 @@ describe('an account opened for editing', () => {
    */
   it('keeps what it never asked about, rather than nulling it', async () => {
     const user = userEvent.setup();
+    // A card, because the statement day and the minimum payment are now the
+    // form's own fields and belong to one — the same rule the credit limit
+    // has always followed.
     render(
       <AccountDialog
         open
         onClose={vi.fn()}
-        editing={{ ...EXISTING, statementDay: 15, minimumPayment: 25, note: 'joint account' }}
+        editing={{ ...EXISTING, type: 'credit', statementDay: 15, minimumPayment: 25, note: 'joint account' }}
       />,
     );
 
@@ -195,6 +199,17 @@ describe('an account opened for editing', () => {
       minimumPayment: 25,
       note: 'joint account',
     });
+  });
+
+  it('keeps a note on an account of any kind, since a note is not a card thing', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, note: 'joint account' }} />);
+
+    await user.clear(screen.getByLabelText('Account name'));
+    await user.type(screen.getByLabelText('Account name'), 'Everyday');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(sent()[0].account.note).toBe('joint account');
   });
 
   it('does not quietly demote a connected account to a manual one', async () => {
@@ -270,5 +285,68 @@ describe('the order the form asks things in', () => {
   it('says the filing choice is only about where it is listed', () => {
     render(<AccountDialog open onClose={vi.fn()} />);
     expect(screen.getByText(/only about where it appears/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Fields the app read but could never be told.
+ *
+ * The note is printed under the account on the Accounts page. The statement
+ * day appears twice on the account screen — "15th of each month", "Next
+ * statement…". The minimum payment appears on Debts, on Accounts and on the
+ * account screen. All three were read from a row that nothing in the app
+ * could write, so they arrived only from sample data: a real account showed a
+ * blank where a number was promised.
+ *
+ * The same shape as the transaction delete, and missed by the audit that went
+ * looking for it — because that audit checked which store actions had callers,
+ * and these are fields, not actions.
+ */
+describe('fields the form never asked for', () => {
+  it('takes a note, which the accounts page already prints', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('Account name'), 'Joint');
+    await user.type(screen.getByLabelText('Note'), 'Shared with Sam');
+    await user.click(screen.getByRole('button', { name: /Add account/ }));
+
+    expect(sent()[0].account.note).toBe('Shared with Sam');
+  });
+
+  it('takes a statement day and a minimum payment on a credit card', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'credit' }} />);
+
+    await user.type(screen.getByLabelText('Statement day'), '12');
+    await user.type(screen.getByLabelText('Minimum payment'), '25');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(sent()[0].account).toMatchObject({ statementDay: 12, minimumPayment: 25 });
+  });
+
+  it('does not offer the card fields to an account that is not a card', () => {
+    render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'savings' }} />);
+    expect(screen.queryByLabelText('Statement day')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Minimum payment')).not.toBeInTheDocument();
+  });
+
+  it('lets a new account say when it was opened', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('Balance today'), '250');
+    await user.type(screen.getByLabelText('Account name'), 'Old savings');
+    await user.click(screen.getByRole('button', { name: /Add account/ }));
+
+    // An account you have had for years did not start today, and dating its
+    // opening balance today puts every earlier transaction in front of it.
+    expect(sent()[0]).toHaveProperty('openedOn');
+  });
+
+  it('does not ask an existing account when it was opened', () => {
+    // That balance is already a transaction with a date of its own.
+    render(<AccountDialog open onClose={vi.fn()} editing={EXISTING} />);
+    expect(screen.queryByLabelText('Opened on')).not.toBeInTheDocument();
   });
 });

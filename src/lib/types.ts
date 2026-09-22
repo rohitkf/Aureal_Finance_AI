@@ -51,7 +51,6 @@ export interface Account {
   minimumPayment?: number;
   /** Savings only. */
   aer?: number;
-  colorKey?: 'primary' | 'success' | 'secondary' | 'warning';
   note?: string;
   /** The group it is shown under and counted in. Absent means by its type. */
   groupId?: string;
