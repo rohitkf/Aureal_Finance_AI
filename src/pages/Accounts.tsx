@@ -3,18 +3,18 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import {
   accountUtilisation,
-  availableCredit,
   availableNow,
   creditUtilisation,
-  isDepository,
   isSpendable,
   netWorth,
+  owesMoney,
+  sideOf,
   totalCreditLimit,
   totalDebt,
 } from '@/lib/finance';
 import { formatMediumDate } from '@/lib/date';
 import { money, percent, round2 } from '@/lib/format';
-import { useAppState, useLoading, useSettings, useToday } from '@/lib/store';
+import { useAppState, useLoading, useSettings } from '@/lib/store';
 import { Badge, StatusDot } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card, Eyebrow, Label } from '@/components/ui/Card';
@@ -51,8 +51,22 @@ const TYPE_SECTION: Record<Account['type'], string> = {
   liability: 'Owed',
 };
 
-/** The order sections appear in when they come from types rather than groups. */
-const TYPE_ORDER: Account['type'][] = ['current', 'savings', 'cash', 'investment', 'asset'];
+/**
+ * The order sections appear in when they come from types rather than groups.
+ *
+ * Every type, including the two that owe money. Credit cards used to be
+ * pulled out and drawn somewhere else entirely, which meant the page rendered
+ * an account in three different places depending on how it had been filed.
+ */
+const TYPE_ORDER: Account['type'][] = [
+  'current',
+  'savings',
+  'cash',
+  'investment',
+  'asset',
+  'credit',
+  'liability',
+];
 
 // Until bank connections exist every account is maintained by hand, and the
 // interface says so rather than implying a live feed.
@@ -65,7 +79,6 @@ const SYNC_TONE = {
 
 export const Accounts = () => {
   const state = useAppState();
-  const today = useToday();
   const { maskBalances } = useSettings();
   const loading = useLoading();
   const { dispatch } = useStore();
@@ -136,26 +149,42 @@ export const Accounts = () => {
       out.push({
         key: `type-${type}`,
         title: TYPE_SECTION[type],
-        side: 'asset',
+        // `sideOf` is the one answer to this question, and the rest of the app
+        // already asks it. Writing 'asset' here instead put credit cards and
+        // loans on the wrong half of the balance sheet — with a green badge
+        // and a subtotal that did not know it was money owed.
+        side: sideOf(accounts[0]!, state.accountGroups),
         accounts,
         subtotal: round2(accounts.reduce((sum, a) => sum + a.balance, 0)),
       });
     }
 
-    // Loans that are not in a group of their own still have to appear.
-    const loans = state.accounts.filter((a) => a.type === 'liability' && !grouped.has(a.id));
-    if (loans.length > 0) {
-      out.push({
-        key: 'type-liability',
-        title: TYPE_SECTION.liability,
-        side: 'liability',
-        accounts: loans,
-        subtotal: round2(loans.reduce((sum, a) => sum + a.balance, 0)),
-      });
-    }
-
     return out;
   }, [state.accounts, state.accountGroups]);
+
+  /**
+   * The page, in two halves.
+   *
+   * What you own, then what you owe, each with its own total — the shape a
+   * balance sheet has had for five hundred years, and the one the screens
+   * people compare this to use. Before, a named group marked "liability"
+   * could sit above an asset group purely because it was created first, and
+   * the only thing saying which was which was a badge on the heading.
+   */
+  const halves = useMemo(
+    () =>
+      (['asset', 'liability'] as const)
+        .map((side) => {
+          const inSide = sections.filter((s) => s.side === side);
+          return {
+            side,
+            sections: inSide,
+            total: round2(inSide.reduce((sum, s) => sum + s.subtotal, 0)),
+          };
+        })
+        .filter((half) => half.sections.length > 0),
+    [sections],
+  );
 
   /** Credit cards keep their own section, unless they have been given a group. */
   const groupedIds = useMemo(
@@ -163,7 +192,6 @@ export const Accounts = () => {
     [sections],
   );
 
-  const depository = state.accounts.filter(isDepository);
   // The headline is spendable cash, so its count must be of the same accounts.
   // An investment sits in the list below but is not money you can spend today.
   const spendable = state.accounts.filter(isSpendable);
@@ -264,15 +292,9 @@ export const Accounts = () => {
         </Card>
       </section>
 
-      {/* ---------------- Depository accounts ---------------- */}
+      {/* ---------------- Every account, in two halves ---------------- */}
       <section className="space-y-3">
-        <div className="flex items-center gap-3">
-          <span className="h-4 w-1.5 rounded-full bg-success" aria-hidden="true" />
-          <h2 className="font-display text-headline-sm text-text">Bank, savings & cash</h2>
-          <span className="tnum text-label-md text-muted">{money(liquid, { masked: maskBalances })}</span>
-        </div>
-
-        {depository.length === 0 ? (
+        {state.accounts.length === 0 ? (
           <Card className="p-0">
             <EmptyState
               icon="bank"
@@ -282,19 +304,40 @@ export const Accounts = () => {
             />
           </Card>
         ) : (
-          <div className="space-y-6">
-            {sections.map((section) => (
+          <div className="space-y-10">
+            {halves.map((half) => (
+              <div key={half.side} className="space-y-6">
+                {/* What you own, then what you owe. The heading is the
+                    organising fact rather than a badge on each section. */}
+                <div className="flex items-baseline justify-between gap-3 border-b border-[rgb(var(--hairline)/0.12)] pb-2.5">
+                  <h2 className="flex items-center gap-2.5 font-display text-headline-sm text-text">
+                    <span
+                      className={cn(
+                        'h-4 w-1.5 rounded-full',
+                        half.side === 'asset' ? 'bg-success' : 'bg-danger',
+                      )}
+                      aria-hidden="true"
+                    />
+                    {half.side === 'asset' ? 'Assets' : 'Liabilities'}
+                  </h2>
+                  <span
+                    className={cn(
+                      'tnum text-label-md font-medium',
+                      half.side === 'asset' ? 'text-success' : 'text-danger',
+                    )}
+                  >
+                    {half.side === 'liability' && '−'}
+                    {money(half.total, { masked: maskBalances })}
+                  </span>
+                </div>
+
+            {half.sections.map((section) => (
               <div key={section.key} className="space-y-3">
                 {/* A heading per section, with what is in it. The subtotal is
                     the question a grouped list is being asked. */}
                 <div className="flex flex-wrap items-center justify-between gap-2 px-1">
                   <div className="flex items-center gap-2.5">
                     <h3 className="text-label-md text-muted">{section.title}</h3>
-                    {section.group && (
-                      <Badge tone={section.side === 'asset' ? 'success' : 'danger'}>
-                        {section.side === 'asset' ? 'Asset' : 'Liability'}
-                      </Badge>
-                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <span
@@ -354,10 +397,24 @@ export const Accounts = () => {
                 </div>
 
                 <div>
-                  <Label>Balance</Label>
-                  <p className="tnum font-display text-metric-md text-text">
+                  <Label>{owesMoney(account) ? 'Owed' : 'Balance'}</Label>
+                  <p
+                    className={cn(
+                      'tnum font-display text-metric-md',
+                      owesMoney(account) ? 'text-danger' : 'text-text',
+                    )}
+                  >
                     {money(account.balance, { masked: maskBalances })}
                   </p>
+                  {/* The one thing the separate credit section said that this
+                      list did not. Kept here rather than in a second listing
+                      of the same cards. */}
+                  {account.type === 'credit' && account.creditLimit ? (
+                    <p className="tnum mt-1 text-label-sm text-muted">
+                      {percent(accountUtilisation(account), 0)} of{' '}
+                      {money(account.creditLimit, { compact: true })} limit
+                    </p>
+                  ) : null}
                   {account.note && <p className="mt-1 truncate text-label-sm text-muted">{account.note}</p>}
                 </div>
               </Link>
@@ -385,30 +442,10 @@ export const Accounts = () => {
                 </div>
               </div>
             ))}
+              </div>
+            ))}
           </div>
         )}
-      </section>
-
-      {/* ---------------- Credit ---------------- */}
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <span className="h-4 w-1.5 rounded-full bg-danger" aria-hidden="true" />
-            <h2 className="font-display text-headline-sm text-text">Credit cards</h2>
-            <span className="tnum text-label-md text-danger">{money(debt, { masked: maskBalances })} owed</span>
-          </div>
-          <p className="text-body-sm text-muted">
-            Total limit{' '}
-            <span className="tnum font-semibold text-text">{money(totalCreditLimit(state.accounts), { compact: true })}</span>{' '}
-            · {percent(creditUtilisation(state.accounts), 1)} used
-          </p>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          {credit.map((account) => (
-            <CreditCardCard key={account.id} account={account} masked={maskBalances} today={today} />
-          ))}
-        </div>
       </section>
 
       {/* ---------------- Virtual accounts ---------------- */}
@@ -676,88 +713,5 @@ export const Accounts = () => {
       />
 
     </div>
-  );
-};
-
-const CreditCardCard = ({ account, masked, today }: { account: Account; masked: boolean; today: string }) => {
-  const util = accountUtilisation(account);
-  const tone = util >= 80 ? 'danger' : util >= 50 ? 'warning' : 'success';
-  const dueDate = (() => {
-    const day = account.paymentDueDay ?? 1;
-    const [y, m] = today.split('-').map(Number);
-    const thisMonth = `${y}-${`${m}`.padStart(2, '0')}-${`${day}`.padStart(2, '0')}`;
-    if (thisMonth >= today) return thisMonth;
-    const nm = m === 12 ? 1 : m! + 1;
-    const ny = m === 12 ? y! + 1 : y!;
-    return `${ny}-${`${nm}`.padStart(2, '0')}-${`${day}`.padStart(2, '0')}`;
-  })();
-
-  return (
-    <Link to={`/accounts/${account.id}`} className="plate group flex min-w-0 flex-col gap-5 p-6 transition-transform duration-500 ease-fluid hover:-translate-y-1">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-surface-high text-primary">
-            <Icon name="card" size={22} />
-          </span>
-          <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h3 className="truncate font-display text-headline-sm text-text">{account.name}</h3>
-              {util >= 80 && (
-                <Badge tone="warning" icon="alert">
-                  High utilisation
-                </Badge>
-              )}
-            </div>
-            <p className="truncate text-body-sm text-muted">
-              {account.institution} · {account.maskedNumber}
-            </p>
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <Label>Owed</Label>
-          <p className="tnum font-display text-metric-md text-danger">{money(account.balance, { masked })}</p>
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <div className="tnum grid grid-cols-2 gap-x-4 gap-y-1 text-label-md text-muted sm:flex sm:justify-between">
-          <span className="truncate">
-            Limit <strong className="text-text">{money(account.creditLimit ?? 0, { compact: true })}</strong>
-          </span>
-          <span className="truncate text-right sm:text-left">
-            Available <strong className="text-text">{money(availableCredit(account), { compact: true })}</strong>
-          </span>
-          <span
-            className={cn(
-              'col-span-2 font-semibold',
-              { danger: 'text-danger', warning: 'text-warning', success: 'text-success' }[tone],
-            )}
-          >
-            {percent(util, 1)} used
-          </span>
-        </div>
-        <Progress
-          value={account.balance}
-          max={account.creditLimit ?? 1}
-          tone={tone}
-          label={`${account.name}: ${money(account.balance)} of ${money(account.creditLimit ?? 0)} limit used`}
-        />
-      </div>
-
-      <dl className="grid grid-cols-2 gap-3 well p-3.5 sm:grid-cols-3">
-        <div>
-          <dt className="text-label-sm text-faint">Payment due</dt>
-          <dd className="tnum text-body-md font-semibold text-text">{formatMediumDate(dueDate)}</dd>
-        </div>
-        <div>
-          <dt className="text-label-sm text-faint">Minimum</dt>
-          <dd className="tnum text-body-md font-semibold text-danger">{money(account.minimumPayment ?? 0, { compact: true })}</dd>
-        </div>
-        <div>
-          <dt className="text-label-sm text-faint">Interest</dt>
-          <dd className="tnum text-body-md font-semibold text-text">{account.apr}% APR</dd>
-        </div>
-      </dl>
-    </Link>
   );
 };

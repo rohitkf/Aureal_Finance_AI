@@ -174,24 +174,17 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
             autoFocus={Boolean(editing)}
             required
           />
-          {/* Which side of the balance sheet it lands on follows the group
-              where there is one, and the type otherwise. */}
+          {/* Type first, and always answered. Group used to sit above it,
+              offering "By its type", "Savings" and "Credit cards" — words
+              the Type list below uses for different things. Two lists that
+              look like the same question with different answers is the whole
+              reason this form read as confusing. */}
           <SelectField
-            label="Group"
-            value={groupId}
-            onChange={setGroupId}
-            action={{ label: 'New group…', onSelect: () => setNewGroupOpen(true) }}
-            hint="Optional. A group is how you think of the accounts — “the flat”, “joint” — rather than what kind they are."
+            label="Type"
+            value={type}
+            onChange={(value) => setType(value as AccountType)}
+            hint="What kind of account it is. This decides whether it counts as something you own or something you owe."
           >
-            <option value="">By its type</option>
-            {accountGroups.map((g) => (
-              <option key={g.id} value={g.id} data-hint={g.side === 'asset' ? 'asset' : 'liability'}>
-                {g.name}
-              </option>
-            ))}
-          </SelectField>
-
-          <SelectField label="Type" value={type} onChange={(value) => setType(value as AccountType)}>
             {TYPES.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label} — {t.hint}
@@ -205,6 +198,24 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
             value={institution}
             onChange={(e) => setInstitution(e.target.value)}
           />
+
+          {/* Below the things that decide what this account *is*, because it
+              decides nothing — it only changes which heading the account is
+              listed under. Most people never touch it. */}
+          <SelectField
+            label="File it under"
+            value={groupId}
+            onChange={setGroupId}
+            action={{ label: 'New group…', onSelect: () => setNewGroupOpen(true) }}
+            hint="Optional, and only about where it appears on the Accounts page. A group is how you think of the accounts — “the flat”, “joint” — not what kind they are. A group can also move an account to the other side of the balance sheet."
+          >
+            <option value="">Listed with its own type</option>
+            {accountGroups.map((g) => (
+              <option key={g.id} value={g.id} data-hint={g.side === 'asset' ? 'asset' : 'liability'}>
+                {g.name}
+              </option>
+            ))}
+          </SelectField>
           <TextField
             label="Last 4 digits"
             inputMode="numeric"

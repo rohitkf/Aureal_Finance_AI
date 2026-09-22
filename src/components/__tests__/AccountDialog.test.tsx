@@ -233,3 +233,42 @@ describe('an account opened for editing', () => {
     expect(sent()[0].account.paymentDueDay).toBeUndefined();
   });
 });
+
+/**
+ * Two lists that looked like the same question.
+ *
+ * The form asked for a Group above a Type. The Group list offered "By its
+ * type", "Savings" and "Credit cards" — words the Type list below used for
+ * different things — so the form appeared to ask what kind of account this is,
+ * twice, with different answers. That is the redundancy that was reported.
+ *
+ * Type is the one that decides anything: what counts as spendable, which
+ * credit-card fields appear, and which side of the balance sheet it lands on.
+ * A group only changes the heading it is listed under.
+ */
+describe('the order the form asks things in', () => {
+  const fieldOrder = () =>
+    Array.from(document.querySelectorAll('label')).map((l) => l.textContent?.trim() ?? '');
+
+  it('asks what kind of account it is before where to file it', () => {
+    render(<AccountDialog open onClose={vi.fn()} />);
+    const labels = fieldOrder();
+    const type = labels.findIndex((l) => l.startsWith('Type'));
+    const group = labels.findIndex((l) => l.startsWith('File it under'));
+
+    expect(type).toBeGreaterThanOrEqual(0);
+    expect(group).toBeGreaterThanOrEqual(0);
+    expect(type).toBeLessThan(group);
+  });
+
+  it('no longer calls the optional one "Group", which read as a second type', () => {
+    render(<AccountDialog open onClose={vi.fn()} />);
+    expect(screen.queryByLabelText('Group')).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/file it under/i)).toBeInTheDocument();
+  });
+
+  it('says the filing choice is only about where it is listed', () => {
+    render(<AccountDialog open onClose={vi.fn()} />);
+    expect(screen.getByText(/only about where it appears/i)).toBeInTheDocument();
+  });
+});

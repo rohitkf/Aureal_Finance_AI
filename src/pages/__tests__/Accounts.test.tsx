@@ -128,3 +128,58 @@ describe('deleting an account', () => {
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'delete-account' }));
   });
 });
+
+/**
+ * The page, in two halves.
+ *
+ * Reported as "confusing and redundant and mixed up", and it was all three.
+ * An account could be drawn in any of three places depending on how it had
+ * been filed: a named-group section, a type-fallback section, or a credit
+ * block of its own further down the page. Named groups came in creation
+ * order, so a liability group could sit above an asset one with nothing but a
+ * badge to say which was which. And the type sections hardcoded `side:
+ * 'asset'`, so a credit card with no group was filed under things you own.
+ */
+const LIABILITIES: Account[] = [
+  { id: 'acc-3', name: 'Amex', type: 'credit', institution: 'Amex', balance: 400, maskedNumber: '••3', syncStatus: 'manual', creditLimit: 2000 },
+  { id: 'acc-4', name: 'Car loan', type: 'liability', institution: 'Bank', balance: 6000, maskedNumber: '••4', syncStatus: 'manual' },
+];
+
+describe('the balance sheet', () => {
+  beforeEach(() => {
+    state.accounts = [...ACCOUNTS, ...LIABILITIES];
+  });
+
+  const half = (name: RegExp) => screen.getByRole('heading', { name, level: 2 });
+
+  it('has a side for what you own and a side for what you owe', () => {
+    render();
+    expect(half(/^assets$/i)).toBeInTheDocument();
+    expect(half(/^liabilities$/i)).toBeInTheDocument();
+  });
+
+  it('puts a credit card under what you owe, not what you own', () => {
+    render();
+
+    // `sideOf` has always known this; the page used to write 'asset' itself
+    // and get it wrong for every card and loan without a group.
+    const liabilities = half(/^liabilities$/i).closest('div')?.parentElement;
+    expect(liabilities).toHaveTextContent('Amex');
+    expect(liabilities).toHaveTextContent('Car loan');
+  });
+
+  it('draws each account once, not once per way of filing it', () => {
+    render();
+    // Credit cards used to appear in the list and again in a section of their
+    // own, which is the redundancy that was reported.
+    expect(screen.getAllByText('Amex')).toHaveLength(1);
+  });
+
+  it('totals each half, so the two numbers can be read against each other', () => {
+    render();
+    // 1200 + 5000 owned, 400 + 6000 owed. Scoped to the heading row, because
+    // "Available now" at the top of the page happens to be the same figure.
+    expect(half(/^assets$/i).parentElement).toHaveTextContent('£6,200.00');
+    expect(half(/^liabilities$/i).parentElement).toHaveTextContent('−£6,400.00');
+  });
+});
