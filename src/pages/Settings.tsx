@@ -138,17 +138,6 @@ export const Settings = () => {
     setPendingRestore(result.backup);
   };
 
-  const exportData = () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `aureal-export-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ tone: 'success', title: 'Export downloaded', description: 'Your full financial data, in JSON.' });
-  };
-
   return (
     <div className="max-w-4xl space-y-8">
       <header>
@@ -426,13 +415,20 @@ export const Settings = () => {
               </Button>
             }
           />
+          {/* There used to be a second download here, of `AppState` as JSON.
+              It was not a smaller version of the backup below — it was a
+              different file, and the wrong one: the state the screens are
+              written against hides archived categories and drops sort
+              orders, and nothing in the app can read it back. Somebody who
+              took it as their safety copy had a file that could not be
+              restored. One download, and it is the one that works. */}
           <SecurityRow
             icon="download"
             title="Export your data"
-            description="Download everything Aureal holds about you, in a portable format."
+            description="Everything Aureal holds, as one file you can keep — and put back."
             action={
-              <Button size="sm" onClick={exportData}>
-                Export
+              <Button size="sm" onClick={() => document.getElementById('backup')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+                Take a backup
               </Button>
             }
           />
