@@ -30,6 +30,7 @@ import { supabase } from './supabase';
 import { useAuth } from './auth';
 import { useToast } from '@/components/ui/Toast';
 import { ISO } from './date';
+import { setRegion } from './intl';
 import {
   accountToRow,
   emptyAppState,
@@ -156,6 +157,20 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const toast = useToast();
   const [state, setState] = useState<AppState>(() => emptyAppState(DEFAULT_SETTINGS));
+
+  /**
+   * Tell the formatters which currency and region to write in.
+   *
+   * `money` and the date helpers are plain functions, called from components,
+   * from `finance.ts` and from the CSV writer — so the answer lives in a
+   * module they can all read rather than in a React value only components can
+   * see. This is the one place that sets it, and it follows `settings`
+   * whichever way they change: a fresh load, a restored backup, or the
+   * pickers under Settings.
+   */
+  useEffect(() => {
+    setRegion({ locale: state.settings.locale, currency: state.settings.currency });
+  }, [state.settings.locale, state.settings.currency]);
   const [loading, setLoading] = useState(true);
   // Distinct from `loading`. `loading` says a request is in flight; this says
   // a request has succeeded at least once. Without it there is no way to tell
@@ -959,6 +974,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             if (s.maskBalances !== undefined) patch.mask_balances = s.maskBalances;
             if (s.theme !== undefined) patch.theme = s.theme;
             if (s.locale !== undefined) patch.locale = s.locale;
+            if (s.currency !== undefined) patch.currency = s.currency;
             // Stored whole rather than merged in SQL: it is one small map, and
             // `resolveAccents` merges it over the defaults on the way back in.
             if (s.accents !== undefined) patch.row_accents = s.accents;

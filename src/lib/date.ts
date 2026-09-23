@@ -2,6 +2,7 @@
  * Date helpers. Everything works on plain `YYYY-MM-DD` strings so dates never
  * drift across timezones — a rent payment on the 20th is on the 20th everywhere.
  */
+import { region } from './intl';
 
 export const ISO = (d: Date): string => {
   const y = d.getFullYear();
@@ -122,7 +123,11 @@ export const isValidISO = (iso: string): boolean => !Number.isNaN(parseISO(iso).
  */
 const EMPTY = '—';
 
-const FMT = (opts: Intl.DateTimeFormatOptions, locale = 'en-GB') =>
+/**
+ * Dates in the region the person chose. The default parameter said `en-GB`
+ * and no caller ever passed anything else, so every date was British.
+ */
+const FMT = (opts: Intl.DateTimeFormatOptions, locale = region().locale) =>
   new Intl.DateTimeFormat(locale, opts);
 
 const format = (opts: Intl.DateTimeFormatOptions, iso: string): string => {

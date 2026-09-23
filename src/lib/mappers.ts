@@ -186,7 +186,8 @@ export const toNetWorthPoint = (row: NetWorthRow): NetWorthPoint => ({
 });
 
 export const toSettings = (row: ProfileRow): Settings => ({
-  currency: 'GBP',
+  // Was the literal 'GBP', so the stored column was read and thrown away.
+  currency: row.currency ?? 'GBP',
   locale: row.locale,
   minimumBalance: num(row.minimum_balance),
   userName: row.display_name,

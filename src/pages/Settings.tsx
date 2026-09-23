@@ -41,10 +41,11 @@ import { LabelDialog } from '@/components/LabelDialog';
 import { DeleteAccountDialog } from '@/components/DeleteAccountDialog';
 import { deleteAccount } from '@/lib/deleteAccount';
 import { LabelChip } from '@/components/LabelPicker';
+import { CURRENCIES, LOCALES } from '@/lib/intl';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
-import { TextField, Toggle } from '@/components/ui/Field';
+import { SelectField, TextField, Toggle } from '@/components/ui/Field';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { ConfirmDialog } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/States';
@@ -216,6 +217,61 @@ export const Settings = () => {
             </p>
           </div>
         </div>
+      </Card>
+
+      {/* ---------------- Currency & region ---------------- */}
+      <Card className="space-y-6" id="region">
+        <CardHeader
+          title="Currency & region"
+          description="How every figure and every date is written. Both were stored in your profile from the beginning and neither was ever read — the app wrote pounds and British dates whatever the columns said."
+        />
+        <div className="grid gap-5 sm:grid-cols-2">
+          <SelectField
+            label="Currency"
+            value={state.settings.currency}
+            onChange={(currency) => {
+              if (currency === state.settings.currency) return;
+              dispatch({ type: 'update-settings', settings: { currency } });
+              toast({
+                tone: 'success',
+                title: 'Currency updated',
+                description: `Every figure is written in ${CURRENCIES.find((c) => c.code === currency)?.label ?? currency} from now on.`,
+              });
+            }}
+            hint="One currency for the whole app. Money in two currencies cannot be added up without a rate and a date, so accounts do not each get their own."
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c.code} value={c.code} data-hint={c.code}>
+                {c.label}
+              </option>
+            ))}
+          </SelectField>
+
+          <SelectField
+            label="Date format"
+            value={state.settings.locale}
+            onChange={(locale) => {
+              if (locale === state.settings.locale) return;
+              dispatch({ type: 'update-settings', settings: { locale } });
+              toast({ tone: 'success', title: 'Region updated' });
+            }}
+            hint="Which way round the day and the month go, and how thousands are separated."
+          >
+            {LOCALES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.label}
+              </option>
+            ))}
+          </SelectField>
+        </div>
+
+        {/* Changing the currency relabels what is already recorded; it does
+            not convert it. Said plainly, because the alternative is somebody
+            believing their balances were converted. */}
+        <p className="text-[12.5px] leading-relaxed text-faint">
+          Changing the currency changes the symbol every figure is written with. It does not convert
+          anything — £100 already recorded becomes €100, not its value in euros.
+        </p>
       </Card>
 
       {/* ---------------- Categories ---------------- */}

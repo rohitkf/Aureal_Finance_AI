@@ -262,7 +262,12 @@ export interface NetWorthPoint {
 }
 
 export interface Settings {
-  currency: 'GBP';
+  /**
+   * An ISO 4217 code. It was the literal type `'GBP'`, which is the clearest
+   * statement there is that nobody expected it to vary — and it did not: the
+   * mapper returned that string whatever the column said.
+   */
+  currency: string;
   locale: string;
   /** The floor Safe-to-Spend must never eat into. */
   minimumBalance: number;
