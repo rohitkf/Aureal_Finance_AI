@@ -1,10 +1,28 @@
 /** Money and number formatting. One place, so every figure reads identically. */
+import { currencySymbol, region, regionVersion } from './intl';
 
-const gbp = (opts: Intl.NumberFormatOptions = {}) =>
-  new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', ...opts });
+/**
+ * The two formatters, rebuilt when the currency changes and not before.
+ *
+ * They used to be built once, at module load, on a hardcoded `en-GB`/`GBP`.
+ * Constructing an `Intl.NumberFormat` is not free and these are called for
+ * every figure on every render, so they are still built once per currency —
+ * just no longer once per lifetime of the bundle.
+ */
+let cached: { at: number; whole: Intl.NumberFormat; pence: Intl.NumberFormat } | null = null;
 
-const WHOLE = gbp({ minimumFractionDigits: 0, maximumFractionDigits: 0 });
-const PENCE = gbp({ minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const formatters = () => {
+  if (cached?.at === regionVersion()) return cached;
+  const { locale, currency } = region();
+  const make = (opts: Intl.NumberFormatOptions) =>
+    new Intl.NumberFormat(locale, { style: 'currency', currency, ...opts });
+  cached = {
+    at: regionVersion(),
+    whole: make({ minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+    pence: make({ minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  };
+  return cached;
+};
 
 export interface MoneyOptions {
   /** Drop the pence when the figure is round money used as a headline. */
@@ -17,7 +35,8 @@ export interface MoneyOptions {
 export const money = (value: number, { compact, signed, masked }: MoneyOptions = {}): string => {
   if (masked) return '••••••';
   const abs = Math.abs(value);
-  const body = compact ? WHOLE.format(abs) : PENCE.format(abs);
+  const { whole, pence } = formatters();
+  const body = compact ? whole.format(abs) : pence.format(abs);
   if (value < 0) return `-${body}`;
   return signed ? `+${body}` : body;
 };
@@ -25,19 +44,20 @@ export const money = (value: number, { compact, signed, masked }: MoneyOptions =
 /** Splits "£4,283.62" into its major and minor parts for typographic emphasis. */
 export const moneyParts = (value: number, masked = false): { main: string; fraction: string } => {
   if (masked) return { main: '••••', fraction: '' };
-  const formatted = PENCE.format(Math.abs(value));
+  const formatted = formatters().pence.format(Math.abs(value));
   const idx = formatted.lastIndexOf('.');
   const sign = value < 0 ? '-' : '';
   return { main: sign + formatted.slice(0, idx), fraction: formatted.slice(idx) };
 };
 
-/** Axis labels: £4.3k, £1.2m. */
+/** Axis labels: £4.3k, €1.2m. Too tight for a full figure, so just the symbol. */
 export const moneyAxis = (value: number): string => {
   const abs = Math.abs(value);
   const sign = value < 0 ? '-' : '';
-  if (abs >= 1_000_000) return `${sign}£${(abs / 1_000_000).toFixed(1)}m`;
-  if (abs >= 1_000) return `${sign}£${(abs / 1_000).toFixed(abs >= 10_000 ? 0 : 1)}k`;
-  return `${sign}£${Math.round(abs)}`;
+  const unit = currencySymbol();
+  if (abs >= 1_000_000) return `${sign}${unit}${(abs / 1_000_000).toFixed(1)}m`;
+  if (abs >= 1_000) return `${sign}${unit}${(abs / 1_000).toFixed(abs >= 10_000 ? 0 : 1)}k`;
+  return `${sign}${unit}${Math.round(abs)}`;
 };
 
 export const percent = (value: number, digits = 0): string => `${value.toFixed(digits)}%`;

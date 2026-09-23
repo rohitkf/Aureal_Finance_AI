@@ -28,6 +28,13 @@ const EDITORS: Record<string, string> = {
   Category: 'src/components/NewCategoryDialog.tsx',
   Label: 'src/components/LabelDialog.tsx',
   AccountGroup: 'src/components/AccountGroupDialog.tsx',
+  /**
+   * Settings has no single dialog — its fields are spread across a dozen
+   * cards on one page — which is exactly why it was left out of this map on
+   * the first pass, and exactly how `currency` and `locale` sat in the
+   * database for months being written by nobody and read by nothing.
+   */
+  Settings: 'src/pages/Settings.tsx',
 };
 
 /**
@@ -50,6 +57,12 @@ const NOT_TYPED = new Set([
   'splits',
   'sortOrder',
   'archived',
+  /**
+   * Settable, but through `useTheme`, which owns the dispatch — so the page
+   * never names the field. A real reachable-by-another-route, not a field
+   * with no home: the Appearance card has the three buttons.
+   */
+  'theme',
 ]);
 
 const types = readFileSync('src/lib/types.ts', 'utf8');
@@ -68,13 +81,29 @@ const fieldsOf = (name: string): string[] => {
     .filter((f) => !NOT_TYPED.has(f));
 };
 
+/**
+ * Settings is asked a stricter question than the dialogs are.
+ *
+ * A dialog exists only to build one object, so naming a field in it is good
+ * evidence the field can be set. The Settings page also *reads* settings all
+ * over itself — `state.settings.currency` to show the current value, the same
+ * word again in a toast — so "the page says `currency` somewhere" would have
+ * passed while the control that sets it was deleted. Tested, and it did.
+ *
+ * So for Settings the field has to appear inside the object being dispatched.
+ */
+const isDispatched = (source: string, field: string): boolean =>
+  new RegExp(`settings:\\s*\\{[^}]*\\b${field}\\b`).test(source);
+
+const isNamed = (source: string, field: string): boolean =>
+  new RegExp(`\\b${field}\\b`).test(source);
+
 describe.each(Object.entries(EDITORS))('%s', (name, editor) => {
   it('can be given every field it carries', () => {
     const source = code(editor);
-    const unreachable = fieldsOf(name).filter(
-      (field) => !new RegExp(`\\b${field}\\b`).test(source),
-    );
+    const reaches = name === 'Settings' ? isDispatched : isNamed;
+    const unreachable = fieldsOf(name).filter((field) => !reaches(source, field));
 
-    expect(unreachable, `${editor} never mentions: ${unreachable.join(', ')}`).toEqual([]);
+    expect(unreachable, `${editor} cannot set: ${unreachable.join(', ')}`).toEqual([]);
   });
 });
