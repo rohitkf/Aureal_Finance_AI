@@ -70,6 +70,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
   /** When the opening balance is dated. Today unless it was opened earlier. */
   const [openedOn, setOpenedOn] = useState(today);
   const [archived, setArchived] = useState(false);
+  const [excluded, setExcluded] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -88,6 +89,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
     setMinimumPayment(editing?.minimumPayment ? String(editing.minimumPayment) : '');
     setOpenedOn(today);
     setArchived(Boolean(editing?.archived));
+    setExcluded(Boolean(editing?.excluded));
   }, [open, editing, today]);
 
   const isCredit = type === 'credit';
@@ -127,7 +129,10 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
       note: note.trim() || undefined,
       statementDay: isCredit ? Number.parseInt(statementDay, 10) || undefined : undefined,
       minimumPayment: isCredit ? Number.parseFloat(minimumPayment) || undefined : undefined,
-      archived: archived || undefined,
+      // Excluding implies archiving: an account left out of every figure has
+      // no business being offered when a payment is recorded.
+      archived: archived || excluded || undefined,
+      excluded: excluded || undefined,
     };
 
     // One action, not two. Sent separately, the opening balance raced the
@@ -248,12 +253,21 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
 
           {/* Only worth offering once the account exists. */}
           {editing && (
-            <CheckboxField
-              checked={archived}
-              onChange={setArchived}
-              label="Closed — stop offering this account"
-              description="It keeps every transaction on it and still counts towards your balances and net worth. It just stops appearing when you record a payment. Deleting instead would take its whole history with it."
-            />
+            <div className="space-y-4">
+              <CheckboxField
+                checked={archived || excluded}
+                onChange={setArchived}
+                disabled={excluded}
+                label="Closed — stop offering this account"
+                description="It keeps every transaction on it and still counts towards your balances and net worth. It just stops appearing when you record a payment. Deleting instead would take its whole history with it."
+              />
+              <CheckboxField
+                checked={excluded}
+                onChange={setExcluded}
+                label="And leave it out of every figure"
+                description="For an account that is yours but is not part of the picture — a business account, or one a partner actually runs. Its balance, its spending, its income and anything it has scheduled stop counting towards your totals, your reports and your forecast. Nothing is deleted, and turning this back off restores all of it."
+              />
+            </div>
           )}
 
           {/* Below the things that decide what this account *is*, because it

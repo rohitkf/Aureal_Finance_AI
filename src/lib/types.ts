@@ -62,6 +62,17 @@ export interface Account {
    * everything else alone.
    */
   archived?: boolean;
+  /**
+   * Yours, but not part of the picture.
+   *
+   * Archiving takes an account out of the pickers and leaves every figure
+   * alone, which is what closing one means. This is the other thing, and not
+   * the same: a business account, or one a partner actually runs, that should
+   * stop colouring your spending, your income, your forecast and your net
+   * worth without being deleted. Implies `archived` — an account left out of
+   * every figure has no business being offered when recording a payment.
+   */
+  excluded?: boolean;
   /** The group it is shown under and counted in. Absent means by its type. */
   groupId?: string;
 }

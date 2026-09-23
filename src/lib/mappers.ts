@@ -92,6 +92,7 @@ export const toAccount = (row: AccountRow): Account => ({
   note: row.note ?? undefined,
   groupId: row.group_id ?? undefined,
   archived: row.archived || undefined,
+  excluded: row.excluded || undefined,
 });
 
 export const toVirtualAccount = (row: VirtualAccountRow): VirtualAccount => ({
@@ -270,6 +271,7 @@ export const accountToRow = (a: Omit<Account, 'id'>) => ({
   note: a.note ?? null,
   group_id: a.groupId ?? null,
   archived: a.archived ?? false,
+  excluded: a.excluded ?? false,
 });
 
 /** The shape every screen is written against. */
