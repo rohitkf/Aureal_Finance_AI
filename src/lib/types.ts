@@ -52,6 +52,16 @@ export interface Account {
   /** Savings only. */
   aer?: number;
   note?: string;
+  /**
+   * Closed, but kept.
+   *
+   * Deleting an account takes its whole history with it, which is right for
+   * one added by mistake and wrong for a current account you closed last
+   * year — that money still moved, and those transactions still belong in
+   * last year's spending. Archiving takes it out of the pickers and leaves
+   * everything else alone.
+   */
+  archived?: boolean;
   /** The group it is shown under and counted in. Absent means by its type. */
   groupId?: string;
 }

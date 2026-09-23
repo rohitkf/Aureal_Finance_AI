@@ -56,6 +56,15 @@ export const sideOf = (a: Pick<Account, 'type' | 'groupId'>, groups: AccountGrou
  * their pension. Every account that is not credit still counts as an asset —
  * `totalAssets` is the figure for that.
  */
+/**
+ * Whether an account should be offered when recording a payment.
+ *
+ * The only thing archiving changes. It is deliberately *not* used by any
+ * total: an account you closed still held what it held, and quietly dropping
+ * it out of net worth would rewrite history rather than tidy a dropdown.
+ */
+export const isSelectable = (a: Pick<Account, 'archived'>): boolean => !a.archived;
+
 export const isSpendable = (a: Account): boolean =>
   a.type === 'current' || a.type === 'savings' || a.type === 'cash';
 

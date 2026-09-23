@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { isSelectable } from '@/lib/finance';
 import {
   endOfMonth,
   formatDay,
@@ -168,7 +169,17 @@ export const AddTransactionSheet = ({
   mode = 'update',
   onDelete,
 }: AddTransactionSheetProps) => {
-  const { accounts } = useAppState();
+  const { accounts: allAccounts } = useAppState();
+  /**
+   * Archived accounts are not offered here — that is the whole point of
+   * archiving one. The account a transaction being *edited* already sits on
+   * stays in the list, or opening an old payment on a closed account would
+   * silently move it somewhere else on save.
+   */
+  const accounts = useMemo(
+    () => allAccounts.filter((a) => isSelectable(a) || a.id === editing?.accountId || a.id === editing?.toAccountId),
+    [allAccounts, editing?.accountId, editing?.toAccountId],
+  );
   const { dispatch } = useStore();
   const allCategories = useCategories();
   const today = useToday();

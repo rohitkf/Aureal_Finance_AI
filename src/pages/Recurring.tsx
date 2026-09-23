@@ -4,7 +4,7 @@ import { cn, pillClass } from '@/lib/cn';
 import { formatMediumDate, relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
 import { FREQUENCY_LABELS, WEEKEND_LABELS, monthlyEquivalent, previewOccurrences } from '@/lib/recurrence';
-import { monthlyCommitments, monthlyTransfers, subscriptionTotals } from '@/lib/finance';
+import { isSelectable, monthlyCommitments, monthlyTransfers, subscriptionTotals } from '@/lib/finance';
 import { newId, useAppState, useCategories, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { Badge } from '@/components/ui/Badge';
@@ -468,7 +468,17 @@ export const Recurring = () => {
         </ul>
       )}
 
-      <RecurringForm draft={draft} setDraft={setDraft} onSave={save} today={today} accounts={state.accounts} />
+      <RecurringForm
+        draft={draft}
+        setDraft={setDraft}
+        onSave={save}
+        today={today}
+        // Archived accounts are not offered, except one this rule already
+        // names — otherwise opening an old rule would quietly retarget it.
+        accounts={state.accounts.filter(
+          (a) => isSelectable(a) || a.id === draft?.accountId || a.id === draft?.toAccountId,
+        )}
+      />
 
       <ConfirmDialog
         open={Boolean(deleting)}

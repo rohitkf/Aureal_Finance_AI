@@ -36,7 +36,10 @@ export interface AccountRow {
   id: string;
   user_id: string;
   name: string;
-  type: 'current' | 'savings' | 'cash' | 'credit' | 'investment';
+  // Matches `accounts_type_check`. The two on the end were added with account
+  // groups and never reached this file, so the row type has been narrower
+  // than the column it describes ever since.
+  type: 'current' | 'savings' | 'cash' | 'credit' | 'investment' | 'asset' | 'liability';
   institution: string;
   balance: number;
   masked_number: string;
@@ -50,6 +53,7 @@ export interface AccountRow {
   aer: number | null;
   note: string | null;
   group_id: string | null;
+  archived: boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;

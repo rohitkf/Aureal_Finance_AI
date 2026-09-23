@@ -183,3 +183,58 @@ describe('the balance sheet', () => {
     expect(half(/^liabilities$/i).parentElement).toHaveTextContent('−£6,400.00');
   });
 });
+
+/**
+ * An account you have closed, without losing what it did.
+ *
+ * Deleting one takes its whole history with it. That is right for an account
+ * added by mistake and wrong for a current account closed last year: the money
+ * that moved through it still moved, and those transactions still belong in
+ * last year's spending. What you actually want is for it to stop being offered
+ * every time you record a payment.
+ */
+describe('a closed account', () => {
+  const CLOSED: Account = {
+    id: 'acc-old',
+    name: 'Old Barclays',
+    type: 'current',
+    institution: 'Barclays',
+    balance: 300,
+    maskedNumber: '••9',
+    syncStatus: 'manual',
+    archived: true,
+  };
+
+  beforeEach(() => {
+    state.accounts = [...ACCOUNTS, CLOSED];
+  });
+
+  it('is listed apart from the ones still in use', () => {
+    render();
+    expect(screen.getByRole('heading', { name: /^closed/i, level: 2 })).toBeInTheDocument();
+  });
+
+  it('is not mixed in with what you own', () => {
+    render();
+    const assets = screen.getByRole('heading', { name: /^assets$/i, level: 2 }).closest('div')?.parentElement;
+    expect(assets).not.toHaveTextContent('Old Barclays');
+  });
+
+  it('still counts towards net worth, because it still held what it held', () => {
+    render();
+    // 1200 + 5000 in use, plus 300 closed. The two halves cover what is in
+    // use; the headline figure covers everything, because quietly dropping a
+    // closed account from net worth would rewrite history rather than tidy a
+    // dropdown.
+    const assets = screen.getByRole('heading', { name: /^assets$/i, level: 2 }).parentElement;
+    expect(assets).toHaveTextContent('£6,200.00');
+    expect(screen.getByText('£6,500.00')).toBeInTheDocument();
+  });
+
+  it('can still be opened and changed, or it could never be reopened', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.click(screen.getByRole('button', { name: 'Edit Old Barclays' }));
+    expect(screen.getByRole('dialog', { name: /edit account/i })).toBeInTheDocument();
+  });
+});
