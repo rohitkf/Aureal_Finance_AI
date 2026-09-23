@@ -54,6 +54,7 @@ export interface AccountRow {
   note: string | null;
   group_id: string | null;
   archived: boolean;
+  excluded: boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;

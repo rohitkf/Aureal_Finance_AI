@@ -350,3 +350,44 @@ describe('fields the form never asked for', () => {
     expect(screen.queryByLabelText('Opened on')).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Closing an account, and leaving one out of the picture.
+ *
+ * Two different things. Closing takes it out of the pickers and leaves every
+ * figure alone — that is what closing an account means, and the money that
+ * moved through it still moved. Excluding takes it out of every figure as
+ * well, for an account that is yours but is not part of the picture.
+ */
+describe('closing and excluding', () => {
+  const save = () => screen.getByRole('button', { name: /save changes/i });
+
+  it('can close an account without changing any figure', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={EXISTING} />);
+
+    await user.click(screen.getByRole('checkbox', { name: /stop offering this account/i }));
+    await user.click(save());
+
+    expect(sent()[0].account).toMatchObject({ archived: true });
+    expect(sent()[0].account.excluded).toBeUndefined();
+  });
+
+  it('excluding also closes it, because a figure-less account should not be offered', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={EXISTING} />);
+
+    await user.click(screen.getByRole('checkbox', { name: /leave it out of every figure/i }));
+    await user.click(save());
+
+    // Stored as both, so no reader has to remember to check two flags to
+    // work out whether to offer an account.
+    expect(sent()[0].account).toMatchObject({ archived: true, excluded: true });
+  });
+
+  it('offers neither on an account that does not exist yet', () => {
+    render(<AccountDialog open onClose={vi.fn()} />);
+    expect(screen.queryByRole('checkbox', { name: /stop offering this account/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /leave it out of every figure/i })).not.toBeInTheDocument();
+  });
+});

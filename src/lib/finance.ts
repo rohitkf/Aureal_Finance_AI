@@ -63,14 +63,49 @@ export const sideOf = (a: Pick<Account, 'type' | 'groupId'>, groups: AccountGrou
  * total: an account you closed still held what it held, and quietly dropping
  * it out of net worth would rewrite history rather than tidy a dropdown.
  */
-export const isSelectable = (a: Pick<Account, 'archived'>): boolean => !a.archived;
+export const isSelectable = (a: Pick<Account, 'archived' | 'excluded'>): boolean =>
+  !a.archived && !a.excluded;
+
+/** Whether an account's money and history are part of any figure at all. */
+export const isCounted = (a: Pick<Account, 'excluded'>): boolean => !a.excluded;
+
+/**
+ * The state every figure is computed from.
+ *
+ * An excluded account is yours and is not part of the picture — a business
+ * account, or one a partner actually runs. Threading that through the twenty
+ * or so aggregates below would mean twenty chances to forget one, and three of
+ * them look an account up by id rather than summing it, so a filter applied
+ * only to the sums would leave those resolving to nothing.
+ *
+ * So it is done once, here, at the top of each function that takes the whole
+ * state: the account goes, and so do its transactions and its rules, and
+ * everything downstream is correct without knowing this exists.
+ *
+ * Returns the same object when nothing is excluded, which is almost always.
+ * A new object every call would break the referential equality the screens
+ * memoise on.
+ */
+export const reported = (state: AppState): AppState => {
+  const out = new Set(state.accounts.filter((a) => !isCounted(a)).map((a) => a.id));
+  if (out.size === 0) return state;
+  return {
+    ...state,
+    accounts: state.accounts.filter((a) => !out.has(a.id)),
+    // A transfer *into* an excluded account still left the account it came
+    // from, so only the account a row belongs to decides.
+    transactions: state.transactions.filter((t) => !out.has(t.accountId)),
+    recurring: state.recurring.filter((r) => !out.has(r.accountId)),
+    virtualAccounts: state.virtualAccounts.filter((v) => !out.has(v.parentAccountId)),
+  };
+};
 
 export const isSpendable = (a: Account): boolean =>
   a.type === 'current' || a.type === 'savings' || a.type === 'cash';
 
 /** Cash you can actually spend today. */
 export const availableNow = (accounts: Account[]): number =>
-  round2(accounts.filter(isSpendable).reduce((sum, a) => sum + a.balance, 0));
+  round2(accounts.filter((a) => isCounted(a) && isSpendable(a)).reduce((sum, a) => sum + a.balance, 0));
 
 /**
  * Everything held, spendable or not — investments and a house included.
@@ -82,7 +117,7 @@ export const availableNow = (accounts: Account[]): number =>
 export const totalAssets = (accounts: Account[], groups: AccountGroup[] = []): number =>
   round2(
     accounts
-      .filter((a) => sideOf(a, groups) === 'asset')
+      .filter((a) => isCounted(a) && sideOf(a, groups) === 'asset')
       .reduce((sum, a) => sum + a.balance, 0),
   );
 
@@ -90,16 +125,16 @@ export const totalAssets = (accounts: Account[], groups: AccountGroup[] = []): n
 export const totalDebt = (accounts: Account[], groups: AccountGroup[] = []): number =>
   round2(
     accounts
-      .filter((a) => sideOf(a, groups) === 'liability')
+      .filter((a) => isCounted(a) && sideOf(a, groups) === 'liability')
       .reduce((sum, a) => sum + a.balance, 0),
   );
 
 /** Owed on credit cards alone, which is not the same as owed altogether. */
 export const totalCardDebt = (accounts: Account[]): number =>
-  round2(accounts.filter((a) => a.type === 'credit').reduce((sum, a) => sum + a.balance, 0));
+  round2(accounts.filter((a) => isCounted(a) && a.type === 'credit').reduce((sum, a) => sum + a.balance, 0));
 
 export const totalCreditLimit = (accounts: Account[]): number =>
-  round2(accounts.filter((a) => a.type === 'credit').reduce((sum, a) => sum + (a.creditLimit ?? 0), 0));
+  round2(accounts.filter((a) => isCounted(a) && a.type === 'credit').reduce((sum, a) => sum + (a.creditLimit ?? 0), 0));
 
 /**
  * How much of the available credit is used, which is only ever about cards.
@@ -149,28 +184,40 @@ export const signedAmount = (t: Transaction): number => {
 export const counts = (t: Pick<Transaction, 'status'>): boolean =>
   t.status !== 'scheduled' && t.status !== 'void';
 
-export const confirmedTransactions = (state: AppState, today: string): Transaction[] =>
-  state.transactions.filter((t) => counts(t) && t.date <= today);
+export const confirmedTransactions = (state: AppState, today: string): Transaction[] => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+  return state.transactions.filter((t) => counts(t) && t.date <= today);
+}
 
-export const monthSpend = (state: AppState, month: string): number =>
-  round2(
+export const monthSpend = (state: AppState, month: string): number => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+  return round2(
     state.transactions
       .filter((t) => t.type === 'expense' && counts(t) && monthKey(t.date) === month)
       .reduce((sum, t) => sum + t.amount, 0),
   );
+}
 
-export const monthIncome = (state: AppState, month: string): number =>
-  round2(
+export const monthIncome = (state: AppState, month: string): number => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+  return round2(
     state.transactions
       .filter((t) => t.type === 'income' && counts(t) && monthKey(t.date) === month)
       .reduce((sum, t) => sum + t.amount, 0),
   );
+}
 
 /**
  * Spend per category for a month. Splits are honoured so a single supermarket
  * shop can land partly in Groceries and partly in Household.
  */
 export const spendByCategory = (state: AppState, month: string): Map<string, number> => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+
   const out = new Map<string, number>();
   for (const t of state.transactions) {
     if (t.type !== 'expense' || !counts(t) || monthKey(t.date) !== month) continue;
@@ -193,8 +240,11 @@ export const spendByCategory = (state: AppState, month: string): Map<string, num
  * Keyed on the date the rule *would* have produced, not on anything that
  * happened, because nothing did.
  */
-export const skippedOccurrences = (state: AppState): Set<string> =>
-  new Set(state.recurringSkips.map((s) => `${s.recurringId}|${s.occurrenceDate}`));
+export const skippedOccurrences = (state: AppState): Set<string> => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+  return new Set(state.recurringSkips.map((s) => `${s.recurringId}|${s.occurrenceDate}`));
+}
 
 /**
  * Money that is still owed although its date has passed.
@@ -242,6 +292,9 @@ const transferEffect = (
 };
 
 export const forecastEvents = (state: AppState, today: string, to: string): ForecastEvent[] => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+
   const events: ForecastEvent[] = [];
   const claimed = new Set<string>();
 
@@ -307,6 +360,9 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
 
 /** Day-by-day projected balance over a horizon, starting from today's cash. */
 export const buildForecast = (state: AppState, today: string, horizonDays: number): Forecast => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+
   const to = addDays(today, horizonDays);
   const events = forecastEvents(state, today, to);
   const byDate = new Map<string, ForecastEvent[]>();
@@ -360,6 +416,9 @@ export const buildForecast = (state: AppState, today: string, horizonDays: numbe
  * full chart would be more furniture than the space deserves.
  */
 export const balanceHistory = (state: AppState, today: string, days = 30): number[] => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+
   const cleared = state.transactions.filter((t) => counts(t) && t.date <= today);
   const deltaOn = (date: string) =>
     cleared
@@ -506,6 +565,9 @@ export const lockedAllocations = (virtualAccounts: VirtualAccount[]): number =>
  * balance untouched. The app does this arithmetic so the user never has to.
  */
 export const safeToSpend = (state: AppState, today: string): SafeToSpend => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+
   const through = endOfMonth(today);
   const events = forecastEvents(state, today, through);
   const counted = events.filter((e) => e.affectsAvailable);
@@ -546,6 +608,9 @@ export interface BudgetProgress {
 }
 
 export const budgetProgress = (state: AppState, month: string): BudgetProgress[] => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+
   const spend = spendByCategory(state, month);
   return state.budgets
     .filter((b) => b.month === month)
@@ -573,22 +638,31 @@ export const budgetProgress = (state: AppState, month: string): BudgetProgress[]
  * own accounts is still yours, and calling it a commitment would say you were
  * spending your savings contribution.
  */
-export const monthlyCommitments = (state: AppState): number =>
-  round2(
+export const monthlyCommitments = (state: AppState): number => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+  return round2(
     state.recurring
       .filter((r) => r.status === 'active' && r.direction === 'out')
       .reduce((sum, r) => sum + monthlyEquivalent(r), 0),
   );
+}
 
 /** What moves between the user's own accounts each month, on a schedule. */
-export const monthlyTransfers = (state: AppState): number =>
-  round2(
+export const monthlyTransfers = (state: AppState): number => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+  return round2(
     state.recurring
       .filter((r) => r.status === 'active' && r.direction === 'transfer')
       .reduce((sum, r) => sum + monthlyEquivalent(r), 0),
   );
+}
 
 export const subscriptionTotals = (state: AppState): { monthly: number; annual: number; count: number } => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+
   const subs = state.recurring.filter((r) => r.isSubscription && r.status === 'active');
   const monthly = round2(subs.reduce((sum, r) => sum + monthlyEquivalent(r), 0));
   return { monthly, annual: round2(monthly * 12), count: subs.length };
@@ -596,6 +670,9 @@ export const subscriptionTotals = (state: AppState): { monthly: number; annual: 
 
 /** Savings rate for a month, as a percentage of income kept. */
 export const savingsRate = (state: AppState, month: string): number => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+
   const income = monthIncome(state, month);
   if (income === 0) return 0;
   return ((income - monthSpend(state, month)) / income) * 100;

@@ -6,6 +6,7 @@ import {
   availableNow,
   creditUtilisation,
   isSpendable,
+  isCounted,
   netWorth,
   owesMoney,
   sideOf,
@@ -130,7 +131,7 @@ export const Accounts = () => {
     }> = [];
 
     for (const group of state.accountGroups) {
-      const accounts = state.accounts.filter((a) => a.groupId === group.id && !a.archived);
+      const accounts = state.accounts.filter((a) => a.groupId === group.id && !a.archived && !a.excluded);
       accounts.forEach((a) => grouped.add(a.id));
       if (accounts.length === 0) continue;
       out.push({
@@ -144,7 +145,7 @@ export const Accounts = () => {
     }
 
     for (const type of TYPE_ORDER) {
-      const accounts = state.accounts.filter((a) => a.type === type && !a.archived && !grouped.has(a.id));
+      const accounts = state.accounts.filter((a) => a.type === type && !a.archived && !a.excluded && !grouped.has(a.id));
       if (accounts.length === 0) continue;
       out.push({
         key: `type-${type}`,
@@ -179,7 +180,7 @@ export const Accounts = () => {
    * account you closed still held what it held. This only stops them taking
    * up the same room as the ones you actually use.
    */
-  const archived = useMemo(() => state.accounts.filter((a) => a.archived), [state.accounts]);
+  const archived = useMemo(() => state.accounts.filter((a) => a.archived || a.excluded), [state.accounts]);
 
   const halves = useMemo(
     () =>
@@ -461,16 +462,21 @@ export const Accounts = () => {
                   <h2 className="flex items-center gap-2.5 font-display text-headline-sm text-muted">
                     <span className="h-4 w-1.5 rounded-full bg-[rgb(var(--hairline)/0.3)]" aria-hidden="true" />
                     Closed
-                    <span className="text-label-md font-normal text-faint">
-                      · not offered, still counted in your net worth
-                    </span>
                   </h2>
                   {/* Its own figure, because the two halves above cover what
                       is in use — so without this the headline net worth would
                       not visibly add up. */}
                   <span className="tnum text-label-md text-faint">
                     {money(
-                      round2(archived.reduce((sum, a) => sum + (sideOf(a, state.accountGroups) === 'liability' ? -a.balance : a.balance), 0)),
+                      round2(
+                        archived
+                          .filter(isCounted)
+                          .reduce(
+                            (sum, a) =>
+                              sum + (sideOf(a, state.accountGroups) === 'liability' ? -a.balance : a.balance),
+                            0,
+                          ),
+                      ),
                       { masked: maskBalances },
                     )}
                   </span>
@@ -484,6 +490,12 @@ export const Accounts = () => {
                       <Link to={`/accounts/${account.id}`} className="min-w-0 flex-1 truncate text-body-md text-muted">
                         {account.name}
                       </Link>
+                      {/* An excluded account's balance is not in any total
+                          above, so showing it here without saying so would
+                          make the page look like it does not add up. */}
+                      {account.excluded && (
+                        <Badge tone="neutral">Not counted</Badge>
+                      )}
                       <span className="tnum shrink-0 text-label-md text-faint">
                         {money(account.balance, { masked: maskBalances })}
                       </span>
