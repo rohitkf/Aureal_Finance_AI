@@ -51,9 +51,14 @@ export const StatusMark = ({
         role="img"
         className={cn(
           'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full',
-          // The tick is the ground showing through, so a filled mark reads as
-          // more settled than an outlined one at a glance.
-          'bg-success text-[rgb(var(--surface-base))]',
+          // `--on-success` is the token for what sits on top of the success
+          // colour, and it is the one that gets this right in both themes.
+          // Dark mode: a near-black tick on bright green, which is what was
+          // asked for. Light mode: white, because the green there is dark
+          // (4 120 87) and a black tick on it would be unreadable. The page
+          // background was standing in for this and only looked right by
+          // coincidence.
+          'bg-success text-[rgb(var(--on-success))]',
           className,
         )}
       >

@@ -206,3 +206,42 @@ describe('removing a transaction', () => {
     expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * A closed account stops being offered.
+ *
+ * Which is the whole point of archiving one — an account you shut last year
+ * should not sit in the list every time you record a payment. The one
+ * exception is the account a transaction being edited already sits on:
+ * dropping that would silently move an old payment somewhere else the moment
+ * the sheet was opened and saved.
+ */
+describe('which accounts are offered', () => {
+  it('leaves out a closed one', async () => {
+    const user = userEvent.setup();
+    ACCOUNTS.push({
+      id: 'acc-old', name: 'Old Barclays', type: 'current', institution: 'Barclays',
+      balance: 0, maskedNumber: '••9', syncStatus: 'manual', archived: true,
+    });
+    render(<AddTransactionSheet open onClose={vi.fn()} />);
+
+    await user.click(screen.getByRole('combobox', { name: /account/i }));
+    expect(screen.queryByRole('option', { name: /old barclays/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /current/i })).toBeInTheDocument();
+    ACCOUNTS.pop();
+  });
+
+  it('keeps the closed account a transaction already sits on', async () => {
+    const user = userEvent.setup();
+    ACCOUNTS.push({
+      id: 'acc-old', name: 'Old Barclays', type: 'current', institution: 'Barclays',
+      balance: 0, maskedNumber: '••9', syncStatus: 'manual', archived: true,
+    });
+    render(<AddTransactionSheet open onClose={vi.fn()} editing={{ ...OVERDUE, accountId: 'acc-old' }} />);
+
+    await user.click(screen.getByRole('combobox', { name: /account/i }));
+    // Otherwise opening an old payment and saving it would quietly rehome it.
+    expect(screen.getByRole('option', { name: /old barclays/i })).toBeInTheDocument();
+    ACCOUNTS.pop();
+  });
+});

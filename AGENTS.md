@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 724 tests
+npm run test         # vitest — 731 tests
 npm run build        # resolves project references and builds the worker
 ```
 

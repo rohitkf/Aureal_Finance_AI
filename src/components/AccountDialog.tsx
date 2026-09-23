@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { newId, useAppState, useStore, useToday } from '@/lib/store';
 import type { Account, AccountGroup, AccountType } from '@/lib/types';
 import { Button } from './ui/Button';
-import { AmountField, DateField, SelectField, TextAreaField, TextField } from './ui/Field';
+import { AmountField, CheckboxField, DateField, SelectField, TextAreaField, TextField } from './ui/Field';
 import { Modal } from './ui/Modal';
 import { useToast } from './ui/Toast';
 import { AccountGroupDialog } from './AccountGroupDialog';
@@ -69,6 +69,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
   const [minimumPayment, setMinimumPayment] = useState('');
   /** When the opening balance is dated. Today unless it was opened earlier. */
   const [openedOn, setOpenedOn] = useState(today);
+  const [archived, setArchived] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -86,6 +87,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
     setStatementDay(editing?.statementDay ? String(editing.statementDay) : '');
     setMinimumPayment(editing?.minimumPayment ? String(editing.minimumPayment) : '');
     setOpenedOn(today);
+    setArchived(Boolean(editing?.archived));
   }, [open, editing, today]);
 
   const isCredit = type === 'credit';
@@ -125,6 +127,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
       note: note.trim() || undefined,
       statementDay: isCredit ? Number.parseInt(statementDay, 10) || undefined : undefined,
       minimumPayment: isCredit ? Number.parseFloat(minimumPayment) || undefined : undefined,
+      archived: archived || undefined,
     };
 
     // One action, not two. Sent separately, the opening balance raced the
@@ -242,6 +245,16 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
             onChange={(e) => setNote(e.target.value)}
             hint="Optional. Shown under the account on the Accounts page."
           />
+
+          {/* Only worth offering once the account exists. */}
+          {editing && (
+            <CheckboxField
+              checked={archived}
+              onChange={setArchived}
+              label="Closed — stop offering this account"
+              description="It keeps every transaction on it and still counts towards your balances and net worth. It just stops appearing when you record a payment. Deleting instead would take its whole history with it."
+            />
+          )}
 
           {/* Below the things that decide what this account *is*, because it
               decides nothing — it only changes which heading the account is

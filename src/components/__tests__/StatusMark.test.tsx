@@ -38,6 +38,19 @@ describe('what each status shows', () => {
     expect(reconciledClass).toContain('bg-success'); // a filled disc
   });
 
+  it('draws the reconciled tick in the colour meant to sit on that fill', () => {
+    // A filled disc says nothing if the tick on it is the same colour. The
+    // page background used to stand in for this and was only right by
+    // coincidence — `--on-success` is the token designed for it, and is a
+    // near-black green in dark mode and white in light, where the success
+    // colour itself is dark.
+    const { container } = render(<StatusMark status="reconciled" />);
+    const className = container.firstElementChild?.className ?? '';
+
+    expect(className).toContain('on-success');
+    expect(className).not.toContain('text-success');
+  });
+
   it.each(['none', 'void', 'scheduled'] as const)('shows nothing for %s', (status) => {
     const { container } = show(status);
     // None has nothing to say and is most rows; void is already struck
