@@ -53,6 +53,7 @@ export interface AccountRow {
   aer: number | null;
   note: string | null;
   group_id: string | null;
+  cash_flow?: boolean | null;
   archived: boolean;
   excluded: boolean;
   sort_order: number;
@@ -114,6 +115,7 @@ export interface AccountGroupRow {
   name: string;
   side: 'asset' | 'liability';
   sort_order: number;
+  kind?: AccountRow['type'] | null;
 }
 
 export interface LabelRow {

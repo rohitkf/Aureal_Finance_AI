@@ -58,6 +58,7 @@ export const toAccountGroup = (row: AccountGroupRow): AccountGroup => ({
   name: row.name,
   side: row.side,
   sortOrder: row.sort_order,
+  kind: row.kind ?? undefined,
 });
 
 export const toLabel = (row: LabelRow): Label => ({
@@ -91,6 +92,7 @@ export const toAccount = (row: AccountRow): Account => ({
   aer: optionalNum(row.aer),
   note: row.note ?? undefined,
   groupId: row.group_id ?? undefined,
+  cashFlow: row.cash_flow ?? undefined,
   archived: row.archived || undefined,
   excluded: row.excluded || undefined,
 });
@@ -270,6 +272,7 @@ export const accountToRow = (a: Omit<Account, 'id'>) => ({
   aer: a.aer ?? null,
   note: a.note ?? null,
   group_id: a.groupId ?? null,
+  cash_flow: a.cashFlow ?? null,
   archived: a.archived ?? false,
   excluded: a.excluded ?? false,
 });

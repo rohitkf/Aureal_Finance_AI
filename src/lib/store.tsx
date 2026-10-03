@@ -50,6 +50,7 @@ import {
   toVirtualAccount,
   transactionToRow,
 } from './mappers';
+import { missingStandardGroups } from './accountGroups';
 
 /** Slices that can be refetched independently after a write. */
 type Slice =
@@ -74,6 +75,10 @@ export type Action =
   | { type: 'restore-backup'; backup: Backup }
   | { type: 'upsert-account-group'; group: AccountGroup }
   | { type: 'delete-account-group'; id: string }
+  /** Put back whichever standard groups are missing, by name. */
+  | { type: 'add-standard-groups' }
+  /** Whether an account counts as spendable — Cash Flow Setup's one switch. */
+  | { type: 'set-cash-flow'; id: string; cashFlow: boolean }
   | { type: 'add-label'; label: Label }
   | { type: 'update-label'; label: Label }
   | { type: 'delete-label'; id: string }
@@ -665,6 +670,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                 name: action.group.name,
                 side: action.group.side,
                 sort_order: action.group.sortOrder,
+                kind: action.group.kind ?? null,
               }),
             );
             return ['accountGroups'];
@@ -677,6 +683,27 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             // a way of reading them, not a thing that owns them.
             check(await supabase.from('account_groups').delete().eq('id', action.id));
             return ['accountGroups', 'accounts'];
+          });
+          break;
+
+        case 'add-standard-groups': {
+          const missing = missingStandardGroups(stateRef.current.accountGroups);
+          if (missing.length === 0) break;
+          run('add the standard groups', async () => {
+            check(
+              await supabase.from('account_groups').insert(
+                missing.map((g) => ({ name: g.name, side: g.side, kind: g.kind, sort_order: g.sortOrder })),
+              ),
+            );
+            return ['accountGroups'];
+          });
+          break;
+        }
+
+        case 'set-cash-flow':
+          run('change that account’s cash flow', async () => {
+            check(await supabase.from('accounts').update({ cash_flow: action.cashFlow }).eq('id', action.id));
+            return ['accounts'];
           });
           break;
 
