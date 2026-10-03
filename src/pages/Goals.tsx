@@ -6,6 +6,7 @@ import { newId, useAppState, useLoading, useSettings, useStore, useToday } from 
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, Eyebrow } from '@/components/ui/Card';
+import { MoneyDial } from '@/components/ui/MoneyDial';
 import { isDepository } from '@/lib/finance';
 import { DateField, SelectField, TextField } from '@/components/ui/Field';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -302,33 +303,34 @@ export const Goals = () => {
                 ))}
             </SelectField>
             <div className="grid gap-4 sm:grid-cols-2">
-              <TextField
+              <MoneyDial
                 label="Target amount"
-                inputMode="decimal"
                 placeholder="10000"
                 value={draft.target}
-                onChange={(e) =>
-                  setDraft({ ...draft, target: e.target.value.replace(/[^0-9.]/g, ''), error: undefined })
-                }
+                max={50_000}
+                min={100}
+                onChange={(target) => setDraft({ ...draft, target, error: undefined })}
                 error={draft.error}
               />
-              <TextField
+              <MoneyDial
                 label="Already saved"
-                inputMode="decimal"
                 value={draft.saved}
-                onChange={(e) => setDraft({ ...draft, saved: e.target.value.replace(/[^0-9.]/g, '') })}
+                // Up to the target when there is one: saving past it is still
+                // typeable, but the track is for the part that matters.
+                max={Math.min(1_000_000, Math.max(100, Number.parseFloat(draft.target) || 50_000))}
+                onChange={(saved) => setDraft({ ...draft, saved })}
               />
               <DateField
                 label="Target date"
                 value={draft.targetDate}
                 onChange={(targetDate) => setDraft({ ...draft, targetDate })}
               />
-              <TextField
+              <MoneyDial
                 label="Monthly contribution"
-                inputMode="decimal"
                 placeholder="400"
                 value={draft.monthlyContribution}
-                onChange={(e) => setDraft({ ...draft, monthlyContribution: e.target.value.replace(/[^0-9.]/g, '') })}
+                max={2_000}
+                onChange={(monthlyContribution) => setDraft({ ...draft, monthlyContribution })}
               />
             </div>
           </div>
@@ -369,19 +371,15 @@ export const Goals = () => {
         }
       >
         {contributing && (
-          <TextField
+          <MoneyDial
             label="Amount"
-            inputMode="decimal"
             autoFocus
             value={contributing.amount}
             error={contributing.error}
-            onChange={(e) =>
-              setContributing({
-                ...contributing,
-                amount: e.target.value.replace(/[^0-9.]/g, ''),
-                error: undefined,
-              })
-            }
+            // The track runs to what is still needed, so its far end is
+            // "finish the goal" — the one amount worth a single drag.
+            max={Math.max(5, Number((contributing.goal.target - contributing.goal.saved).toFixed(2)))}
+            onChange={(amount) => setContributing({ ...contributing, amount, error: undefined })}
             hint={`${money(Math.max(0, contributing.goal.target - contributing.goal.saved))} still needed.`}
           />
         )}

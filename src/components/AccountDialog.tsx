@@ -3,6 +3,11 @@ import { newId, useAppState, useStore, useToday } from '@/lib/store';
 import type { Account, AccountGroup, AccountType } from '@/lib/types';
 import { Button } from './ui/Button';
 import { AmountField, CheckboxField, DateField, SelectField, TextAreaField, TextField } from './ui/Field';
+import { DayOfMonthPicker } from './ui/DayOfMonthPicker';
+import { DigitsField } from './ui/DigitsField';
+import { MoneyDial } from './ui/MoneyDial';
+import { RangeField } from './ui/RangeField';
+import { sanitizeAmount } from '@/lib/amount';
 import { Modal } from './ui/Modal';
 import { useToast } from './ui/Toast';
 import { AccountGroupDialog } from './AccountGroupDialog';
@@ -191,7 +196,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
             label={isCredit ? 'Balance owed today' : 'Balance today'}
             value={balance}
             tone={isCredit ? 'expense' : 'income'}
-            onChange={(e) => setBalance(e.target.value.replace(/[^0-9.]/g, ''))}
+            onChange={(e) => setBalance(sanitizeAmount(e.target.value))}
             hint="Recorded as an opening balance you can edit later."
           />
         )}
@@ -287,69 +292,73 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
               </option>
             ))}
           </SelectField>
-          <TextField
+          <DigitsField
             label="Last 4 digits"
-            inputMode="numeric"
-            maxLength={4}
-            placeholder="8291"
             value={lastFour}
-            onChange={(e) => setLastFour(e.target.value.replace(/\D/g, ''))}
+            onChange={setLastFour}
             hint="Optional. Only the last four are ever stored."
           />
 
           {isCredit && (
             <>
-              <TextField
+              <MoneyDial
                 label="Credit limit"
-                inputMode="decimal"
-                placeholder="2950"
                 value={creditLimit}
-                onChange={(e) => setCreditLimit(e.target.value.replace(/[^0-9.]/g, ''))}
+                onChange={setCreditLimit}
+                max={20_000}
+                min={100}
+                placeholder="2950"
               />
-              <TextField
+              {/* The database allows up to 200%; the track stops at 60, where
+                  every real card is, and + reaches the rest. */}
+              <RangeField
                 label="APR %"
-                inputMode="decimal"
-                placeholder="29.9"
-                value={apr}
-                onChange={(e) => setApr(e.target.value.replace(/[^0-9.]/g, ''))}
+                optional
+                value={apr === '' ? null : Number(apr)}
+                onChange={(v) => setApr(v === null ? '' : String(v))}
+                min={0}
+                max={200}
+                sliderMax={60}
+                step={0.1}
+                describe={(v) => `${v.toFixed(1)}% APR`}
               />
-              <TextField
+              <DayOfMonthPicker
                 label="Payment due day"
-                inputMode="numeric"
-                maxLength={2}
-                placeholder="26"
-                value={dueDay}
-                onChange={(e) => setDueDay(e.target.value.replace(/\D/g, ''))}
+                optional
+                value={dueDay === '' ? null : Number(dueDay)}
+                onChange={(day) => setDueDay(day === null ? '' : String(day))}
                 hint="Day of the month."
               />
               {/* Both of these were already printed on the account screen and
                   on Debts, read from a row nothing could write. */}
-              <TextField
+              <DayOfMonthPicker
                 label="Statement day"
-                inputMode="numeric"
-                maxLength={2}
-                placeholder="12"
-                value={statementDay}
-                onChange={(e) => setStatementDay(e.target.value.replace(/\D/g, ''))}
+                optional
+                value={statementDay === '' ? null : Number(statementDay)}
+                onChange={(day) => setStatementDay(day === null ? '' : String(day))}
                 hint="Day of the month the statement is issued."
               />
-              <TextField
+              <MoneyDial
                 label="Minimum payment"
-                inputMode="decimal"
-                placeholder="25"
                 value={minimumPayment}
-                onChange={(e) => setMinimumPayment(e.target.value.replace(/[^0-9.]/g, ''))}
+                onChange={setMinimumPayment}
+                max={1_000}
+                placeholder="25"
               />
             </>
           )}
 
           {type === 'savings' && (
-            <TextField
+            <RangeField
               label="Interest rate (AER %)"
-              inputMode="decimal"
-              placeholder="4.65"
-              value={aer}
-              onChange={(e) => setAer(e.target.value.replace(/[^0-9.]/g, ''))}
+              optional
+              value={aer === '' ? null : Number(aer)}
+              onChange={(v) => setAer(v === null ? '' : String(v))}
+              min={0}
+              max={100}
+              sliderMax={10}
+              step={0.05}
+              describe={(v) => `${v.toFixed(2)}% AER`}
             />
           )}
         </div>

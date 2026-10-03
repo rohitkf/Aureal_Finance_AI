@@ -12,7 +12,7 @@ import {
 } from '@/lib/date';
 import { evaluateExpression, isPlainNumber, stripToExpression } from '@/lib/calc';
 import { money } from '@/lib/format';
-import { FREQUENCY_LABELS, WEEKEND_LABELS, previewOccurrences } from '@/lib/recurrence';
+import { FREQUENCY_LABELS, WEEKEND_LABELS, cadencePhrase, previewOccurrences } from '@/lib/recurrence';
 import { newId, useAppState, useCategories, useStore, useToday } from '@/lib/store';
 import type {
   Account,
@@ -45,6 +45,7 @@ import {
   TimeField,
 } from './ui/Field';
 import { Modal } from './ui/Modal';
+import { RangeField } from './ui/RangeField';
 import { useToast } from './ui/Toast';
 import { CategoryIcon } from './CategoryIcon';
 import { NewCategoryDialog } from './NewCategoryDialog';
@@ -232,7 +233,10 @@ export const AddTransactionSheet = ({
   const [weekendMode, setWeekendMode] = useState<WeekendMode>('previous');
   const [endMode, setEndMode] = useState<'never' | 'date' | 'count'>('never');
   const [endDate, setEndDate] = useState('');
-  const [occurrences, setOccurrences] = useState('');
+  // Starts on a year of monthly payments rather than empty: the control is a
+  // slider, which always shows a number, so the state has to hold the one it
+  // shows — otherwise "after 12 payments" on screen saves as "never".
+  const [occurrences, setOccurrences] = useState('12');
   const [isSubscription, setIsSubscription] = useState(false);
 
   const categories = useMemo(
@@ -272,7 +276,7 @@ export const AddTransactionSheet = ({
     setWeekendMode('previous');
     setEndMode('never');
     setEndDate('');
-    setOccurrences('');
+    setOccurrences('12');
     setIsSubscription(false);
     setError(undefined);
     setLabelIds(editing?.labelIds ?? []);
@@ -839,14 +843,17 @@ export const AddTransactionSheet = ({
                     ))}
                   </SelectField>
 
-                  <TextField
+                  <RangeField
                     label="Repeat every"
-                    inputMode="numeric"
-                    value={interval}
-                    onChange={(e) => setInterval(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                    value={everyN}
+                    onChange={(v) => setInterval(String(v ?? 1))}
+                    min={1}
+                    max={99}
+                    sliderMax={24}
+                    describe={(n) => cadencePhrase(frequency, n)}
                     hint={
                       everyN <= 1
-                        ? `Every ${FREQUENCY_LABELS[frequency].toLowerCase().replace(/ly$/, '')} period — leave it at 1 unless you want it less often.`
+                        ? 'Leave it here unless you want it less often.'
                         : `${everyN} times less often than ${FREQUENCY_LABELS[frequency].toLowerCase()}.`
                     }
                   />
@@ -885,11 +892,14 @@ export const AddTransactionSheet = ({
                     <DateField label="End date" value={endDate} onChange={setEndDate} placeholder="Choose a date" />
                   )}
                   {endMode === 'count' && (
-                    <TextField
+                    <RangeField
                       label="Number of payments"
-                      inputMode="numeric"
-                      value={occurrences}
-                      onChange={(e) => setOccurrences(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      value={Number(occurrences) || 12}
+                      onChange={(v) => setOccurrences(String(v ?? 12))}
+                      min={1}
+                      max={9999}
+                      sliderMax={120}
+                      describe={(n) => (n === 1 ? '1 payment' : `${n} payments`)}
                       hint="Counted from this one, which is the first."
                     />
                   )}

@@ -59,6 +59,31 @@ export const FREQUENCY_LABELS: Record<Frequency, string> = {
   custom: 'Custom',
 };
 
+/**
+ * How often a rule runs, said the way a person would: "Every 3 months".
+ *
+ * `interval` multiplies the named cadence, so quarterly every 2 is every six
+ * months — and saying "every 2 quarters" makes the reader do that sum. The
+ * phrase is in the cadence's own base unit instead.
+ */
+export const cadencePhrase = (frequency: Frequency, interval: number, customDays?: number): string => {
+  const n = Math.max(1, Math.round(interval));
+  const base: Record<Frequency, [unit: string, per: number]> = {
+    daily: ['day', 1],
+    weekly: ['week', 1],
+    fortnightly: ['week', 2],
+    monthly: ['month', 1],
+    bimonthly: ['month', 2],
+    quarterly: ['month', 3],
+    semiannual: ['month', 6],
+    yearly: ['year', 1],
+    custom: ['day', Math.max(1, customDays ?? 1)],
+  };
+  const [unit, per] = base[frequency];
+  const count = n * per;
+  return count === 1 ? `Every ${unit}` : `Every ${count} ${unit}s`;
+};
+
 const MONTH_STEP: Partial<Record<Frequency, number>> = {
   monthly: 1,
   bimonthly: 2,

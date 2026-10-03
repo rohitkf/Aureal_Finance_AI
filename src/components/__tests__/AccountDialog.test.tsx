@@ -12,7 +12,7 @@
  * read £0.00 next to an error nobody could act on. One action now carries
  * both, so the order is not something the network gets to decide.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -318,16 +318,46 @@ describe('fields the form never asked for', () => {
     const user = userEvent.setup();
     render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'credit' }} />);
 
-    await user.type(screen.getByLabelText('Statement day'), '12');
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Statement day' })).getByRole('radio', { name: '12' }));
     await user.type(screen.getByLabelText('Minimum payment'), '25');
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     expect(sent()[0].account).toMatchObject({ statementDay: 12, minimumPayment: 25 });
   });
 
+  it('saves the card details set with the new controls', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'credit', maskedNumber: '' }} />);
+
+    await user.type(screen.getByLabelText('Last 4 digits'), '82x91');
+    await user.type(screen.getByLabelText('Credit limit'), '£3,000.50');
+    // From Not set, + starts the rate at 0.0%; three more presses is 0.3%.
+    for (let i = 0; i < 4; i += 1) await user.click(screen.getByRole('button', { name: 'More — APR %' }));
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Payment due day' })).getByRole('radio', { name: 'Last day' }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(sent()[0].account).toMatchObject({
+      maskedNumber: '••••8291',
+      creditLimit: 3000.5,
+      apr: 0.3,
+      paymentDueDay: 31,
+    });
+  });
+
+  it('leaves an optional rate and day unset unless they are set', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'credit' }} />);
+
+    expect(screen.getByRole('slider', { name: 'APR %' })).toHaveAttribute('aria-valuetext', 'Not set');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(sent()[0].account.apr).toBeUndefined();
+    expect(sent()[0].account.paymentDueDay).toBeUndefined();
+  });
+
   it('does not offer the card fields to an account that is not a card', () => {
     render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'savings' }} />);
-    expect(screen.queryByLabelText('Statement day')).not.toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Statement day' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Minimum payment')).not.toBeInTheDocument();
   });
 

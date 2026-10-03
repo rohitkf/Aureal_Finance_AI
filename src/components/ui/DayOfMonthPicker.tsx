@@ -18,8 +18,11 @@ import { cn } from '@/lib/cn';
 export const LAST_DAY = 31;
 
 interface DayOfMonthPickerProps {
-  value: number;
-  onChange: (day: number) => void;
+  /** `null` is "not set", and is only offered when `optional`. */
+  value: number | null;
+  onChange: (day: number | null) => void;
+  /** Adds a "Not set" choice, for a day the account may not have. */
+  optional?: boolean;
   label: string;
   /** Rendered under the grid, e.g. to explain what the choice means. */
   hint?: string;
@@ -28,7 +31,7 @@ interface DayOfMonthPickerProps {
 
 const DAYS = Array.from({ length: 30 }, (_, i) => i + 1);
 
-export const DayOfMonthPicker = ({ value, onChange, label, hint, id }: DayOfMonthPickerProps) => {
+export const DayOfMonthPicker = ({ value, onChange, label, hint, id, optional }: DayOfMonthPickerProps) => {
   const groupRef = useRef<HTMLDivElement>(null);
 
   // A radiogroup is one tab stop, and arrow keys move within it. Tabbing
@@ -40,14 +43,15 @@ export const DayOfMonthPicker = ({ value, onChange, label, hint, id }: DayOfMont
     if (step === 0) return;
     e.preventDefault();
 
-    const next = value + step;
+    // From "not set", the arrows start at the 1st.
+    const next = value === null ? 1 : value + step;
     if (next >= 1 && next <= LAST_DAY) {
       onChange(next);
       groupRef.current?.querySelector<HTMLElement>(`[data-day="${next}"]`)?.focus();
     }
   };
 
-  const tile = (day: number, children: React.ReactNode, wide = false) => {
+  const tile = (day: number | null, children: React.ReactNode, span?: 'col-span-2' | 'col-span-3') => {
     const active = value === day;
     return (
       <button
@@ -55,14 +59,14 @@ export const DayOfMonthPicker = ({ value, onChange, label, hint, id }: DayOfMont
         type="button"
         role="radio"
         aria-checked={active}
-        data-day={day}
+        data-day={day ?? 'none'}
         // Roving tabindex: only the selected tile is in the tab order.
         tabIndex={active ? 0 : -1}
         onClick={() => onChange(day)}
         className={cn(
           'flex min-h-[38px] items-center justify-center rounded-xl text-[13px] tabular-nums',
           'transition-all duration-400 ease-fluid active:scale-[0.96]',
-          wide && 'col-span-3 px-3',
+          span, span && 'px-3',
           active
             ? 'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.22),0_6px_16px_-8px_rgb(var(--primary-strong)/0.8)]'
             : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.06)] hover:text-text',
@@ -85,7 +89,9 @@ export const DayOfMonthPicker = ({ value, onChange, label, hint, id }: DayOfMont
         className="grid grid-cols-7 gap-1.5"
       >
         {DAYS.map((d) => tile(d, d))}
-        {tile(LAST_DAY, 'Last day', true)}
+        {tile(LAST_DAY, 'Last day', 'col-span-3')}
+        {/* Two columns, so it finishes the row Last day starts. */}
+        {optional && tile(null, 'Not set', 'col-span-2')}
       </div>
       {hint && <p className="text-[12.5px] leading-snug text-faint">{hint}</p>}
     </div>

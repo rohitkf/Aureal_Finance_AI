@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { describeError } from '@/lib/errors';
 import { formatMediumDate } from '@/lib/date';
 import {
@@ -45,6 +45,7 @@ import { CURRENCIES, LOCALES } from '@/lib/intl';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
+import { MoneyDial } from '@/components/ui/MoneyDial';
 import { SelectField, TextField, Toggle } from '@/components/ui/Field';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { ConfirmDialog } from '@/components/ui/Modal';
@@ -76,6 +77,14 @@ export const Settings = () => {
   const navigate = useNavigate();
 
   const [minimum, setMinimum] = useState(String(state.settings.minimumBalance));
+  // The field copied the stored figure once, on first render — and Settings
+  // can render before the profile has loaded, when that figure is £0. Leaving
+  // the field then saved £0 over the real buffer. Follow the stored value
+  // whenever it changes, which is on load and after each save.
+  useEffect(() => {
+    setMinimum(String(state.settings.minimumBalance));
+    setMinimumError(undefined);
+  }, [state.settings.minimumBalance]);
   const [minimumError, setMinimumError] = useState<string | undefined>();
   const [name, setName] = useState(state.settings.userName);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -181,16 +190,16 @@ export const Settings = () => {
           description="The balance you never want to dip below. Everything above it is treated as spendable."
         />
         <div className="grid gap-5 sm:grid-cols-2">
-          <TextField
+          <MoneyDial
             label="Minimum balance"
-            inputMode="decimal"
             value={minimum}
             error={minimumError}
-            onChange={(e) => {
-              setMinimum(e.target.value.replace(/[^0-9.]/g, ''));
+            max={5_000}
+            onChange={(next) => {
+              setMinimum(next);
               setMinimumError(undefined);
             }}
-            onBlur={() => {
+            onCommit={() => {
               const value = Number.parseFloat(minimum);
               // It used to put the old figure back without a word, which looks
               // like the app losing what you typed. Say what was wrong and keep

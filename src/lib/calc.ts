@@ -56,7 +56,11 @@ const parseUnary = (c: Cursor): number => {
   const start = c.at;
   while (/[0-9.]/.test(c.text[c.at] ?? '')) c.at += 1;
   if (c.at === start) return Number.NaN;
-  const number = Number.parseFloat(c.text.slice(start, c.at));
+  const token = c.text.slice(start, c.at);
+  // One decimal point, and pennies at most. `parseFloat` would read `1.2.3`
+  // as 1.2 and drop the rest without a word, so `12.50.10+5` saved as £17.50.
+  if (!/^(\d+\.?\d{0,2}|\.\d{1,2})$/.test(token)) return Number.NaN;
+  const number = Number.parseFloat(token);
   return Number.isFinite(number) ? number : Number.NaN;
 };
 
