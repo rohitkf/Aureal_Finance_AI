@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 796 tests
+npm run test         # vitest — 828 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -66,7 +66,7 @@ Vocabulary that is easy to get wrong:
 
 | Word | What it means here |
 |---|---|
-| **Available now** | Cleared balances of the accounts money can actually be spent from — current, savings, cash. Credit is a debt and investments are not cash, so neither counts. |
+| **Available now** | Cleared balances of the accounts in the cash flow — switched on in Cash flow setup (`accounts.cash_flow`), or by default current, savings and cash. Money owed never counts, whatever the switch says. |
 | **A credit account's `balance`** | What is **owed**, as a positive number. Spending increases it; a payment reduces it. |
 | **`scheduled`** | It has not happened. It is on Reminders and in the forecast, and moves no balance. The only status that means this. |
 | **`none`** | It happened and counts, and nobody has checked it. What a new transaction gets. |
@@ -79,7 +79,9 @@ Vocabulary that is easy to get wrong:
 | **A transfer rule** | A standing order between two of your own accounts. `account_id` is the source, `to_account_id` the destination. |
 | **`interval`** | Every N of whatever `frequency` counts in. Monthly with 3 is quarterly, weekly with 2 is fortnightly. It multiplies the named cadence rather than replacing it, so stored rules keep meaning what they meant. Absent is 1. |
 | **`weekendMode`** | What a Saturday or Sunday does to one occurrence: `none`, `previous` (how a salary behaves), `next` (how most direct debits behave), `nearest`, `skip`. It never moves the schedule — only the day the payment shows on. |
-| **An account group** | A group of accounts you named yourself. It decides which side of the balance sheet its accounts are counted on. `sideOf()` resolves it; the group wins, the type is the fallback. |
+| **An account group** | Where every account lives — Bank, Cash, Credit Card, Mortgages, or one you named — under Assets or Liabilities, as in Bluecoins. Everyone gets the standard fourteen (`seed_account_groups`, mirrored by `STANDARD_GROUPS` and held to it by a test). The account form's "Account type" *is* the group. `sideOf()` decides the side; `groupOf()` finds an account's group, falling back to the standard home for its type on rows older than groups. |
+| **A group's `kind`** | The account `type` a group gives what is created in it: Bank makes `current`, Credit Card makes `credit`. Null on a group someone named: a plain `asset` or `liability` by side (`kindOf`). The database refuses a kind on the wrong side. An edited account keeps its own type while it stays in its group, so a savings account in Bank stays savings. |
+| **Cash flow** | Whether an account is money you can spend — Safe to Spend and the forecast start from these. Null means by type, so nothing moved for accounts nobody has switched. |
 | **`asset` / `liability`** | Account types for a thing you own that is not money (a house) and a thing you owe that is not a card (a loan). |
 | **An opening balance** | What an account held when it was added. Written as an income (or an expense on something you owe) because balances are derived from transactions — and marked `is_opening`, because it is not money that arrived and must not be coloured as if it were. |
 | **An accent** | Which of the six semantic colours a kind of line is drawn in. `DEFAULT_ACCENTS` is the design; `profiles.row_accents` is the person's override, merged over it by `resolveAccents`. |
@@ -282,7 +284,8 @@ Each of these has already cost real time here.
   it. A "what is still to come" filter written as `date > today` reopens this.
 - **`isDepository` is not "spendable".** It means "not a credit facility", so
   it includes investments. Safe-to-Spend and the forecast start from
-  `isSpendable` (current, savings, cash); net worth uses `totalAssets`, which
+  `isSpendable` (the cash flow switch, defaulting to current, savings and
+  cash); net worth uses `totalAssets`, which
   is everything owned. Using the wrong one offers somebody their pension.
 - **`net_worth_snapshots` is written by nothing but the sample seed.** Any
   chart that reads it directly is empty for every real account. `netWorthSeries`

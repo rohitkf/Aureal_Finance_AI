@@ -29,6 +29,13 @@ export interface AccountGroup {
   name: string;
   side: BalanceSide;
   sortOrder: number;
+  /**
+   * The account type an account made in this group is given — Bank makes
+   * current accounts, Credit Card makes credit cards. Absent on a group
+   * somebody named themselves: its accounts are a plain asset or liability.
+   * See `kindOf` in finance.ts.
+   */
+  kind?: AccountType;
 }
 
 export type SyncStatus = 'live' | 'manual' | 'error' | 'reconnect';
@@ -73,8 +80,18 @@ export interface Account {
    * every figure has no business being offered when recording a payment.
    */
   excluded?: boolean;
-  /** The group it is shown under and counted in. Absent means by its type. */
+  /**
+   * The group it is listed in. Every account has one since the standard groups
+   * arrived; absent only on rows that predate them, which are shown in the
+   * standard group their type belongs to (`groupOf`).
+   */
   groupId?: string;
+  /**
+   * Whether it counts as money you can spend — Safe to Spend and the forecast.
+   * Set on Cash Flow Setup. Absent means by type: current, savings and cash
+   * count, which is how every account behaved before it could be chosen.
+   */
+  cashFlow?: boolean;
 }
 
 /**

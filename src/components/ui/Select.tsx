@@ -1,4 +1,5 @@
 import {
+  Fragment,
   Children,
   isValidElement,
   useCallback,
@@ -59,19 +60,30 @@ interface Opt {
   label: string;
   /** A second, quieter column — a balance, a count. Never the thing chosen. */
   hint?: string;
+  /** The `<optgroup>` it sat in, drawn as a heading above the first of its run. */
+  group?: string;
 }
 
-/** Reads `<option value="x" data-hint="…">Label</option>` children into a flat list. */
-const readOptions = (children: ReactNode): Opt[] =>
+/**
+ * Reads `<option value="x" data-hint="…">Label</option>` children into a flat
+ * list. An `<optgroup label="…">` around some of them marks them with that
+ * label, so a long list can be read in sections — Assets, then Liabilities —
+ * without the keyboard having to step over the headings.
+ */
+const readOptions = (children: ReactNode, group?: string): Opt[] =>
   Children.toArray(children).flatMap((child) => {
     if (!isValidElement(child)) return [];
+    if (child.type === 'optgroup') {
+      const props = child.props as { label?: string; children?: ReactNode };
+      return readOptions(props.children, props.label);
+    }
     const props = child.props as { value?: string | number; children?: ReactNode; 'data-hint'?: string };
     if (props.value === undefined) return [];
     const label = Children.toArray(props.children)
       .map((c) => (typeof c === 'string' || typeof c === 'number' ? String(c) : ''))
       .join('')
       .trim();
-    return [{ value: String(props.value), label: label || String(props.value), hint: props['data-hint'] }];
+    return [{ value: String(props.value), label: label || String(props.value), hint: props['data-hint'], group }];
   });
 
 export const Select = ({
@@ -322,9 +334,21 @@ export const Select = ({
         >
           {options.map((option, index) => {
             const isSelected = option.value === value;
+            const heading = option.group && option.group !== options[index - 1]?.group ? option.group : null;
             return (
+              <Fragment key={option.value}>
+              {heading && (
+                // Not an option, so it has no index and the arrow keys pass
+                // over it; presentation, so a screen reader is not told the
+                // list holds one more choice than it does.
+                <li
+                  role="presentation"
+                  className="px-3 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.18em] text-faint first:pt-1.5"
+                >
+                  {heading}
+                </li>
+              )}
               <li
-                key={option.value}
                 id={`${listId}-${index}`}
                 role="option"
                 aria-selected={isSelected}
@@ -369,6 +393,7 @@ export const Select = ({
                   {isSelected && <Icon name="check" size={15} />}
                 </span>
               </li>
+              </Fragment>
             );
           })}
 

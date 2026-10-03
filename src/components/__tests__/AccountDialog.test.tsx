@@ -17,11 +17,15 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const dispatch = vi.fn();
+// Every person has the standard groups, and the form asks which one an account
+// is in — so the tests give it them, with ids that read in a failure.
+const { STANDARD_GROUPS } = await import('@/lib/accountGroups');
+const GROUPS = STANDARD_GROUPS.map((g) => ({ ...g, id: `g-${g.name}` }));
 const toast = vi.fn();
 
 vi.mock('@/lib/store', () => ({
   useStore: () => ({ dispatch, today: '2026-09-18' }),
-  useAppState: () => ({ accountGroups: [] }),
+  useAppState: () => ({ accountGroups: GROUPS }),
   useToday: () => '2026-09-22',
   newId: () => 'generated-id',
 }));
@@ -261,47 +265,102 @@ describe('an account opened for editing', () => {
  * credit-card fields appear, and which side of the balance sheet it lands on.
  * A group only changes the heading it is listed under.
  */
-describe('the order the form asks things in', () => {
-  const fieldOrder = () =>
-    Array.from(document.querySelectorAll('label')).map((l) => l.textContent?.trim() ?? '');
+/** Drives the app's dropdown, which is a listbox rather than a <select>. */
+const choose = async (user: ReturnType<typeof userEvent.setup>, field: string, option: string) => {
+  await user.click(screen.getByRole('combobox', { name: field }));
+  await user.click(screen.getByRole('option', { name: option }));
+};
 
-  it('asks what kind of account it is before where to file it', () => {
-    render(<AccountDialog open onClose={vi.fn()} />);
-    const labels = fieldOrder();
-    const type = labels.findIndex((l) => l.startsWith('Type'));
-    const group = labels.findIndex((l) => l.startsWith('File it under'));
-
-    expect(type).toBeGreaterThanOrEqual(0);
-    expect(group).toBeGreaterThanOrEqual(0);
-    expect(type).toBeLessThan(group);
+/*
+ * The form used to ask two things that read as one question — a Type, and a
+ * group to "file it under" — and nothing stopped the answers disagreeing. Now
+ * it asks which group the account is in, as Bluecoins does, and the type
+ * follows from the group.
+ */
+describe('the one question about what an account is', () => {
+  it('is the group, called Account type, and nothing else asks it', () => {
+    open();
+    expect(screen.getByRole('combobox', { name: 'Account type' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Type' })).toBeNull();
+    expect(screen.queryByLabelText(/file it under/i)).toBeNull();
   });
 
-  it('no longer calls the optional one "Group", which read as a second type', () => {
-    render(<AccountDialog open onClose={vi.fn()} />);
-    expect(screen.queryByLabelText('Group')).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/file it under/i)).toBeInTheDocument();
+  it('lists the groups under Assets and Liabilities', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(screen.getByRole('combobox', { name: 'Account type' }));
+    const list = screen.getByRole('listbox');
+    expect(within(list).getByText('Assets')).toBeInTheDocument();
+    expect(within(list).getByText('Liabilities')).toBeInTheDocument();
+    // Headings, not choices: the keyboard and a screen reader skip them.
+    expect(within(list).queryByRole('option', { name: 'Assets' })).toBeNull();
+    expect(within(list).getAllByRole('option').map((o) => o.textContent)).toContain('Mortgages');
   });
 
-  it('says the filing choice is only about where it is listed', () => {
-    render(<AccountDialog open onClose={vi.fn()} />);
-    expect(screen.getByText(/only about where it appears/i)).toBeInTheDocument();
+  it('starts a new account in Bank, as a current account that counts as spendable', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.type(screen.getByLabelText('Account name'), 'Monzo');
+    await user.click(screen.getByRole('button', { name: /Add account/ }));
+
+    expect(sent()[0].account).toMatchObject({ groupId: 'g-Bank', type: 'current', cashFlow: true });
+  });
+
+  it('makes a credit card of an account put in Credit Card, kept out of the cash flow', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.type(screen.getByLabelText('Account name'), 'Amex');
+    await choose(user, 'Account type', 'Credit Card');
+    // The card's own questions appear once the group says it is a card.
+    expect(screen.getByLabelText('Credit limit')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Balance owed today/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Add account/ }));
+
+    expect(sent()[0].account).toMatchObject({ groupId: 'g-Credit Card', type: 'credit', cashFlow: false });
+  });
+
+  it('makes a plain asset of an account in a group like Properties', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.type(screen.getByLabelText('Account name'), 'The house');
+    await choose(user, 'Account type', 'Properties');
+    expect(screen.queryByLabelText('Credit limit')).toBeNull();
+    await user.click(screen.getByRole('button', { name: /Add account/ }));
+
+    expect(sent()[0].account).toMatchObject({ groupId: 'g-Properties', type: 'asset', cashFlow: false });
+  });
+
+  it('keeps a savings account a savings account when it is edited in Bank', async () => {
+    const user = userEvent.setup();
+    render(
+      <AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'savings', groupId: 'g-Bank', cashFlow: false }} />,
+    );
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    // Not turned into a current account by the group, and not put back into
+    // the cash flow by a form that does not ask about it.
+    expect(sent()[0].account).toMatchObject({ type: 'savings', groupId: 'g-Bank', cashFlow: false });
+  });
+
+  it('gives an account older than groups the group it is listed under', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'credit', groupId: undefined }} />);
+    expect(screen.getByRole('combobox', { name: 'Account type' })).toHaveTextContent('Credit Card');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(sent()[0].account).toMatchObject({ type: 'credit', groupId: 'g-Credit Card' });
+  });
+
+  it('retypes an account moved to a group of a different kind', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, groupId: 'g-Bank' }} />);
+    await choose(user, 'Account type', 'Investments');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(sent()[0].account).toMatchObject({ type: 'investment', groupId: 'g-Investments' });
   });
 });
 
-/**
- * Fields the app read but could never be told.
- *
- * The note is printed under the account on the Accounts page. The statement
- * day appears twice on the account screen — "15th of each month", "Next
- * statement…". The minimum payment appears on Debts, on Accounts and on the
- * account screen. All three were read from a row that nothing in the app
- * could write, so they arrived only from sample data: a real account showed a
- * blank where a number was promised.
- *
- * The same shape as the transaction delete, and missed by the audit that went
- * looking for it — because that audit checked which store actions had callers,
- * and these are fields, not actions.
- */
 describe('fields the form never asked for', () => {
   it('takes a note, which the accounts page already prints', async () => {
     const user = userEvent.setup();

@@ -16,20 +16,23 @@ import {
 import { formatMediumDate } from '@/lib/date';
 import { money, percent, round2 } from '@/lib/format';
 import { useAppState, useLoading, useSettings } from '@/lib/store';
-import { Badge, StatusDot } from '@/components/ui/Badge';
+import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card, Eyebrow, Label } from '@/components/ui/Card';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Progress, SegmentedBar } from '@/components/ui/Progress';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
 import { AccountDialog } from '@/components/AccountDialog';
-import { AccountGroupDialog } from '@/components/AccountGroupDialog';
 import { VirtualAccountDialog } from '@/components/VirtualAccountDialog';
-import { ConfirmDialog } from '@/components/ui/Modal';
+import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { IconButton } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { useStore } from '@/lib/store';
-import type { Account, AccountGroup, BalanceSide, VirtualAccount } from '@/lib/types';
+import type { Account, VirtualAccount } from '@/lib/types';
+import { groupOf, sortGroups } from '@/lib/accountGroups';
+import { CURRENCIES } from '@/lib/intl';
+import { AccountGroupsDialog } from '@/components/AccountGroupsDialog';
+import { CashFlowDialog } from '@/components/CashFlowDialog';
 
 const TYPE_ICON: Record<Account['type'], IconName> = {
   current: 'bank',
@@ -41,46 +44,11 @@ const TYPE_ICON: Record<Account['type'], IconName> = {
   liability: 'scale',
 };
 
-/** What each type is called when it is the heading of its own section. */
-const TYPE_SECTION: Record<Account['type'], string> = {
-  current: 'Current accounts',
-  savings: 'Savings',
-  cash: 'Cash',
-  credit: 'Credit cards',
-  investment: 'Investments',
-  asset: 'Assets',
-  liability: 'Owed',
-};
-
-/**
- * The order sections appear in when they come from types rather than groups.
- *
- * Every type, including the two that owe money. Credit cards used to be
- * pulled out and drawn somewhere else entirely, which meant the page rendered
- * an account in three different places depending on how it had been filed.
- */
-const TYPE_ORDER: Account['type'][] = [
-  'current',
-  'savings',
-  'cash',
-  'investment',
-  'asset',
-  'credit',
-  'liability',
-];
-
-// Until bank connections exist every account is maintained by hand, and the
-// interface says so rather than implying a live feed.
-const SYNC_TONE = {
-  live: { tone: 'success' as const, label: 'Synced' },
-  manual: { tone: 'neutral' as const, label: 'Manual' },
-  error: { tone: 'danger' as const, label: 'Sync failed' },
-  reconnect: { tone: 'warning' as const, label: 'Reconnect needed' },
-};
-
 export const Accounts = () => {
   const state = useAppState();
-  const { maskBalances } = useSettings();
+  const { maskBalances, currency } = useSettings();
+  // "GBP - British pound", as Bluecoins writes it under each account.
+  const currencyLine = `${currency} - ${CURRENCIES.find((c) => c.code === currency)?.label ?? currency}`;
   const loading = useLoading();
   const { dispatch } = useStore();
   const toast = useToast();
@@ -91,8 +59,10 @@ export const Accounts = () => {
     editing: null,
   });
   const [deletingAllocation, setDeletingAllocation] = useState<VirtualAccount | null>(null);
-  const [editingGroup, setEditingGroup] = useState<AccountGroup | null>(null);
-  const [deletingGroup, setDeletingGroup] = useState<AccountGroup | null>(null);
+  /** The + menu, and the two screens it leads to beside the account form. */
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(false);
+  const [cashFlowOpen, setCashFlowOpen] = useState(false);
   /**
    * The account being changed, and the one being removed.
    *
@@ -112,66 +82,26 @@ export const Accounts = () => {
   }, [params, setParams]);
 
   /**
-   * The page, in sections.
+   * The page, the way a balance sheet — and Bluecoins — lays it out.
    *
-   * A group you named comes first and keeps its own accounts whatever type
-   * they are — that is the whole point of naming it. What is left falls back
-   * to the arrangement this screen always had, one section per type, so
-   * somebody who has never made a group sees exactly what they saw before.
+   * Assets, then Liabilities. Under each, every group in its own order, empty
+   * ones included: a group with nothing in it yet is still a place an account
+   * can go, and seeing it is how you know it exists. Every account sits in
+   * exactly one group (`groupOf`), so nothing can appear twice or not at all.
    */
-  const sections = useMemo(() => {
-    const grouped = new Set<string>();
-    const out: Array<{
-      key: string;
-      title: string;
-      side: BalanceSide;
-      group?: AccountGroup;
-      accounts: Account[];
-      subtotal: number;
-    }> = [];
-
-    for (const group of state.accountGroups) {
-      const accounts = state.accounts.filter((a) => a.groupId === group.id && !a.archived && !a.excluded);
-      accounts.forEach((a) => grouped.add(a.id));
-      if (accounts.length === 0) continue;
-      out.push({
-        key: group.id,
-        title: group.name,
-        side: group.side,
-        group,
-        accounts,
-        subtotal: round2(accounts.reduce((sum, a) => sum + a.balance, 0)),
-      });
-    }
-
-    for (const type of TYPE_ORDER) {
-      const accounts = state.accounts.filter((a) => a.type === type && !a.archived && !a.excluded && !grouped.has(a.id));
-      if (accounts.length === 0) continue;
-      out.push({
-        key: `type-${type}`,
-        title: TYPE_SECTION[type],
-        // `sideOf` is the one answer to this question, and the rest of the app
-        // already asks it. Writing 'asset' here instead put credit cards and
-        // loans on the wrong half of the balance sheet — with a green badge
-        // and a subtotal that did not know it was money owed.
-        side: sideOf(accounts[0]!, state.accountGroups),
-        accounts,
-        subtotal: round2(accounts.reduce((sum, a) => sum + a.balance, 0)),
-      });
-    }
-
-    return out;
+  const halves = useMemo(() => {
+    const open = state.accounts.filter((a) => !a.archived && !a.excluded);
+    return (['asset', 'liability'] as const).map((side) => {
+      const groups = sortGroups(state.accountGroups)
+        .filter((g) => g.side === side)
+        .map((group) => {
+          const accounts = open.filter((a) => groupOf(a, state.accountGroups)?.id === group.id);
+          return { group, accounts, subtotal: round2(accounts.reduce((sum, a) => sum + a.balance, 0)) };
+        });
+      return { side, groups, total: round2(groups.reduce((sum, g) => sum + g.subtotal, 0)) };
+    });
   }, [state.accounts, state.accountGroups]);
 
-  /**
-   * The page, in two halves.
-   *
-   * What you own, then what you owe, each with its own total — the shape a
-   * balance sheet has had for five hundred years, and the one the screens
-   * people compare this to use. Before, a named group marked "liability"
-   * could sit above an asset group purely because it was created first, and
-   * the only thing saying which was which was a badge on the heading.
-   */
   /**
    * Closed accounts, kept out of the two halves and shown under their own
    * heading at the end.
@@ -182,31 +112,10 @@ export const Accounts = () => {
    */
   const archived = useMemo(() => state.accounts.filter((a) => a.archived || a.excluded), [state.accounts]);
 
-  const halves = useMemo(
-    () =>
-      (['asset', 'liability'] as const)
-        .map((side) => {
-          const inSide = sections.filter((s) => s.side === side);
-          return {
-            side,
-            sections: inSide,
-            total: round2(inSide.reduce((sum, s) => sum + s.subtotal, 0)),
-          };
-        })
-        .filter((half) => half.sections.length > 0),
-    [sections],
-  );
-
-  /** Credit cards keep their own section, unless they have been given a group. */
-  const groupedIds = useMemo(
-    () => new Set(sections.filter((s) => s.group).flatMap((s) => s.accounts.map((a) => a.id))),
-    [sections],
-  );
-
   // The headline is spendable cash, so its count must be of the same accounts.
   // An investment sits in the list below but is not money you can spend today.
   const spendable = state.accounts.filter(isSpendable);
-  const credit = state.accounts.filter((a) => a.type === 'credit' && !groupedIds.has(a.id));
+  const credit = state.accounts.filter((a) => a.type === 'credit' && isCounted(a));
   const liquid = availableNow(state.accounts);
   const debt = totalDebt(state.accounts, state.accountGroups);
 
@@ -257,11 +166,16 @@ export const Accounts = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2.5">
-          <ButtonLink to="/settings#connections" icon="bank">
-            Bank sync — coming soon
-          </ButtonLink>
-          <Button variant="primary" icon="plus" onClick={() => setDialogOpen(true)}>
-            Add account
+          <Button icon="bank" onClick={() => setCashFlowOpen(true)}>
+            Cash flow setup
+          </Button>
+          {/* The page's own +, as in Bluecoins: a new account, or the group
+              setup. In the header rather than floating, because a phone's
+              island nav already has a + — for a transaction — and two
+              identical buttons a thumb apart that do different things is a
+              mistake waiting to be made. */}
+          <Button variant="primary" icon="plus" aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
+            Add
           </Button>
         </div>
       </header>
@@ -281,7 +195,7 @@ export const Accounts = () => {
         <Card>
           <div className="flex items-center justify-between">
             <Eyebrow>Total owed</Eyebrow>
-            <Badge tone="danger">{credit.length} facilities</Badge>
+            <Badge tone="danger">{credit.length === 1 ? '1 facility' : `${credit.length} facilities`}</Badge>
           </div>
           <p className="tnum mt-3 font-display text-metric-lg text-danger">
             {money(debt, { masked: maskBalances })}
@@ -305,155 +219,138 @@ export const Accounts = () => {
 
       {/* ---------------- Every account, in two halves ---------------- */}
       <section className="space-y-3">
-        {state.accounts.length === 0 ? (
+        {/* With nothing added yet the groups still show, at £0.00 — they are
+            where accounts go, and seeing them is the quickest way to learn
+            that. The prompt sits above them rather than in their place. */}
+        {state.accounts.length === 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-primary/8 p-4 shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.2)]">
+            <p className="text-body-sm text-muted">
+              <strong className="text-text">No accounts yet.</strong> Add your bank account, a card or cash, and the
+              rest of Aureal comes to life.
+            </p>
+            <Button size="sm" variant="primary" icon="plus" onClick={() => setDialogOpen(true)}>
+              Add your first account
+            </Button>
+          </div>
+        )}
+        {state.accountGroups.length === 0 && state.accounts.length > 0 ? (
+          // Only after restoring an old backup: accounts, and no headings to
+          // list them under. Say so, and offer the way back.
           <Card className="p-0">
             <EmptyState
-              icon="bank"
-              title="No accounts yet"
-              description="Add your current account, a savings pot or a credit card, and the rest of Aureal comes to life."
-              action={{ label: 'Add your first account', onClick: () => setDialogOpen(true) }}
+              icon="layers"
+              title="No account groups"
+              description="Every account is listed under a group. Put the standard ones back to see your accounts here."
+              action={{ label: 'Account group setup', onClick: () => setGroupsOpen(true) }}
             />
           </Card>
         ) : (
           <div className="space-y-10">
             {halves.map((half) => (
-              <div key={half.side} className="space-y-6">
-                {/* What you own, then what you owe. The heading is the
-                    organising fact rather than a badge on each section. */}
-                <div className="flex items-baseline justify-between gap-3 border-b border-[rgb(var(--hairline)/0.12)] pb-2.5">
-                  <h2 className="flex items-center gap-2.5 font-display text-headline-sm text-text">
-                    <span
-                      className={cn(
-                        'h-4 w-1.5 rounded-full',
-                        half.side === 'asset' ? 'bg-success' : 'bg-danger',
-                      )}
-                      aria-hidden="true"
-                    />
+              <section key={half.side} aria-labelledby={`half-${half.side}`}>
+                {/* What you own, then what you owe — the organising fact, as
+                    a heading rather than a badge on every group. */}
+                <div className="flex items-baseline justify-between gap-3 border-b border-[rgb(var(--hairline)/0.14)] pb-2.5">
+                  <h2
+                    id={`half-${half.side}`}
+                    className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted"
+                  >
                     {half.side === 'asset' ? 'Assets' : 'Liabilities'}
                   </h2>
                   <span
                     className={cn(
                       'tnum text-label-md font-medium',
-                      half.side === 'asset' ? 'text-success' : 'text-danger',
+                      half.side === 'asset' ? 'text-text' : 'text-danger',
                     )}
                   >
-                    {half.side === 'liability' && '−'}
+                    {half.side === 'liability' && half.total > 0 && '−'}
                     {money(half.total, { masked: maskBalances })}
                   </span>
                 </div>
 
-            {half.sections.map((section) => (
-              <div key={section.key} className="space-y-3">
-                {/* A heading per section, with what is in it. The subtotal is
-                    the question a grouped list is being asked. */}
-                <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-                  <div className="flex items-center gap-2.5">
-                    <h3 className="text-label-md text-muted">{section.title}</h3>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span
-                      className={cn(
-                        'tnum text-label-md',
-                        section.side === 'liability' ? 'text-danger' : 'text-muted',
+                <ul className="divide-y divide-[rgb(var(--hairline)/0.06)]">
+                  {half.groups.map(({ group, accounts, subtotal }) => (
+                    <li key={group.id} className="py-1">
+                      {/* Right padding matches the account rows' (room for their
+                          edit button), so group totals and balances read as
+                          one column of figures. */}
+                      <div className="flex items-baseline justify-between gap-3 py-2.5 pl-1 pr-12 sm:pr-14">
+                        <h3
+                          className={cn(
+                            'truncate text-[15px] font-medium tracking-[-0.01em]',
+                            accounts.length > 0 ? 'text-primary' : 'text-primary/55',
+                          )}
+                        >
+                          {group.name}
+                        </h3>
+                        <span
+                          className={cn(
+                            'tnum shrink-0 text-[15px]',
+                            accounts.length === 0
+                              ? 'text-faint'
+                              : half.side === 'liability' && subtotal > 0
+                                ? 'text-danger'
+                                : 'text-text',
+                          )}
+                        >
+                          {money(subtotal, { masked: maskBalances })}
+                        </span>
+                      </div>
+
+                      {accounts.length > 0 && (
+                        <ul className="pb-1.5">
+                          {accounts.map((account) => (
+                            <li key={account.id} className="group/row relative flex items-center">
+                              <Link
+                                to={`/accounts/${account.id}`}
+                                className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl py-2 pl-5 pr-12 transition-colors duration-300 ease-fluid hover:bg-[rgb(var(--hairline)/0.04)] sm:pr-14"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate text-[14.5px] text-text">{account.name}</span>
+                                  {/* One string, so it reads, finds and tests
+                                      as one line (AGENTS.md §8). */}
+                                  <span className="block truncate text-[12.5px] text-faint">
+                                    {[
+                                      currencyLine,
+                                      account.institution,
+                                      account.maskedNumber,
+                                      account.type === 'credit' && account.creditLimit
+                                        ? `${percent(accountUtilisation(account), 0)} of ${money(account.creditLimit, { compact: true })}`
+                                        : '',
+                                      account.aer ? `${account.aer}% AER` : '',
+                                      account.note ?? '',
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' · ')}
+                                  </span>
+                                </span>
+                                <span
+                                  className={cn(
+                                    'tnum shrink-0 text-[14.5px]',
+                                    owesMoney(account) && account.balance > 0 ? 'text-danger' : 'text-text',
+                                  )}
+                                >
+                                  {money(account.balance, { masked: maskBalances })}
+                                </span>
+                              </Link>
+                              {/* Beside the link, not inside it: a button in a
+                                  link is invalid and would follow it too. */}
+                              <IconButton
+                                type="button"
+                                icon="edit"
+                                label={`Edit ${account.name}`}
+                                size={14}
+                                className="absolute right-1 h-9 w-9 opacity-0 transition-opacity duration-300 focus-visible:opacity-100 group-hover/row:opacity-100 max-sm:opacity-100"
+                                onClick={() => setEditingAccount(account)}
+                              />
+                            </li>
+                          ))}
+                        </ul>
                       )}
-                    >
-                      {section.side === 'liability' && '−'}
-                      {money(section.subtotal, { masked: maskBalances })}
-                    </span>
-                    {section.group && (
-                      <>
-                        <IconButton
-                          icon="edit"
-                          label={`Edit the ${section.group.name} group`}
-                          size={14}
-                          onClick={() => setEditingGroup(section.group!)}
-                        />
-                        <IconButton
-                          icon="trash"
-                          label={`Delete the ${section.group.name} group`}
-                          size={14}
-                          onClick={() => setDeletingGroup(section.group!)}
-                        />
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  {section.accounts.map((account) => (
-              <div key={account.id} className="group relative min-w-0">
-              <Link
-                to={`/accounts/${account.id}`}
-                className="plate flex h-full min-w-0 flex-col justify-between gap-7 p-6 transition-transform duration-500 ease-fluid hover:-translate-y-1"
-              >
-                <div>
-                  <div className="flex items-start justify-between">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Icon name={TYPE_ICON[account.type]} size={21} />
-                    </span>
-                    {account.aer ? (
-                      <Badge tone="success">{account.aer}% AER</Badge>
-                    ) : (
-                      <StatusDot
-                        tone={SYNC_TONE[account.syncStatus].tone}
-                        label={SYNC_TONE[account.syncStatus].label}
-                        pulse={account.syncStatus === 'live'}
-                      />
-                    )}
-                  </div>
-                  <h3 className="mt-3 font-display text-headline-sm text-text">{account.name}</h3>
-                  <p className="tnum text-label-sm text-faint">
-                    {account.institution} · {account.maskedNumber}
-                  </p>
-                </div>
-
-                <div>
-                  <Label>{owesMoney(account) ? 'Owed' : 'Balance'}</Label>
-                  <p
-                    className={cn(
-                      'tnum font-display text-metric-md',
-                      owesMoney(account) ? 'text-danger' : 'text-text',
-                    )}
-                  >
-                    {money(account.balance, { masked: maskBalances })}
-                  </p>
-                  {/* The one thing the separate credit section said that this
-                      list did not. Kept here rather than in a second listing
-                      of the same cards. */}
-                  {account.type === 'credit' && account.creditLimit ? (
-                    <p className="tnum mt-1 text-label-sm text-muted">
-                      {percent(accountUtilisation(account), 0)} of{' '}
-                      {money(account.creditLimit, { compact: true })} limit
-                    </p>
-                  ) : null}
-                  {account.note && <p className="mt-1 truncate text-label-sm text-muted">{account.note}</p>}
-                </div>
-              </Link>
-
-              {/* Beside the card rather than inside it: a button nested in a
-                  link is invalid, and every click on it would also follow the
-                  link. On a touch screen there is no hover to reveal them, so
-                  there they simply stay. */}
-              <div className="absolute bottom-5 right-5 flex gap-1 opacity-0 transition-opacity duration-300 group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
-                <IconButton
-                  icon="edit"
-                  label={`Edit ${account.name}`}
-                  size={14}
-                  onClick={() => setEditingAccount(account)}
-                />
-                <IconButton
-                  icon="trash"
-                  label={`Delete ${account.name}`}
-                  size={14}
-                  onClick={() => setDeletingAccount(account)}
-                />
-              </div>
-              </div>
+                    </li>
                   ))}
-                </div>
-              </div>
-            ))}
-              </div>
+                </ul>
+              </section>
             ))}
 
             {archived.length > 0 && (
@@ -720,25 +617,6 @@ export const Accounts = () => {
         confirmLabel="Delete account"
       />
 
-      <AccountGroupDialog
-        open={editingGroup !== null}
-        onClose={() => setEditingGroup(null)}
-        editing={editingGroup}
-      />
-
-      <ConfirmDialog
-        open={deletingGroup !== null}
-        onClose={() => setDeletingGroup(null)}
-        title="Delete this group?"
-        subject={deletingGroup?.name ?? ''}
-        consequence="The grouping goes, and nothing else."
-        preserved="The accounts in it stay exactly as they are, with their balances and their history, and go back to being grouped by their type."
-        confirmLabel="Delete group"
-        onConfirm={() => {
-          if (deletingGroup) dispatch({ type: 'delete-account-group', id: deletingGroup.id });
-          setDeletingGroup(null);
-        }}
-      />
 
       <VirtualAccountDialog
         open={allocationDialog.open}
@@ -779,6 +657,36 @@ export const Accounts = () => {
         confirmLabel="Remove"
       />
 
+
+      <Modal open={menuOpen} onClose={() => setMenuOpen(false)} title="Add" size="sm">
+        <div className="-mx-2 space-y-1">
+          {[
+            { icon: 'bank' as const, label: 'Add new account', hint: 'A bank account, a card, a loan — anything with a balance.', go: () => setDialogOpen(true) },
+            { icon: 'layers' as const, label: 'Account group setup', hint: 'The headings accounts sit under, in Assets and Liabilities.', go: () => setGroupsOpen(true) },
+          ].map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                item.go();
+              }}
+              className="flex w-full items-center gap-4 rounded-2xl px-3 py-3.5 text-left transition-colors duration-300 ease-fluid hover:bg-[rgb(var(--hairline)/0.05)]"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Icon name={item.icon} size={19} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[15px] text-text">{item.label}</span>
+                <span className="block text-[12.5px] leading-snug text-faint">{item.hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </Modal>
+
+      <AccountGroupsDialog open={groupsOpen} onClose={() => setGroupsOpen(false)} />
+      <CashFlowDialog open={cashFlowOpen} onClose={() => setCashFlowOpen(false)} />
     </div>
   );
 };

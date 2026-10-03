@@ -19,6 +19,9 @@ import { DEFAULT_ACCENTS } from '@/lib/accents';
 
 const dispatch = vi.fn();
 const toast = vi.fn();
+// Every person has the standard groups; the page lists accounts under them.
+const { STANDARD_GROUPS } = await import('@/lib/accountGroups');
+const GROUPS = STANDARD_GROUPS.map((g) => ({ ...g, id: `g-${g.name}` }));
 
 const SETTINGS: Settings = {
   currency: 'GBP',
@@ -60,7 +63,7 @@ beforeEach(() => {
     virtualAccounts: [],
     categories: [],
     labels: [],
-    accountGroups: [],
+    accountGroups: GROUPS,
     transactions: [],
     recurring: [],
     budgets: [],
@@ -93,14 +96,27 @@ describe('changing an account', () => {
   });
 });
 
+/*
+ * Delete lives in the account's own dialog, as in Bluecoins, rather than as a
+ * bin beside every row of a list you scroll with your thumb.
+ */
 describe('deleting an account', () => {
   const confirmation = () => within(screen.getByRole('dialog', { name: /delete this account\?/i }));
+  const deleteFromDialog = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
+    await user.click(screen.getByRole('button', { name: `Edit ${name}` }));
+    await user.click(within(screen.getByRole('dialog', { name: /edit account/i })).getByRole('button', { name: /^delete$/i }));
+  };
+
+  it('is not a button beside every row', () => {
+    render();
+    expect(screen.queryByRole('button', { name: 'Delete Current' })).toBeNull();
+  });
 
   it('asks first, naming the account and what goes with it', async () => {
     const user = userEvent.setup();
     render();
 
-    await user.click(screen.getByRole('button', { name: 'Delete Current' }));
+    await deleteFromDialog(user, 'Current');
 
     // The cascade is real, so the wording has to be. Transactions on this
     // account are deleted with it.
@@ -112,7 +128,7 @@ describe('deleting an account', () => {
     const user = userEvent.setup();
     render();
 
-    await user.click(screen.getByRole('button', { name: 'Delete Savings' }));
+    await deleteFromDialog(user, 'Savings');
     await user.click(confirmation().getByRole('button', { name: /delete account/i }));
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'delete-account', id: 'acc-2' });
@@ -122,7 +138,7 @@ describe('deleting an account', () => {
     const user = userEvent.setup();
     render();
 
-    await user.click(screen.getByRole('button', { name: 'Delete Current' }));
+    await deleteFromDialog(user, 'Current');
     await user.click(confirmation().getByRole('button', { name: /cancel/i }));
 
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'delete-account' }));
@@ -236,5 +252,122 @@ describe('a closed account', () => {
     render();
     await user.click(screen.getByRole('button', { name: 'Edit Old Barclays' }));
     expect(screen.getByRole('dialog', { name: /edit account/i })).toBeInTheDocument();
+  });
+});
+
+/*
+ * The page laid out the way Bluecoins and a balance sheet do: Assets then
+ * Liabilities, every group under each in its own order — empty ones included,
+ * because a group is a place an account can go — and each account under the
+ * one group it is in.
+ */
+describe('accounts in their groups', () => {
+  const groupRow = (name: string) => screen.getByRole('heading', { name, level: 3 }).closest('li')!;
+
+  it('lists every group under its side, in order, empty ones too', () => {
+    render();
+    const assets = screen.getByRole('heading', { name: /^assets$/i, level: 2 }).closest('section')!;
+    const names = within(assets).getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(names).toEqual(STANDARD_GROUPS.filter((g) => g.side === 'asset').map((g) => g.name));
+  });
+
+  it('puts an account older than groups in the standard group for its type', () => {
+    render();
+    // Neither fixture account has a groupId: current and savings both go in Bank.
+    expect(groupRow('Bank')).toHaveTextContent('Current');
+    expect(groupRow('Bank')).toHaveTextContent('Savings');
+    expect(groupRow('Bank')).toHaveTextContent('£6,200.00');
+    expect(groupRow('Cash')).toHaveTextContent('£0.00');
+  });
+
+  it('puts an account in the group it was given', () => {
+    state.accounts = [{ ...ACCOUNTS[0]!, groupId: 'g-Foreign Assets' }, ACCOUNTS[1]!];
+    render();
+    expect(groupRow('Foreign Assets')).toHaveTextContent('Current');
+    expect(groupRow('Bank')).not.toHaveTextContent('Current');
+  });
+
+  it('says the currency under each account, as one line', () => {
+    render();
+    expect(screen.getByText('GBP - British pound · Monzo · ••1')).toBeInTheDocument();
+  });
+
+  it('shows the groups even before there is an account, with a way to add one', () => {
+    state.accounts = [];
+    render();
+    expect(screen.getByRole('heading', { name: 'Mortgages', level: 3 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add your first account/i })).toBeInTheDocument();
+  });
+});
+
+describe('the + button', () => {
+  it('offers a new account and the group setup', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    const menu = within(screen.getByRole('dialog', { name: 'Add' }));
+    await user.click(menu.getByRole('button', { name: /add new account/i }));
+    expect(screen.getByRole('dialog', { name: /add an account/i })).toBeInTheDocument();
+  });
+
+  it('leads to the group setup, which lists every group with what is in it', async () => {
+    const user = userEvent.setup();
+    // A closed account is counted apart, because the page lists it apart.
+    state.accounts = [...ACCOUNTS, { ...ACCOUNTS[0]!, id: 'acc-old', name: 'Old', archived: true }];
+    render();
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    await user.click(screen.getByRole('button', { name: /account group setup/i }));
+
+    const setup = within(screen.getByRole('dialog', { name: /account group setup/i }));
+    const bank = setup.getByText('Bank').closest('li')!;
+    expect(bank).toHaveTextContent('2 accounts · 1 closed');
+    expect(setup.getByText('Payables').closest('li')).toHaveTextContent('No accounts');
+  });
+
+  it('says where a deleted group’s accounts go before it deletes it', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    await user.click(screen.getByRole('button', { name: /account group setup/i }));
+    await user.click(screen.getByRole('button', { name: 'Delete Bank' }));
+
+    const confirm = within(screen.getByRole('dialog', { name: /delete this group\?/i }));
+    expect(confirm.getByText(/its 2 accounts move to the standard group/i)).toBeInTheDocument();
+    await user.click(confirm.getByRole('button', { name: /delete group/i }));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'delete-account-group', id: 'g-Bank' });
+  });
+
+  it('offers to put back standard groups that have gone missing', async () => {
+    const user = userEvent.setup();
+    state.accountGroups = GROUPS.filter((g) => g.name !== 'Loans');
+    render();
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    await user.click(screen.getByRole('button', { name: /account group setup/i }));
+
+    expect(screen.getByText(/the standard group loans is missing/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /put it back/i }));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'add-standard-groups' });
+  });
+});
+
+describe('Cash flow setup', () => {
+  it('switches each account that holds money in or out of what you can spend', async () => {
+    const user = userEvent.setup();
+    // The loan is filed under an asset group, as an old account could be:
+    // what it is decides, not where it is listed.
+    state.accounts = [...ACCOUNTS, LIABILITIES[0]!, { ...LIABILITIES[1]!, groupId: 'g-Other Assets' }];
+    render();
+    await user.click(screen.getByRole('button', { name: /cash flow setup/i }));
+
+    const setup = within(screen.getByRole('dialog', { name: /cash flow setup/i }));
+    // Money owed is never offered: a switch must not add a debt to cash.
+    expect(setup.queryByRole('switch', { name: /amex/i })).toBeNull();
+    expect(setup.queryByRole('switch', { name: /car loan/i })).toBeNull();
+    const savings = setup.getByRole('switch', { name: /savings/i });
+    expect(savings).toHaveAttribute('aria-checked', 'true');
+
+    await user.click(savings);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'set-cash-flow', id: 'acc-2', cashFlow: false });
   });
 });

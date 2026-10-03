@@ -101,7 +101,15 @@ export const reported = (state: AppState): AppState => {
 };
 
 export const isSpendable = (a: Account): boolean =>
-  a.type === 'current' || a.type === 'savings' || a.type === 'cash';
+  // Chosen on Cash Flow Setup when it has been; otherwise the rule every
+  // account followed before it could be chosen. A switch only ever applies to
+  // something that holds money — a card's balance is a debt, and counting it
+  // as cash would add what you owe to what you can spend.
+  !owesMoney(a) && (a.cashFlow ?? spendsByType(a.type));
+
+/** Whether an account of this type counts as spendable when nobody has said. */
+export const spendsByType = (type: Account['type']): boolean =>
+  type === 'current' || type === 'savings' || type === 'cash';
 
 /** Cash you can actually spend today. */
 export const availableNow = (accounts: Account[]): number =>

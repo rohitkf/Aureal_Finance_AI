@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { newId, useAppState, useStore, useToday } from '@/lib/store';
-import type { Account, AccountGroup, AccountType } from '@/lib/types';
+import type { Account, AccountGroup } from '@/lib/types';
+import { cashFlowByDefault, groupOf, kindOf, sortGroups } from '@/lib/accountGroups';
+import { owesMoney } from '@/lib/finance';
 import { Button } from './ui/Button';
 import { AmountField, CheckboxField, DateField, SelectField, TextAreaField, TextField } from './ui/Field';
 import { DayOfMonthPicker } from './ui/DayOfMonthPicker';
@@ -12,15 +14,28 @@ import { Modal } from './ui/Modal';
 import { useToast } from './ui/Toast';
 import { AccountGroupDialog } from './AccountGroupDialog';
 
-const TYPES: Array<{ value: AccountType; label: string; hint: string }> = [
-  { value: 'current', label: 'Current account', hint: 'Day-to-day banking' },
-  { value: 'savings', label: 'Savings', hint: 'Money set aside' },
-  { value: 'cash', label: 'Cash', hint: 'Notes and coins' },
-  { value: 'credit', label: 'Credit card', hint: 'A balance you owe' },
-  { value: 'investment', label: 'Investment', hint: 'Stocks, funds, pensions' },
-  { value: 'asset', label: 'Asset', hint: 'Something you own: a house, a car' },
-  { value: 'liability', label: 'Liability', hint: 'Something you owe that is not a card' },
-];
+
+/** A name worth copying, for the kind of account the group makes. */
+const PLACEHOLDER: Record<Account['type'], string> = {
+  current: 'e.g. Monzo Current',
+  savings: 'e.g. Rainy Day Saver',
+  cash: 'e.g. Wallet',
+  credit: 'e.g. Amex Gold',
+  investment: 'e.g. Vanguard ISA',
+  asset: 'e.g. The house',
+  liability: 'e.g. Car loan',
+};
+
+/** What putting an account in a group of this kind means, in a sentence. */
+const GROUP_HINT: Record<Account['type'], string> = {
+  current: 'Money in the bank. Counts towards Safe to Spend unless you switch it off in Cash flow setup.',
+  savings: 'Money in the bank. Counts towards Safe to Spend unless you switch it off in Cash flow setup.',
+  cash: 'Notes and coins. Counts towards Safe to Spend unless you switch it off in Cash flow setup.',
+  credit: 'A card: what you spend is added to what you owe, and a payment brings it down.',
+  investment: 'Held at its value in your net worth, but not counted as money you can spend today.',
+  asset: 'Something you own. Adds to your net worth; switch it into Cash flow setup if it is money you spend from.',
+  liability: 'Something you owe. Spending on it adds to the debt, and a payment brings it down.',
+};
 
 interface AccountDialogProps {
   open: boolean;
@@ -52,7 +67,6 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
   const [newGroupOpen, setNewGroupOpen] = useState(false);
 
   const [name, setName] = useState('');
-  const [type, setType] = useState<AccountType>('current');
   const [institution, setInstitution] = useState('');
   const [balance, setBalance] = useState('');
   const [lastFour, setLastFour] = useState('');
@@ -80,7 +94,6 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
   useEffect(() => {
     if (!open) return;
     setName(editing?.name ?? '');
-    setType(editing?.type ?? 'current');
     setInstitution(editing?.institution ?? '');
     setBalance(editing ? String(editing.balance) : '');
     setLastFour(editing?.maskedNumber?.replace(/\D/g, '') ?? '');
@@ -88,18 +101,45 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
     setApr(editing?.apr ? String(editing.apr) : '');
     setDueDay(editing?.paymentDueDay ? String(editing.paymentDueDay) : '');
     setAer(editing?.aer ? String(editing.aer) : '');
-    setGroupId(editing?.groupId ?? '');
+    // An existing account opens on the group it is listed in — its own, or
+    // for a row older than groups, the one the page shows it under. A new one
+    // opens on Bank, the group most accounts belong in.
+    setGroupId(
+      editing
+        ? (groupOf(editing, accountGroups)?.id ?? '')
+        : (accountGroups.find((g) => g.name === 'Bank')?.id ?? sortGroups(accountGroups)[0]?.id ?? ''),
+    );
     setNote(editing?.note ?? '');
     setStatementDay(editing?.statementDay ? String(editing.statementDay) : '');
     setMinimumPayment(editing?.minimumPayment ? String(editing.minimumPayment) : '');
     setOpenedOn(today);
     setArchived(Boolean(editing?.archived));
     setExcluded(Boolean(editing?.excluded));
+    // Groups arriving after the dialog opened — a first load, a group just
+    // made — must not reset what was typed, so they are not a dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing, today]);
+
+  const group = accountGroups.find((g) => g.id === groupId);
+  /**
+   * What the account is, which the form no longer asks.
+   *
+   * The group decides: Bank makes a current account, Credit Card a credit
+   * card. An existing account keeps its own type while it stays in its group,
+   * so opening and saving a savings account filed under Bank does not quietly
+   * turn it into a current account.
+   */
+  const type =
+    editing && group && group.id === groupOf(editing, accountGroups)?.id
+      ? editing.type
+      : group
+        ? kindOf(group)
+        : (editing?.type ?? 'current');
+  const holdsMoney = type === 'current' || type === 'savings';
 
   const isCredit = type === 'credit';
   const parsedBalance = Number.parseFloat(balance) || 0;
-  const valid = name.trim().length > 0;
+  const valid = name.trim().length > 0 && Boolean(group);
 
   const save = () => {
     if (!valid) return;
@@ -129,8 +169,11 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
       creditLimit: isCredit ? Number.parseFloat(creditLimit) || undefined : undefined,
       apr: isCredit ? Number.parseFloat(apr) || undefined : undefined,
       paymentDueDay: isCredit ? Number.parseInt(dueDay, 10) || undefined : undefined,
-      aer: type === 'savings' ? Number.parseFloat(aer) || undefined : undefined,
+      aer: holdsMoney ? Number.parseFloat(aer) || undefined : undefined,
       groupId: groupId || undefined,
+      // A new account starts in or out of the cash flow the way its group
+      // does (Bank and Cash in); after that it is Cash Flow Setup's to change.
+      cashFlow: editing ? editing.cashFlow : group ? cashFlowByDefault(group) : undefined,
       note: note.trim() || undefined,
       statementDay: isCredit ? Number.parseInt(statementDay, 10) || undefined : undefined,
       minimumPayment: isCredit ? Number.parseFloat(minimumPayment) || undefined : undefined,
@@ -193,9 +236,9 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
       <div className="space-y-8">
         {!editing && (
           <AmountField
-            label={isCredit ? 'Balance owed today' : 'Balance today'}
+            label={owesMoney({ type }) ? 'Balance owed today' : 'Balance today'}
             value={balance}
-            tone={isCredit ? 'expense' : 'income'}
+            tone={owesMoney({ type }) ? 'expense' : 'income'}
             onChange={(e) => setBalance(sanitizeAmount(e.target.value))}
             hint="Recorded as an opening balance you can edit later."
           />
@@ -204,36 +247,56 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
         <div className="grid gap-5 sm:grid-cols-2">
           <TextField
             label="Account name"
-            placeholder="e.g. Main Current Account"
+            placeholder={PLACEHOLDER[type]}
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoFocus={Boolean(editing)}
             required
           />
-          {/* Type first, and always answered. Group used to sit above it,
-              offering "By its type", "Savings" and "Credit cards" — words
-              the Type list below uses for different things. Two lists that
-              look like the same question with different answers is the whole
-              reason this form read as confusing. */}
+          {/* The one question about what this account is. It used to be two
+              — a Type, and a group to "file it under" — that read as the same
+              question with different answers. The group is the answer, and
+              the type follows from it (`kindOf`). */}
           <SelectField
-            label="Type"
-            value={type}
-            onChange={(value) => setType(value as AccountType)}
-            hint="What kind of account it is. This decides whether it counts as something you own or something you owe."
+            label="Account type"
+            value={groupId}
+            onChange={setGroupId}
+            placeholder="Choose a group"
+            action={{ label: 'New group…', onSelect: () => setNewGroupOpen(true) }}
+            error={accountGroups.length === 0 ? 'You have no groups yet. Add one, or put the standard ones back in Account group setup.' : undefined}
+            hint={group ? GROUP_HINT[type] : undefined}
           >
-            {TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label} — {t.hint}
-              </option>
+            {(['asset', 'liability'] as const).map((side) => (
+              <optgroup key={side} label={side === 'asset' ? 'Assets' : 'Liabilities'}>
+                {sortGroups(accountGroups)
+                  .filter((g) => g.side === side)
+                  .map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+              </optgroup>
             ))}
           </SelectField>
 
-          <TextField
-            label="Bank or provider"
-            placeholder="e.g. Monzo"
-            value={institution}
-            onChange={(e) => setInstitution(e.target.value)}
+          <TextAreaField
+            label="Note"
+            placeholder="Joint account with Sam"
+            value={note}
+            maxLength={200}
+            rows={2}
+            onChange={(e) => setNote(e.target.value)}
+            hint="Optional. Shown under the account on the Accounts page."
           />
+
+          {type !== 'cash' && (
+            <TextField
+              label={owesMoney({ type }) ? 'Lender or provider' : 'Bank or provider'}
+              placeholder={type === 'credit' ? 'e.g. Amex' : owesMoney({ type }) ? 'e.g. Nationwide' : 'e.g. Monzo'}
+              value={institution}
+              onChange={(e) => setInstitution(e.target.value)}
+            />
+          )}
 
           {/* Only on a new account: an existing one's opening balance is a
               transaction already, with a date you change by editing it. */}
@@ -246,19 +309,18 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
             />
           )}
 
-          <TextAreaField
-            label="Note"
-            placeholder="Joint account with Sam"
-            value={note}
-            maxLength={200}
-            rows={2}
-            onChange={(e) => setNote(e.target.value)}
-            hint="Optional. Shown under the account on the Accounts page."
-          />
+          {(holdsMoney || type === 'credit') && (
+            <DigitsField
+              label="Last 4 digits"
+              value={lastFour}
+              onChange={setLastFour}
+              hint="Optional. Only the last four are ever stored."
+            />
+          )}
 
           {/* Only worth offering once the account exists. */}
           {editing && (
-            <div className="space-y-4">
+            <div className="space-y-4 sm:col-span-2">
               <CheckboxField
                 checked={archived || excluded}
                 onChange={setArchived}
@@ -274,30 +336,6 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
               />
             </div>
           )}
-
-          {/* Below the things that decide what this account *is*, because it
-              decides nothing — it only changes which heading the account is
-              listed under. Most people never touch it. */}
-          <SelectField
-            label="File it under"
-            value={groupId}
-            onChange={setGroupId}
-            action={{ label: 'New group…', onSelect: () => setNewGroupOpen(true) }}
-            hint="Optional, and only about where it appears on the Accounts page. A group is how you think of the accounts — “the flat”, “joint” — not what kind they are. A group can also move an account to the other side of the balance sheet."
-          >
-            <option value="">Listed with its own type</option>
-            {accountGroups.map((g) => (
-              <option key={g.id} value={g.id} data-hint={g.side === 'asset' ? 'asset' : 'liability'}>
-                {g.name}
-              </option>
-            ))}
-          </SelectField>
-          <DigitsField
-            label="Last 4 digits"
-            value={lastFour}
-            onChange={setLastFour}
-            hint="Optional. Only the last four are ever stored."
-          />
 
           {isCredit && (
             <>
@@ -348,7 +386,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
             </>
           )}
 
-          {type === 'savings' && (
+          {holdsMoney && (
             <RangeField
               label="Interest rate (AER %)"
               optional
