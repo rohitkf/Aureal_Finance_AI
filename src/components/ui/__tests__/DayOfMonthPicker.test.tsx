@@ -4,12 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { DayOfMonthPicker, LAST_DAY } from '../DayOfMonthPicker';
 
-const Harness = ({ initial = 1 }: { initial?: number }) => {
-  const [day, setDay] = useState(initial);
+const Harness = ({ initial = 1, optional }: { initial?: number | null; optional?: boolean }) => {
+  const [day, setDay] = useState<number | null>(initial);
   return (
     <>
-      <DayOfMonthPicker label="Payment day of month" value={day} onChange={setDay} />
-      <output data-testid="value">{day}</output>
+      <DayOfMonthPicker label="Payment day of month" value={day} onChange={setDay} optional={optional} />
+      <output data-testid="value">{day ?? 'none'}</output>
     </>
   );
 };
@@ -115,5 +115,35 @@ describe('DayOfMonthPicker', () => {
     await user.click(within(group()).getByRole('radio', { name: 'Last day' }));
     await user.keyboard('{ArrowRight}{ArrowDown}');
     expect(value()).toBe('31');
+  });
+
+  /*
+   * A card's due day and statement day are optional. A grid with no way back
+   * to "none" would make the first tap permanent.
+   */
+  it('offers Not set only when the day is optional', () => {
+    const { unmount } = render(<Harness />);
+    expect(within(group()).queryByRole('radio', { name: 'Not set' })).toBeNull();
+    unmount();
+    render(<Harness initial={null} optional />);
+    expect(within(group()).getByRole('radio', { name: 'Not set' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('can be set and then put back to Not set', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={null} optional />);
+
+    await user.click(within(group()).getByRole('radio', { name: '26' }));
+    expect(value()).toBe('26');
+    await user.click(within(group()).getByRole('radio', { name: 'Not set' }));
+    expect(value()).toBe('none');
+  });
+
+  it('starts the arrows at the 1st from Not set', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={null} optional />);
+    await user.tab();
+    await user.keyboard('{ArrowRight}');
+    expect(value()).toBe('1');
   });
 });

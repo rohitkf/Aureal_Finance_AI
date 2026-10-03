@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
 import { formatMediumDate, relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
-import { FREQUENCY_LABELS, WEEKEND_LABELS, monthlyEquivalent, previewOccurrences } from '@/lib/recurrence';
+import { FREQUENCY_LABELS, WEEKEND_LABELS, cadencePhrase, monthlyEquivalent, previewOccurrences } from '@/lib/recurrence';
 import { isSelectable, monthlyCommitments, monthlyTransfers, subscriptionTotals } from '@/lib/finance';
 import { newId, useAppState, useCategories, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
@@ -20,6 +20,8 @@ import {
   TextField,
 } from '@/components/ui/Field';
 import { DayOfMonthPicker, LAST_DAY } from '@/components/ui/DayOfMonthPicker';
+import { RangeField } from '@/components/ui/RangeField';
+import { sanitizeAmount } from '@/lib/amount';
 import { reanchor, type DraftRule } from '@/lib/recurringDraft';
 import { Icon } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
@@ -87,29 +89,19 @@ const emptyDraft = (today: string, accountId: string, toAccountId = '', isSubscr
   startDate: today,
   endMode: 'never',
   endDate: '',
-  occurrences: '',
+  // A slider always shows a number, so the draft holds the one it shows.
+  occurrences: '12',
   weekendMode: 'none',
   isSubscription,
   notes: '',
 });
 
-/** "Every 3rd month" said the way a person would read it back. */
+// The slider's readout already says "Every 3 months", so the line under it
+// says the other half: what that means against the frequency chosen above.
 const intervalHint = (draft: DraftRule): string => {
   const n = Number(draft.interval) || 1;
-  const unit: Partial<Record<Frequency, string>> = {
-    daily: 'day',
-    weekly: 'week',
-    fortnightly: 'fortnight',
-    monthly: 'month',
-    bimonthly: 'two months',
-    quarterly: 'quarter',
-    semiannual: 'six months',
-    yearly: 'year',
-    custom: 'cycle',
-  };
-  const word = unit[draft.frequency] ?? 'period';
-  if (n <= 1) return `Every ${word}.`;
-  return `Every ${n} ${word}${word.endsWith('s') ? '' : 's'} — so ${n} times less often than ${FREQUENCY_LABELS[draft.frequency].toLowerCase()}.`;
+  if (n <= 1) return 'Leave it here unless you want it less often.';
+  return `${n} times less often than ${FREQUENCY_LABELS[draft.frequency].toLowerCase()}.`;
 };
 
 const toRule = (draft: DraftRule): RecurringPayment => ({
@@ -452,7 +444,7 @@ export const Recurring = () => {
                           startDate: rule.startDate,
                           endMode: rule.endDate ? 'date' : rule.occurrences ? 'count' : 'never',
                           endDate: rule.endDate ?? '',
-                          occurrences: String(rule.occurrences ?? ''),
+                          occurrences: String(rule.occurrences ?? 12),
                           weekendMode: rule.weekendMode ?? 'none',
                           isSubscription: Boolean(rule.isSubscription),
                           notes: rule.notes ?? '',
@@ -559,7 +551,7 @@ const RecurringForm = ({
           label="Amount"
           value={draft.amount}
           tone={draft.direction === 'in' ? 'income' : draft.direction === 'transfer' ? 'transfer' : 'expense'}
-          onChange={(e) => setDraft({ ...draft, amount: e.target.value.replace(/[^0-9.]/g, '') })}
+          onChange={(e) => setDraft({ ...draft, amount: sanitizeAmount(e.target.value) })}
         />
 
         <SegmentedControl
@@ -691,20 +683,26 @@ const RecurringForm = ({
           {/* Every-N on top of the frequency, so anything between the named
               cadences is reachable: monthly every 3 is quarterly, weekly every
               2 is fortnightly, yearly every 2 is a thing that exists. */}
-          <TextField
+          <RangeField
             label="Repeat every"
-            inputMode="numeric"
-            value={draft.interval}
-            onChange={(e) => setDraft({ ...draft, interval: e.target.value.replace(/\D/g, '').slice(0, 2) })}
+            value={Math.min(Math.max(Number(draft.interval) || 1, 1), 99)}
+            onChange={(v) => setDraft({ ...draft, interval: String(v ?? 1) })}
+            min={1}
+            max={99}
+            sliderMax={24}
+            describe={(n) => cadencePhrase(draft.frequency, n, Number(draft.customIntervalDays) || 30)}
             hint={intervalHint(draft)}
           />
 
           {draft.frequency === 'custom' && (
-            <TextField
+            <RangeField
               label="Repeat every (days)"
-              inputMode="numeric"
-              value={draft.customIntervalDays}
-              onChange={(e) => setDraft({ ...draft, customIntervalDays: e.target.value.replace(/\D/g, '') })}
+              value={Math.min(Math.max(Number(draft.customIntervalDays) || 30, 1), 3650)}
+              onChange={(v) => setDraft({ ...draft, customIntervalDays: String(v ?? 30) })}
+              min={1}
+              max={3650}
+              sliderMax={365}
+              describe={(n) => (n === 1 ? '1 day' : `${n} days`)}
             />
           )}
 
@@ -712,7 +710,7 @@ const RecurringForm = ({
             <DayOfMonthPicker
               label="Payment day of month"
               value={Number(draft.anchorDay) || 1}
-              onChange={(day) => setDraft({ ...draft, anchorDay: String(day) })}
+              onChange={(day) => setDraft({ ...draft, anchorDay: String(day ?? 1) })}
               hint={
                 Number(draft.anchorDay) === LAST_DAY
                   ? 'Whatever day the month ends on — the 28th, 29th, 30th or 31st.'
@@ -768,11 +766,14 @@ const RecurringForm = ({
             />
           )}
           {draft.endMode === 'count' && (
-            <TextField
+            <RangeField
               label="Number of payments"
-              inputMode="numeric"
-              value={draft.occurrences}
-              onChange={(e) => setDraft({ ...draft, occurrences: e.target.value.replace(/\D/g, '') })}
+              value={Number(draft.occurrences) || 12}
+              onChange={(v) => setDraft({ ...draft, occurrences: String(v ?? 12) })}
+              min={1}
+              max={9999}
+              sliderMax={120}
+              describe={(n) => (n === 1 ? '1 payment' : `${n} payments`)}
               hint="Counted from the start date, including any that have already been paid."
             />
           )}

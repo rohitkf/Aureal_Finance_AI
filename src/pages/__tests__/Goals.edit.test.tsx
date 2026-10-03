@@ -88,7 +88,7 @@ describe('changing a goal', () => {
 
     await user.clear(screen.getByLabelText('Goal name'));
     await user.type(screen.getByLabelText('Goal name'), 'The wedding');
-    await user.click(screen.getByRole('button', { name: /save goal|save changes|save/i }));
+    await user.click(screen.getByRole('button', { name: /^save goal$/i }));
 
     expect(saved()).toMatchObject({
       type: 'upsert-goal',
@@ -103,7 +103,7 @@ describe('changing a goal', () => {
     await user.click(screen.getAllByRole('button', { name: /new goal|add a goal/i })[0]!);
     await user.type(screen.getByLabelText('Goal name'), 'Car');
     await user.type(screen.getByLabelText("Target amount"), '5000');
-    await user.click(screen.getByRole('button', { name: /save goal|save changes|save/i }));
+    await user.click(screen.getByRole('button', { name: /^save goal$/i }));
 
     expect(saved().goal).toMatchObject({ name: 'Car', icon: 'target' });
     expect(saved().goal.linkedAccountId).toBeUndefined();
@@ -135,7 +135,7 @@ describe('the account behind a goal', () => {
     await user.type(screen.getByLabelText('Target amount'), '5000');
     await user.click(screen.getByRole('combobox', { name: /money for this is in/i }));
     await user.click(screen.getByRole('option', { name: /savings/i }));
-    await user.click(screen.getByRole('button', { name: /save goal|save changes|save/i }));
+    await user.click(screen.getByRole('button', { name: /^save goal$/i }));
 
     expect(saved().goal.linkedAccountId).toBe('acc-2');
   });
@@ -155,7 +155,7 @@ describe('the account behind a goal', () => {
     await user.click(screen.getAllByRole('button', { name: /new goal|add a goal/i })[0]!);
     await user.type(screen.getByLabelText('Goal name'), 'Car');
     await user.type(screen.getByLabelText('Target amount'), '5000');
-    await user.click(screen.getByRole('button', { name: /save goal|save changes|save/i }));
+    await user.click(screen.getByRole('button', { name: /^save goal$/i }));
 
     expect(saved().goal.linkedAccountId).toBeUndefined();
   });

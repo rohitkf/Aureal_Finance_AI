@@ -224,3 +224,37 @@ describe('an existing transfer in the list', () => {
     expect(screen.getByText(/no longer exists/)).toBeInTheDocument();
   });
 });
+
+/*
+ * Not about transfers, but this file already stands the screen up. The count
+ * and the interval used to be text boxes: an empty count saved as "never
+ * ends" while the form said it would stop, and `0` or `1.5` could be typed
+ * into either.
+ */
+describe('how often, and how many times', () => {
+  it('ends after the number of payments the slider shows, even untouched', async () => {
+    const user = userEvent.setup();
+    render();
+    await openForm(user);
+
+    await user.type(screen.getByLabelText('Amount'), '15');
+    await user.type(screen.getByLabelText('Name'), 'Gym');
+    await choose(user, 'Ends', /After a number of payments/);
+    expect(screen.getByRole('slider', { name: 'Number of payments' })).toHaveAttribute('aria-valuetext', '12 payments');
+    await user.click(screen.getByRole('button', { name: /Create payment/ }));
+
+    expect(saved().occurrences).toBe(12);
+  });
+
+  it('takes an amount as an amount, whatever is typed', async () => {
+    const user = userEvent.setup();
+    render();
+    await openForm(user);
+
+    await user.type(screen.getByLabelText('Amount'), '12.345');
+    await user.type(screen.getByLabelText('Name'), 'Gym');
+    await user.click(screen.getByRole('button', { name: /Create payment/ }));
+
+    expect(saved().amount).toBe(12.34);
+  });
+});

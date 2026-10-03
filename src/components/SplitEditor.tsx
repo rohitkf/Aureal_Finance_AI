@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { sanitizeAmount } from '@/lib/amount';
 import { cn } from '@/lib/cn';
 import { money } from '@/lib/format';
 import { splitTotals, type SplitKind, type SplitPart } from '@/lib/splits';
@@ -118,7 +119,7 @@ export const SplitEditor = ({
                   inputMode="decimal"
                   placeholder="0.00"
                   value={part.amount}
-                  onChange={(e) => update(part.key, { amount: e.target.value.replace(/[^0-9.]/g, '') })}
+                  onChange={(e) => update(part.key, { amount: sanitizeAmount(e.target.value) })}
                 />
               </div>
 

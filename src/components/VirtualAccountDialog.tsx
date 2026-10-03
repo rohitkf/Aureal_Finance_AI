@@ -6,6 +6,8 @@ import type { IconName } from './ui/Icon';
 import type { VirtualAccount } from '@/lib/types';
 import { Button } from './ui/Button';
 import { AmountField, CheckboxField, DateField, SelectField, TextField } from './ui/Field';
+import { sanitizeAmount } from '@/lib/amount';
+import { MoneyDial } from './ui/MoneyDial';
 import { Icon } from './ui/Icon';
 import { Modal } from './ui/Modal';
 import { useToast } from './ui/Toast';
@@ -168,7 +170,7 @@ export const VirtualAccountDialog = ({
               error={error}
               autoFocus
               onChange={(e) => {
-                setAllocated(e.target.value.replace(/[^0-9.]/g, ''));
+                setAllocated(sanitizeAmount(e.target.value));
                 setError(undefined);
               }}
               hint={
@@ -221,13 +223,13 @@ export const VirtualAccountDialog = ({
                 ))}
               </SelectField>
 
-              <TextField
+              <MoneyDial
                 label="Target"
-                inputMode="decimal"
                 placeholder="1200"
                 value={target}
-                onChange={(e) => {
-                  setTarget(e.target.value.replace(/[^0-9.]/g, ''));
+                max={20_000}
+                onChange={(next) => {
+                  setTarget(next);
                   setError(undefined);
                 }}
                 hint="Optional — what you are building towards."

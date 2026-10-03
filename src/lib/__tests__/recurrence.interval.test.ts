@@ -6,7 +6,7 @@
  * rule's own anchors, whatever is done to the dates that come out of it.
  */
 import { describe, expect, it } from 'vitest';
-import { expandRecurrence, landOn, monthlyEquivalent } from '../recurrence';
+import { cadencePhrase, expandRecurrence, landOn, monthlyEquivalent } from '../recurrence';
 import type { RecurringPayment } from '../types';
 
 const rule = (over: Partial<RecurringPayment> = {}): RecurringPayment => ({
@@ -179,5 +179,24 @@ describe('the weekend rule across a series', () => {
       '2026-03-03',
       '2026-04-03',
     ]);
+  });
+});
+
+describe('how often a rule runs, in words', () => {
+  it('says one period plainly', () => {
+    expect(cadencePhrase('monthly', 1)).toBe('Every month');
+    expect(cadencePhrase('weekly', 1)).toBe('Every week');
+  });
+
+  it('counts in the cadence’s own unit, so nobody has to multiply', () => {
+    expect(cadencePhrase('monthly', 3)).toBe('Every 3 months');
+    expect(cadencePhrase('quarterly', 2)).toBe('Every 6 months');
+    expect(cadencePhrase('fortnightly', 1)).toBe('Every 2 weeks');
+    expect(cadencePhrase('yearly', 2)).toBe('Every 2 years');
+  });
+
+  it('uses the days of a custom rule', () => {
+    expect(cadencePhrase('custom', 1, 10)).toBe('Every 10 days');
+    expect(cadencePhrase('custom', 3, 10)).toBe('Every 30 days');
   });
 });

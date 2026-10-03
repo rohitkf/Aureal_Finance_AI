@@ -367,6 +367,39 @@ describe('repeating a transaction', () => {
     expect(transaction.recurringId).toBeTruthy();
   });
 
+  /*
+   * The count was a text box that started empty, and an empty count saved as
+   * no count at all — "after a number of payments" quietly became "never".
+   * It is a slider now, so it always shows a number, and it saves the one it
+   * shows.
+   */
+  it('ends after the number of payments on screen, even untouched', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.keyboard('9.99');
+    await tickRepeats(user);
+    await choose(user, 'Ends', 'After a number of payments');
+    expect(screen.getByRole('slider', { name: 'Number of payments' })).toHaveAttribute('aria-valuetext', '12 payments');
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    expect(savedRule().occurrences).toBe(12);
+  });
+
+  it('repeats every few months when the slider says so', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.keyboard('120');
+    await tickRepeats(user);
+    await user.click(screen.getByRole('button', { name: 'More — Repeat every' }));
+    await user.click(screen.getByRole('button', { name: 'More — Repeat every' }));
+    expect(screen.getByText('Every 3 months')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    expect(savedRule()).toMatchObject({ frequency: 'monthly', interval: 3 });
+  });
+
   it('leaves a one-off transaction unattached', async () => {
     const user = userEvent.setup();
     open();

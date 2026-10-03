@@ -60,6 +60,9 @@ describe('what has no value yet', () => {
     ['1//2', 'two operators in a row'],
     ['5/0', 'a division with no answer'],
     ['.', 'a lone decimal point'],
+    ['1.2.3', 'a number with two decimal points'],
+    ['12.50.10+5', 'a malformed number inside a sum'],
+    ['12.345', 'a fraction of a penny'],
   ])('returns NaN for %s (%s)', (input) => {
     expect(evaluateExpression(input)).toBeNaN();
   });

@@ -144,6 +144,18 @@ devices, three apps.
 | `<input type="date">` | `DateField` → `DatePicker` | Speaks the same `YYYY-MM-DD` strings as the rest of the app, so nothing above it changes and no `Date` drifts across a timezone. Weeks start Monday |
 | `<input type="checkbox">` | `CheckboxField` | `role="checkbox"` button, so the tick and the focus ring are the app's |
 | A free-text number with a fixed range | A picker that cannot express an invalid value | `DayOfMonthPicker` is the model |
+| A free-text amount you *set* — a limit, a budget, a goal, a buffer | `MoneyDial` | A slider through round figures (`moneyStops`: fivers at the bottom, hundreds near the top), ± nudges that land on the same grid, and the figure itself still typeable for the exact amount. `max` is where the track ends, not a cap |
+| A free-text count or rate — how often, how many times, an APR | `RangeField` | Says the value as a phrase ("Every 3 months") on screen and in `aria-valuetext`. `sliderMax` keeps the track to the useful part of a long range; + still reaches `max`. `optional` adds "Not set" and Clear |
+| A day of the month that may be blank | `DayOfMonthPicker` with `optional` | Adds a "Not set" tile, so the first tap is not permanent |
+| A short identifier made of digits — the last four of a card | `DigitsField` | One real input drawn as cells, so paste and screen readers behave normally |
+
+**An amount you *record* stays typed.** A transaction, an opening balance or
+a split part is whatever the receipt says — £23.47 — and no slider lands on
+that. Those keep a text field, but every one goes through `sanitizeAmount`
+(`lib/amount.ts`): one decimal point, pennies at most, nine whole digits. The
+transaction amount also takes a sum (`12.40+3`), and `calc.ts` holds each
+number in it to the same rule — it used to read `1.2.3` as 1.2 and drop the
+rest.
 
 `<input type="range">` stays native, and is the one deliberate exception: it
 already handles arrow keys, Home and End, page steps and touch dragging, and a

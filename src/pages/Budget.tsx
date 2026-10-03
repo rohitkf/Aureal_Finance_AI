@@ -9,7 +9,8 @@ import { SafeToSpendCard } from '@/components/SafeToSpendCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
-import { SelectField, TextField } from '@/components/ui/Field';
+import { MoneyDial } from '@/components/ui/MoneyDial';
+import { SelectField } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { Progress } from '@/components/ui/Progress';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
@@ -286,18 +287,13 @@ export const Budget = () => {
                 </option>
               ))}
             </SelectField>
-            <TextField
+            <MoneyDial
               label="Monthly limit"
-              inputMode="decimal"
               placeholder="400"
               value={editing.limit}
-              onChange={(e) =>
-                setEditing({
-                  ...editing,
-                  limit: e.target.value.replace(/[^0-9.]/g, ''),
-                  error: undefined,
-                })
-              }
+              max={2_000}
+              min={5}
+              onChange={(limit) => setEditing({ ...editing, limit, error: undefined })}
               error={editing.error}
               hint={`You've spent ${money(spend.get(editing.categoryId) ?? 0)} in this category this month.`}
             />
