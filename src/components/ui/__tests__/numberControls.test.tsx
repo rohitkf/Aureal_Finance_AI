@@ -51,11 +51,13 @@ describe('setting an amount with the money dial', () => {
     expect(screen.getByRole('slider', { name: 'Monthly limit slider' })).toHaveAttribute('aria-valuetext', '£250.00');
   });
 
-  it('keeps a typed figure above the end of the track', async () => {
+  it('keeps a typed figure above the end of the track, and says that figure', async () => {
     const user = userEvent.setup();
     render(<Money max={2_000} />);
     await user.type(screen.getByLabelText('Monthly limit'), '3500');
     expect(value()).toBe('3500');
+    // The thumb waits at the end; a screen reader still hears the real amount.
+    expect(screen.getByRole('slider', { name: 'Monthly limit slider' })).toHaveAttribute('aria-valuetext', '£3,500.00');
   });
 
   it('nudges by a round step, tidying a typed figure as it goes', async () => {

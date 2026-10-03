@@ -149,7 +149,9 @@ export const MoneyDial = ({
         <input
           type="range"
           aria-label={`${label} slider`}
-          aria-valuetext={amount === null ? 'Not set' : money(stops[index])}
+          // The amount itself, not the stop the thumb is nearest: a typed £2,600
+          // on a track that ends at £2,000 must not be read out as £2,000.
+          aria-valuetext={amount === null ? 'Not set' : money(amount)}
           min={0}
           max={stops.length - 1}
           step={1}
