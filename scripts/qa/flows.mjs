@@ -3,7 +3,7 @@ import { BASE_URL, createReporter, hasCredentials, launch, signIn } from './lib.
 /**
  * The prototype flows from the product brief, driven end to end:
  * sign in → dashboard → add an expense → it shows up and the numbers move;
- * create a recurring payment → the forecast changes;
+ * create a recurring payment → Time Machine changes;
  * create a budget → existing spending is already counted against it.
  */
 const report = createReporter('Product flows');
@@ -52,9 +52,11 @@ const after = await safeToSpend();
 report.check(before !== after, `Safe to Spend recalculates (${before} → ${after})`);
 
 // ---- Create a recurring payment ----------------------------------------
-await page.goto(`${BASE_URL}/forecast`, { waitUntil: 'networkidle' });
+// Time Machine opens on this month, which is where a payment on the 22nd lands.
+const monthEnd = () => page.locator('text=/you (will have|have|had)$/i').locator('xpath=..').innerText();
+await page.goto(`${BASE_URL}/time-machine`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(800);
-const troughBefore = await page.locator('text=Lowest projected balance').locator('xpath=../..').innerText();
+const endBefore = await monthEnd();
 
 await page.goto(`${BASE_URL}/recurring?new=1`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(500);
@@ -67,13 +69,13 @@ report.check(preview.split('2026').length > 2, 'the recurrence form previews rea
 await page.getByRole('button', { name: 'Create payment' }).click();
 await page.waitForTimeout(600);
 
-await page.goto(`${BASE_URL}/forecast`, { waitUntil: 'networkidle' });
+await page.goto(`${BASE_URL}/time-machine`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(900);
-const troughAfter = await page.locator('text=Lowest projected balance').locator('xpath=../..').innerText();
-report.check(troughBefore !== troughAfter, 'the forecast low point moves once a commitment is added');
+const endAfter = await monthEnd();
+report.check(endBefore !== endAfter, 'the month-end balance moves once a commitment is added');
 report.check(
   await page.getByText('QA Storage Unit').first().isVisible(),
-  'the new commitment appears in the day-by-day ledger',
+  'the new commitment appears on the timeline',
 );
 
 // ---- Create a budget ----------------------------------------------------

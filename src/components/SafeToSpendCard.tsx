@@ -124,7 +124,7 @@ export const SafeToSpendCard = ({
 
         <div className="relative mt-5 flex items-center gap-2">
           <Icon name="shield" size={13} className="shrink-0 text-faint" />
-          <ArrowLink to="/forecast">See how this is calculated</ArrowLink>
+          <ArrowLink to="/time-machine">See the month in Time Machine</ArrowLink>
         </div>
       </div>
     </section>

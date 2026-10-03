@@ -332,7 +332,7 @@ export const Dashboard = () => {
               <CardHeader
                 title="What’s coming up"
                 description="Your next money movements, in order."
-                action={<ArrowLink to="/forecast">Full forecast</ArrowLink>}
+                action={<ArrowLink to="/time-machine">Open Time Machine</ArrowLink>}
               />
 
               <ol className="relative space-y-1 pl-7">

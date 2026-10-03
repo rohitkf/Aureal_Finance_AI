@@ -12,7 +12,7 @@ export const APP_ROUTES = [
   '/accounts',
   '/transactions',
   '/budget',
-  '/forecast',
+  '/time-machine',
   '/recurring',
   '/subscriptions',
   '/goals',

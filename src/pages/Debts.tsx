@@ -205,11 +205,12 @@ export const Debts = () => {
         <div>
           <h3 className="font-display text-headline-sm text-text">Want to clear this faster?</h3>
           <p className="text-body-sm text-muted">
-            Your forecast shows what an extra payment would do to your balance before you commit to it.
+            Time Machine shows where your balance lands after everything already scheduled, so you can see what room
+            there is for an extra payment before you commit to it.
           </p>
         </div>
-        <ButtonLink to="/forecast" variant="primary" iconRight="arrow-right">
-          Try it in the forecast
+        <ButtonLink to="/time-machine" variant="primary" iconRight="arrow-right">
+          Open Time Machine
         </ButtonLink>
       </Card>
     </div>

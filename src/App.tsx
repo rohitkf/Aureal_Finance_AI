@@ -26,7 +26,7 @@ const AccountDetail = lazy(() => import('@/pages/AccountDetail').then((m) => ({ 
 const Accounts = lazy(() => import('@/pages/Accounts').then((m) => ({ default: m.Accounts })));
 const Budget = lazy(() => import('@/pages/Budget').then((m) => ({ default: m.Budget })));
 const Debts = lazy(() => import('@/pages/Debts').then((m) => ({ default: m.Debts })));
-const Forecast = lazy(() => import('@/pages/Forecast').then((m) => ({ default: m.Forecast })));
+const TimeMachine = lazy(() => import('@/pages/TimeMachine').then((m) => ({ default: m.TimeMachine })));
 const Goals = lazy(() => import('@/pages/Goals').then((m) => ({ default: m.Goals })));
 const Recurring = lazy(() => import('@/pages/Recurring').then((m) => ({ default: m.Recurring })));
 const Reports = lazy(() => import('@/pages/Reports').then((m) => ({ default: m.Reports })));
@@ -129,7 +129,10 @@ const ProtectedApp = () => (
           <Route path="accounts/:id" element={<Screen><AccountDetail /></Screen>} />
           <Route path="transactions" element={<Screen><Transactions /></Screen>} />
           <Route path="budget" element={<Screen><Budget /></Screen>} />
-          <Route path="forecast" element={<Screen><Forecast /></Screen>} />
+          <Route path="time-machine" element={<Screen><TimeMachine /></Screen>} />
+          {/* Forecast became Time Machine. The old address still works, so a
+              bookmark or an installed shortcut lands where it always did. */}
+          <Route path="forecast" element={<Navigate to="/time-machine" replace />} />
           <Route path="recurring" element={<Screen><Recurring /></Screen>} />
           {/* Subscriptions is a filter on Recurring now, not a screen of its
               own. The old address still works, so a bookmark, a shared link

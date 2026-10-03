@@ -90,7 +90,7 @@ you can edit or clear like anything else.
 | **Account detail** | How has this account behaved, and what's scheduled against it? |
 | **Transactions** | What did I spend, filtered any way I like? |
 | **Budget** | Am I on track this month, category by category? |
-| **Forecast** | What will my balance look like, and when is it tightest? |
+| **Time Machine** | Over any window I pick, and the accounts I pick, what will I have left at the end? |
 | **Recurring** | What leaves and arrives on a schedule? |
 | **Subscriptions** | What am I paying for, and what does it cost over a year? |
 | **Goals** | Am I actually on track to reach them? |
@@ -100,8 +100,7 @@ you can edit or clear like anything else.
 | **Sign in / up / reset** | Email and password, with a proper forgotten-password flow. |
 
 Plus: global search (`⌘K` / `Ctrl+K`) including natural-language questions such as
-*"how much did I spend on food last month"*, a quick-add flow behind the floating **+**, and a
-what-if simulator on the forecast screen.
+*"how much did I spend on food last month"*, and a quick-add flow behind the floating **+**.
 
 ---
 
@@ -163,6 +162,9 @@ Everything on screen derives from pure functions in `src/lib`, which makes the n
 - **`buildForecast(state, today, days)`** — walks the horizon day by day, applying scheduled
   transactions and generated recurrences, and never double-counts a scheduled transaction against
   the rule that produced it. Returns the daily series plus the peak, trough and totals.
+- **`timeMachine(state, today, { from, to, accountIds })`** — the Time Machine screen. Replays
+  what happened in the window from the ledger and projects what has not, line by line, with each
+  chosen account's balance after every line. Start, plus money in, less money out, is the end.
 - **`safeToSpend(state, today)`** — available cash, plus income expected before month end, minus
   everything committed, minus the minimum balance.
 - **`budgetProgress(state, month)`** — spend against limits, honouring category splits, sorted by
@@ -252,7 +254,7 @@ QA_EMAIL=you@example.com QA_PASSWORD=… npm run qa   # in another
 | --- | --- |
 | `qa:responsive` | No horizontal overflow on any screen at any of the six widths |
 | `qa:a11y` | Names, labels, headings, target sizes, AA contrast in both themes, keyboard operation |
-| `qa:flows` | Sign in → add expense → numbers move; recurring payment → forecast changes; budget → counts existing spend; search; destructive confirmation |
+| `qa:flows` | Sign in → add expense → numbers move; recurring payment → Time Machine changes; budget → counts existing spend; search; destructive confirmation |
 | `qa:states` | Every empty state, the 404 screen, service-worker registration and offline loading |
 | — | Suites needing sign-in skip cleanly when `QA_EMAIL` / `QA_PASSWORD` are unset |
 | `qa:screenshots` | Captures every screen in both themes at desktop and phone widths |

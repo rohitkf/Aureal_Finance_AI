@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 828 tests
+npm run test         # vitest — 862 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -89,6 +89,7 @@ Vocabulary that is easy to get wrong:
 | **A category split** | One payment, one account, filed under several headings. Rows in `transaction_splits`, which must total the payment — a deferred trigger enforces it. |
 | **An account split** | One payment taken out of several accounts. Ordinary sibling transactions sharing `split_group_id`, never a side table: each part genuinely moves its own account's balance, and the trigger works off `account_id`. |
 | **An occurrence** | One date a recurring rule produces. `transactions.recurring_date` says which one a row stands in for; `recurring_skips` says one does not happen. |
+| **Time Machine** | The screen that was Forecast (`/forecast` redirects). A window and a set of cash-flow accounts; `timeMachine()` replays what happened inside it from the ledger, projects the rest exactly as `forecastEvents` would, and gives each line the balance of every chosen account it touched. A transfer between two chosen accounts is a `move`: both balances change, the total does not. |
 | **The register** | The transactions page's default view: every line with the balance of its account afterwards, history behind and projections ahead. |
 
 Other things that are true and not guessable:
@@ -131,6 +132,7 @@ Other things that are true and not guessable:
 src/
   lib/finance.ts        the engine — every figure on every screen derives here
   lib/recurrence.ts     nine frequencies, expanded over a window
+  lib/timeMachine.ts    the Time Machine: a window's balance, replayed then projected
   lib/store.tsx         Supabase-backed state; keeps the AppState shape so
                         the engine and the pages never learn there is a database
   lib/mappers.ts        Postgres row ↔ domain model. `num()` lives here

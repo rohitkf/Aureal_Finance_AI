@@ -11,7 +11,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { to: '/accounts', label: 'Accounts', icon: 'bank' },
   { to: '/transactions', label: 'Transactions', icon: 'receipt' },
   { to: '/budget', label: 'Budget', icon: 'pie' },
-  { to: '/forecast', label: 'Forecast', icon: 'trending-up' },
+  { to: '/time-machine', label: 'Time Machine', icon: 'clock' },
 ];
 
 export const PLANNING_NAV: NavItem[] = [
@@ -26,7 +26,7 @@ export const MOBILE_NAV: NavItem[] = [
   { to: '/', label: 'Home', icon: 'dashboard' },
   { to: '/transactions', label: 'Transactions', icon: 'receipt' },
   { to: '/budget', label: 'Budget', icon: 'pie' },
-  { to: '/forecast', label: 'Forecast', icon: 'trending-up' },
+  { to: '/time-machine', label: 'Time Machine', icon: 'clock' },
 ];
 
 export const MORE_NAV: NavItem[] = [
