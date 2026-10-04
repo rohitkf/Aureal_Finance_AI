@@ -18,6 +18,8 @@ import type { Account, Transaction } from '@/lib/types';
 
 /** Every request issued, in the order it left the client. */
 let issued: string[] = [];
+/** What each insert carried, by table. */
+let payloads: Array<{ table: string; row: Record<string, unknown> }> = [];
 /** Requests parked until a test lets them go. */
 let pending: Array<() => void> = [];
 
@@ -35,8 +37,9 @@ const chain = (table: string) => {
   for (const method of ['select', 'eq', 'order', 'maybeSingle', 'limit', 'single', 'upsert', 'delete']) {
     self[method] = () => self;
   }
-  self.insert = () => {
+  self.insert = (row: Record<string, unknown>) => {
     issued.push(`insert:${table}`);
+    payloads.push({ table, row });
     return {
       then: (resolve: (r: unknown) => unknown) =>
         new Promise<void>((go) => pending.push(go)).then(() => resolve({ data: [], error: null })),
@@ -89,6 +92,7 @@ const OPENING: Transaction = {
 
 beforeEach(async () => {
   issued = [];
+  payloads = [];
   pending = [];
   toast.mockClear();
   render(
@@ -137,5 +141,27 @@ describe('two writes in a row', () => {
 
     // A failure must not leave the queue wedged for everything behind it.
     expect(issued.filter((r) => r === 'insert:transactions')).toHaveLength(2);
+  });
+});
+
+describe('an opening balance on something owed', () => {
+  it('is written as money out on a loan, as it is on a card', async () => {
+    act(() => {
+      dispatch({
+        type: 'upsert-account',
+        account: { ...ACCOUNT, id: 'loan', name: 'Car loan', type: 'liability' },
+        openingBalance: 6000,
+      });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await settle();
+    await settle();
+
+    // Written as income, the trigger read it as paying the loan off and the
+    // new account showed −£6,000.
+    const opening = payloads.find((p) => p.table === 'transactions')!.row;
+    expect(opening).toMatchObject({ type: 'expense', amount: 6000, is_opening: true });
   });
 });

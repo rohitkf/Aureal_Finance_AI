@@ -259,14 +259,16 @@ export const AddTransactionSheet = ({
     setDate(editing?.date ?? today);
     setTime(editing?.time ?? nowTime());
     /**
-     * A new transaction starts as something that has not happened.
+     * A new transaction dated today or earlier has happened; one dated ahead
+     * has not.
      *
-     * Entering it is how you say it is coming, not that it is done — so today
-     * and every day after it opens as `scheduled` and waits on Reminders until
-     * you tick it off. Backdating is the exception: a date already gone by is
-     * something you are recording after the fact, so it counts immediately.
+     * Today used to open as `scheduled` too, on the theory that entering
+     * something is how you say it is coming. Most of what anyone enters today
+     * is the coffee they just bought, and it sat out of the balance until it
+     * was ticked off a second time. A bill due today that has not gone yet is
+     * the exception, and the box says so in one tap.
      */
-    setStatus(editing?.status ?? ((editing?.date ?? today) >= today ? 'scheduled' : 'none'));
+    setStatus(editing?.status ?? ((editing?.date ?? today) > today ? 'scheduled' : 'none'));
     setStatusTouched(false);
     setLastSettledStatus(editing && editing.status !== 'scheduled' ? editing.status : 'none');
     setDateMode(editing ? 'custom' : 'today');
@@ -308,9 +310,21 @@ export const AddTransactionSheet = ({
    * forgotten.
    */
   useEffect(() => {
-    if (!open || editing || statusTouched) return;
-    setStatus(date >= today ? 'scheduled' : 'none');
+    if (!open) return;
+    // A date that has not come yet cannot have happened, whatever was said
+    // before the date moved. A payment marked as gone through but dated next
+    // week is already in the balance, and every timeline drawn by date then
+    // disagreed with "available now" until the day arrived.
+    if (date > today) {
+      setStatus('scheduled');
+      return;
+    }
+    if (editing || statusTouched) return;
+    setStatus('none');
   }, [open, editing, statusTouched, date, today]);
+
+  /** Whether the date leaves the has-it-happened question open at all. */
+  const dateAhead = date > today;
 
   // Keep the selections valid as the available options change.
   useEffect(() => {
@@ -478,8 +492,9 @@ export const AddTransactionSheet = ({
       categoryId,
       // A date in the future is a plan, not a fact — it lands in the forecast.
       // On an edit the person says which it is, because only they know whether
-      // a payment that was due last week actually went out.
-      status,
+      // a payment that was due last week actually went out. Checked again
+      // here, so nothing that reaches the store can be counted ahead of its day.
+      status: date > today ? 'scheduled' : status,
       notes: notes.trim() || undefined,
       recurringId: editing?.recurringId ?? rule?.id,
       // The occurrence this stands in for, kept even when the date is moved —
@@ -775,18 +790,23 @@ export const AddTransactionSheet = ({
           </div>
 
           {/* On a new transaction this is the only status question worth
-              asking, and the default answers it: entering something is how you
-              say it is coming. Untick it the moment it goes through — or right
-              now, if you are recording something you have just done. */}
+              asking, and the date answers it: today or earlier has happened,
+              ahead has not. Tick it for a bill due today that has not gone
+              out; a date ahead leaves nothing to answer. */}
           {!editing && (
             <CheckboxField
               checked={status === 'scheduled'}
+              disabled={dateAhead}
               onChange={(on) => {
                 setStatus(on ? 'scheduled' : 'none');
                 setStatusTouched(true);
               }}
               label="This hasn’t happened yet"
-              description="Keeps it on Reminders and out of your balance until you record it. Ticked by default for today and any date ahead; untick it if the money has already moved."
+              description={
+                dateAhead
+                  ? 'A date that hasn’t come yet can’t have happened. It waits on Reminders and in Time Machine until then.'
+                  : 'Tick it for a bill due today that hasn’t gone out yet — it stays on Reminders and out of your balance until you record it.'
+              }
             />
           )}
 
@@ -809,9 +829,14 @@ export const AddTransactionSheet = ({
                   made you answer both with one press. */}
               <CheckboxField
                 checked={status === 'scheduled'}
+                disabled={dateAhead}
                 onChange={(on) => setStatus(on ? 'scheduled' : lastSettledStatus)}
                 label="This hasn’t happened yet"
-                description="Keeps it on Reminders and out of your balance until you come back and record it. Untick it the day it goes through."
+                description={
+                  dateAhead
+                    ? 'A date that hasn’t come yet can’t have happened. Move the date to today to record it as gone through.'
+                    : 'Keeps it on Reminders and out of your balance until you come back and record it. Untick it the day it goes through.'
+                }
               />
             </div>
           )}

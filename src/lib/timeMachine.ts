@@ -65,7 +65,10 @@ export interface TimeMachineLine {
   id: string;
   /** The day it is drawn under. An overdue payment is drawn under today. */
   date: string;
-  /** Its own date, which differs from `date` only when it is overdue. */
+  /**
+   * Its own date. It differs from `date` when it is overdue (drawn today, still
+   * owed) or recorded early (dated ahead, already in the balance, drawn today).
+   */
   dueDate: string;
   time?: string;
   label: string;
@@ -207,9 +210,14 @@ export const timeMachine = (
     const scheduled = !counts(t);
     // Overdue money has not left yet and still will, so it leaves today.
     const overdue = scheduled && t.date <= today;
+    // Counted, but dated ahead: it is already in the balance — the trigger
+    // never looks at the date — so it has left by today, whatever the date
+    // says. Drawn on its own date, the timeline's "now" disagreed with
+    // "available now" by exactly this payment until the day came round.
+    const early = !scheduled && t.date > today;
     const movement: Movement = {
       id: t.id,
-      date: overdue ? today : t.date,
+      date: overdue || early ? today : t.date,
       dueDate: t.date,
       time: t.time,
       label: t.merchant,

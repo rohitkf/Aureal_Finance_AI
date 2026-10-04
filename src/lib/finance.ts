@@ -919,8 +919,12 @@ export const accountTrace = (
   const settled = state.transactions.filter(
     (t) => counts(t) && !t.isOpening && (t.accountId === accountId || t.toAccountId === accountId),
   );
+  // A counted row dated ahead is in the balance already, so it has happened
+  // by today whatever its date says; walked on its own date, today's point
+  // disagreed with the balance printed above the chart.
+  const on = (t: Transaction) => (t.date > today ? today : t.date);
   const endOf = (date: string) =>
-    round2(account.balance - settled.filter((t) => t.date > date).reduce((s, t) => s + balanceDelta(t, account), 0));
+    round2(account.balance - settled.filter((t) => on(t) > date).reduce((s, t) => s + balanceDelta(t, account), 0));
 
   // Still to come: what it does to this balance, signed the way the stored
   // balance moves.
@@ -998,7 +1002,7 @@ export const accountTrace = (
     // What moved that day, settled and still to come, signed as the stored
     // balance moves. On an owed account a rise is spending and a fall is a payment.
     const moves = [
-      ...settled.filter((t) => t.date === date).map((t) => balanceDelta(t, account)),
+      ...settled.filter((t) => on(t) === date).map((t) => balanceDelta(t, account)),
       ...onDay.map((p) => p.delta),
     ];
     const rising = moves.filter((d) => d > 0).reduce((s, d) => s + d, 0);

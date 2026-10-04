@@ -528,6 +528,10 @@ const Line = ({
                 <Badge className="whitespace-nowrap">Expected</Badge>
               ) : line.projected ? (
                 <Badge tone="primary" className="whitespace-nowrap">Scheduled</Badge>
+              ) : line.dueDate > line.date ? (
+                // Recorded as gone through but dated ahead: already in the
+                // balance, so it is drawn today, and says what date it carries.
+                <Badge className="whitespace-nowrap">{`Recorded early · dated ${formatDay(line.dueDate)}`}</Badge>
               ) : null}
             </p>
             <p className={cn('tnum shrink-0 text-body-sm font-semibold', AMOUNT_TONE[line.effect])}>

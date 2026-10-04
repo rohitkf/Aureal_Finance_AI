@@ -147,9 +147,9 @@ describe('Add transaction', () => {
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(dispatch.mock.calls[0][0]).toMatchObject({
       type: 'add-transaction',
-      // Today, so it has not happened yet: entering something is how you say
-      // it is coming, and it waits on Reminders until it is ticked off.
-      transaction: { amount: 42.5, type: 'expense', accountId: 'acc-1', status: 'scheduled' },
+      // Today, so it has happened: most of what is entered today is what was
+      // just spent, and it belongs in the balance straight away.
+      transaction: { amount: 42.5, type: 'expense', accountId: 'acc-1', status: 'none' },
     });
   });
 
@@ -737,13 +737,13 @@ describe('splitting a payment', () => {
 });
 
 describe('whether a new transaction has happened yet', () => {
-  it('assumes today has not, so it waits on Reminders', async () => {
+  it('assumes today has, so the coffee just bought is in the balance', async () => {
     const user = userEvent.setup();
     open();
     await user.keyboard('12');
     await user.click(screen.getByRole('button', { name: /save transaction/i }));
 
-    expect(dispatch.mock.calls[0][0].transaction.status).toBe('scheduled');
+    expect(dispatch.mock.calls[0][0].transaction.status).toBe('none');
   });
 
   it('assumes a date ahead has not either', async () => {
@@ -770,11 +770,36 @@ describe('whether a new transaction has happened yet', () => {
     const user = userEvent.setup();
     open();
     await user.keyboard('12');
-    // Recording a coffee bought five minutes ago: today's date, already done.
+    // A bill due today that has not gone out yet.
     await user.click(screen.getByRole('checkbox', { name: /hasn.t happened yet/i }));
     await user.click(screen.getByRole('button', { name: /save transaction/i }));
 
-    expect(dispatch.mock.calls[0][0].transaction.status).toBe('none');
+    expect(dispatch.mock.calls[0][0].transaction.status).toBe('scheduled');
+  });
+
+  it('cannot say a date ahead has happened', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('12');
+    await pickDate(user, 'Date', '2026-04-20');
+
+    const box = screen.getByRole('checkbox', { name: /hasn.t happened yet/i });
+    expect(box).toBeChecked();
+    expect(box).toBeDisabled();
+    expect(box).toHaveTextContent(/can.t have happened/);
+  });
+
+  it('puts a date moved ahead back to not happened, whatever was said first', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.keyboard('12');
+    // Said "not yet", then "yes it has", then moved the date into next month.
+    await user.click(screen.getByRole('checkbox', { name: /hasn.t happened yet/i }));
+    await user.click(screen.getByRole('checkbox', { name: /hasn.t happened yet/i }));
+    await pickDate(user, 'Date', '2026-04-20');
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+    expect(dispatch.mock.calls[0][0].transaction.status).toBe('scheduled');
   });
 
   it('does not put the four statuses in the way of a new one', () => {

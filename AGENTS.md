@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 907 tests
+npm run test         # vitest — 914 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -411,6 +411,19 @@ Each of these has already cost real time here.
   today. A prediction about a period we already have facts for invents history,
   and worse, the register's balance column would then count money that is not in
   the account. Scrolling back shows what happened, not what was expected.
+- **A new transaction's status follows its date: today or earlier has
+  happened, ahead has not.** A date ahead cannot be marked as happened — the
+  form locks the box and the save checks again. There is deliberately no
+  database rule for it: Postgres's `current_date` is UTC, so a payment
+  entered just after midnight in the UK would be refused for an hour every
+  summer, and a check on UPDATE would fire on the `on delete set null`
+  cascade and make deleting an account fail (see below). Rows recorded ahead
+  before the rule existed are treated as having happened by today:
+  `timeMachine` and `accountTrace` draw them today, badged with their date,
+  so "now" is always "available now".
+- **An opening balance on anything owed is money out.** `owesMoney()`, not
+  `type === 'credit'` — written as income, a new £6,000 loan read as paid off
+  and showed −£6,000.
 - **A counted transaction dated ahead is already in the balance.** The trigger
   ignores the date, so a row marked "none" for next week moved the balance
   today. `forecastEvents` therefore takes only `scheduled` rows as events;

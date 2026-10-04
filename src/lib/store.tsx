@@ -51,6 +51,7 @@ import {
   transactionToRow,
 } from './mappers';
 import { missingStandardGroups } from './accountGroups';
+import { owesMoney } from './finance';
 
 /** Slices that can be refetched independently after a write. */
 type Slice =
@@ -905,9 +906,11 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
                   occurred_on: action.openedOn ?? ISO(new Date()),
                   merchant: 'Opening balance',
                   amount: opening,
-                  // On a credit account the stored balance is what is owed, so
-                  // an opening balance is money out, not money in.
-                  type: a.type === 'credit' ? 'expense' : 'income',
+                  // On anything owed — a card or a loan — the stored balance is
+                  // what is owed, so an opening balance is money out, not in.
+                  // Testing for `credit` alone wrote a new £6,000 loan as
+                  // income, which the trigger reads as paying it off: −£6,000.
+                  type: owesMoney(a) ? 'expense' : 'income',
                   status: 'cleared',
                   // A fact about the row, so renaming it later leaves it an
                   // opening balance — and the register keeps colouring it as

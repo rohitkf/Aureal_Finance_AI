@@ -302,3 +302,31 @@ describe('an account added inside the window', () => {
     expect(tm.lines.some((l) => l.id === 'opening')).toBe(false);
   });
 });
+
+describe('a payment recorded as gone through but dated ahead', () => {
+  // Already in the balance — the trigger never looks at the date — so it has
+  // left by today. Drawn on its own date, "now" disagreed with "available now".
+  const s = state({
+    accounts: [account('current', 'current', 860), account('savings', 'savings', 500)],
+    transactions: [tx({ id: 'tax', date: '2026-10-05', amount: 140, type: 'expense' })],
+    recurring: [],
+  });
+  const tm = timeMachine(s, TODAY, OCTOBER);
+
+  it('is drawn today, keeping the date it carries', () => {
+    const line = tm.lines.find((l) => l.id === 'tax')!;
+    expect(line.date).toBe(TODAY);
+    expect(line.dueDate).toBe('2026-10-05');
+    expect(line.projected).toBe(false);
+  });
+
+  it('leaves "now" at exactly the money there is', () => {
+    expect(tm.now!.total).toBe(availableNow(s.accounts));
+  });
+
+  it('is part of the start of a window that opens after today, not counted again', () => {
+    const later = timeMachine(s, TODAY, { from: '2026-10-10', to: '2026-10-31' });
+    expect(later.start).toBe(1360);
+    expect(later.lines).toEqual([]);
+  });
+});

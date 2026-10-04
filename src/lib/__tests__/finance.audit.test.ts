@@ -407,3 +407,13 @@ describe('the net worth chart', () => {
     expect(netWorthSeries(s, TODAY, 6).map((p) => p.month)).toEqual(['2026-08', '2026-09', '2026-10']);
   });
 });
+
+describe('an account chart with a payment recorded ahead', () => {
+  it('reads today as the balance, since the payment has already left', () => {
+    const s = state({ transactions: [tx({ id: 'tax', date: '2026-10-05', amount: 140, type: 'expense' })] });
+    const trace = accountTrace(s, 'current', TODAY, 2, 5);
+    expect(trace.find((d) => d.date === TODAY)!.closing).toBe(1000);
+    expect(trace.find((d) => d.date === '2026-10-02')!.closing).toBe(1140);
+    expect(trace.at(-1)!.closing).toBe(1000);
+  });
+});
