@@ -5,6 +5,7 @@ import {
   monthIncome,
   monthSpend,
   monthlyCommitments,
+  monthlyRecurringIncome,
   netWorth,
   netWorthSeries,
   savingsRate,
@@ -14,8 +15,7 @@ import {
 } from '@/lib/finance';
 import { addMonths, formatMonthYear, formatShortMonth, monthKey } from '@/lib/date';
 import { downloadCsv } from '@/lib/csv';
-import { money, percent } from '@/lib/format';
-import { monthlyEquivalent } from '@/lib/recurrence';
+import { money, percent, round2 } from '@/lib/format';
 import { useAppState, useCategoryLookup, useLoading, useSettings, useToday } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { DonutChart } from '@/components/charts/DonutChart';
@@ -54,13 +54,7 @@ export const Reports = () => {
 
   // Likewise, commitments are compared against recurring income rather than
   // whatever has happened to land so far this month.
-  const recurringIncome = useMemo(
-    () =>
-      state.recurring
-        .filter((r) => r.status === 'active' && r.direction === 'in')
-        .reduce((sum, r) => sum + monthlyEquivalent(r), 0),
-    [state.recurring],
-  );
+  const recurringIncome = useMemo(() => monthlyRecurringIncome(state), [state]);
 
   /**
    * The last N calendar months, counted back from this one.
@@ -121,6 +115,12 @@ export const Reports = () => {
     [state, today, range],
   );
 
+  const netWorthChange = useMemo(() => {
+    const first = netWorthPoints[0];
+    const last = netWorthPoints[netWorthPoints.length - 1];
+    return first && last ? round2(last.assets - last.liabilities - (first.assets - first.liabilities)) : 0;
+  }, [netWorthPoints]);
+
   const hasData = state.transactions.length > 0;
 
   if (loading) return <SkeletonChart />;
@@ -177,7 +177,7 @@ export const Reports = () => {
             />
             <Kpi
               label="Net worth"
-              value={money(netWorth(state.accounts), { compact: true, masked: maskBalances })}
+              value={money(netWorth(state.accounts, state.accountGroups), { compact: true, masked: maskBalances })}
               tone="primary"
               note="Assets minus what you owe"
             />
@@ -204,14 +204,11 @@ export const Reports = () => {
               title="Net worth"
               description="Assets minus liabilities. The dashed lines show each side separately."
               action={
-                <Badge tone="success" icon="trending-up">
-                  {money(
-                    (netWorthPoints[netWorthPoints.length - 1]?.assets ?? 0) -
-                      (netWorthPoints[netWorthPoints.length - 1]?.liabilities ?? 0) -
-                      ((netWorthPoints[0]?.assets ?? 0) - (netWorthPoints[0]?.liabilities ?? 0)),
-                    { compact: true, signed: true },
-                  )}{' '}
-                  over {range} months
+                <Badge tone={netWorthChange >= 0 ? 'success' : 'danger'} icon={netWorthChange >= 0 ? 'arrow-up' : 'arrow-down'}>
+                  {money(netWorthChange, { compact: true, signed: true })}{' '}
+                  {/* The series starts when something was first recorded, so
+                      "over 6 months" claimed a history that was not there. */}
+                  since {formatShortMonth(`${netWorthPoints[0]?.month ?? month}-01`)}
                 </Badge>
               }
             />
@@ -252,7 +249,7 @@ export const Reports = () => {
               <dl className="space-y-3">
                 <Line label="Recurring commitments" value={money(monthlyCommitments(state), { compact: true })} note="Per month" />
                 <Line label="Subscriptions" value={money(subs.monthly, { compact: true })} note={`${subs.count} active · ${money(subs.annual, { compact: true })} a year`} />
-                <Line label="Total debt" value={money(totalDebt(state.accounts), { compact: true })} note="Across credit facilities" tone="danger" />
+                <Line label="Total debt" value={money(totalDebt(state.accounts, state.accountGroups), { compact: true })} note="Cards, loans and anything else owed" tone="danger" />
                 <Line
                   label="Committed share of income"
                   value={percent(recurringIncome > 0 ? (monthlyCommitments(state) / recurringIncome) * 100 : 0)}

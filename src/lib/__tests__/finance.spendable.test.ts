@@ -77,12 +77,12 @@ describe('the three totals, on the same accounts', () => {
   });
 
   it('counts the investment as an asset', () => {
-    expect(totalAssets(ACCOUNTS)).toBe(53_050);
+    expect(totalAssets(ACCOUNTS, [])).toBe(53_050);
   });
 
   it('nets the debt off everything owned, investment included', () => {
-    expect(totalDebt(ACCOUNTS)).toBe(700);
-    expect(netWorth(ACCOUNTS)).toBe(52_350);
+    expect(totalDebt(ACCOUNTS, [])).toBe(700);
+    expect(netWorth(ACCOUNTS, [])).toBe(52_350);
   });
 });
 

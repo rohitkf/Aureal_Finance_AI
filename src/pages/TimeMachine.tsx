@@ -528,8 +528,6 @@ const Line = ({
                 <Badge className="whitespace-nowrap">Expected</Badge>
               ) : line.projected ? (
                 <Badge tone="primary" className="whitespace-nowrap">Scheduled</Badge>
-              ) : line.isOpening ? (
-                <Badge tone="secondary" className="whitespace-nowrap">Opening balance</Badge>
               ) : null}
             </p>
             <p className={cn('tnum shrink-0 text-body-sm font-semibold', AMOUNT_TONE[line.effect])}>

@@ -109,7 +109,7 @@ export const DonutChart = ({
               className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors duration-400 ease-fluid hover:bg-surface-high"
             >
               <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: a.color }} />
-              <span className="min-w-0 flex-1 truncate text-body-sm text-text">{a.label}</span>
+              <span className="min-w-0 flex-1 break-words text-body-sm leading-snug text-text">{a.label}</span>
               <span className="tnum shrink-0 text-body-sm font-semibold text-text">{money(a.value)}</span>
               <span className="tnum w-12 shrink-0 text-right text-label-sm text-faint">
                 {percent(a.fraction * 100)}

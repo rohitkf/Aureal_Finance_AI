@@ -16,9 +16,9 @@ Two designed palettes, not an inversion:
 - **Light — "Soft Structuralism."** A neutral silver ground with pure white surfaces floating on
   wide, highly diffused ambient shadow. Structure comes from elevation, not from grey rules.
 
-The dashboard uses an **asymmetrical bento**: the balance plate spans two rows beside the
-Safe-to-Spend hero, with the flow tiles stacked underneath. Every span collapses to a single
-column below `lg`.
+The dashboard uses an **asymmetrical bento**: Safe to Spend, which shows its working, spans two
+rows on the right; the balance plate and the two flow tiles beneath it share the left. Every span
+collapses to a single column below `lg`.
 
 ---
 

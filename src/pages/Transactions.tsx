@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
 import { formatFullDate, formatMediumDate, formatTime, monthKey, relativeDayLabel } from '@/lib/date';
 import { downloadCsv } from '@/lib/csv';
+import { inAndOut, isMovement } from '@/lib/finance';
 import { Register } from '@/components/Register';
 import { Reminders } from '@/components/Reminders';
 import { isReminder, ledgerRows, ledgerWindow, type LedgerRow } from '@/lib/ledger';
@@ -169,13 +170,12 @@ export const Transactions = () => {
     return [...map.entries()];
   }, [filtered]);
 
-  const totals = useMemo(
-    () => ({
-      spent: filtered.filter((t) => t.type === 'expense' && t.status !== 'scheduled').reduce((s, t) => s + t.amount, 0),
-      received: filtered.filter((t) => t.type === 'income' && t.status !== 'scheduled').reduce((s, t) => s + t.amount, 0),
-    }),
-    [filtered],
-  );
+  // Cancelled payments and opening balances are on the list and in neither
+  // total: one never happened, the other was never money arriving.
+  const totals = useMemo(() => {
+    const { income, spent } = inAndOut(filtered);
+    return { spent, received: income };
+  }, [filtered]);
 
   /**
    * How many reminders have a date that has already gone by — the count worth
@@ -425,10 +425,8 @@ export const Transactions = () => {
             </Card>
           ) : (
             groups.map(([date, items]) => {
-              const net = items.reduce(
-                (s, t) => s + (t.type === 'income' ? t.amount : t.type === 'expense' ? -t.amount : 0),
-                0,
-              );
+              const day = inAndOut(items);
+              const net = day.income - day.spent;
               return (
                 <section key={date} className="space-y-1.5">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1">
@@ -616,9 +614,7 @@ const TransactionDetail = ({
   const category = lookupCategory(transaction.categoryId);
   const account = state.accounts.find((a) => a.id === transaction.accountId);
 
-  const merchantHistory = state.transactions.filter(
-    (t) => t.merchant === transaction.merchant && t.status !== 'scheduled',
-  );
+  const merchantHistory = state.transactions.filter((t) => t.merchant === transaction.merchant && isMovement(t));
   const merchantTotal = merchantHistory.reduce((s, t) => s + t.amount, 0);
 
   const body = (

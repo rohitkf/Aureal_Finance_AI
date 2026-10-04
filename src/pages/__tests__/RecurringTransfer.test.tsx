@@ -212,7 +212,7 @@ describe('an existing transfer in the list', () => {
   it('is not counted as a monthly commitment — the money is still yours', () => {
     render();
     expect(screen.getByText('Moved between accounts')).toBeInTheDocument();
-    expect(screen.getByText(/still your money/)).toBeInTheDocument();
+    expect(screen.getByText(/between your own accounts/)).toBeInTheDocument();
   });
 
   it('says so plainly when its destination has been deleted', () => {

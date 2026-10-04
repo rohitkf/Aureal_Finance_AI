@@ -60,13 +60,20 @@ describe('lockedAllocations', () => {
         allocation({ id: 'a', allocated: 500, locked: true }),
         allocation({ id: 'b', allocated: 300 }),
         allocation({ id: 'c', allocated: 200, locked: true }),
-      ]),
+      ], [ACCOUNT]),
     ).toBe(700);
   });
 
   it('is zero when nothing is locked', () => {
-    expect(lockedAllocations([allocation({ locked: false })])).toBe(0);
-    expect(lockedAllocations([])).toBe(0);
+    expect(lockedAllocations([allocation({ locked: false })], [ACCOUNT])).toBe(0);
+    expect(lockedAllocations([], [ACCOUNT])).toBe(0);
+  });
+
+  it('ignores one inside an account that was never spendable', () => {
+    // An allocation in an ISA was never in "available", so holding it back
+    // from available as well took it off twice.
+    const isa = { ...ACCOUNT, id: 'isa', type: 'investment' as const };
+    expect(lockedAllocations([allocation({ parentAccountId: 'isa', allocated: 500, locked: true })], [ACCOUNT, isa])).toBe(0);
   });
 });
 
@@ -108,6 +115,6 @@ describe('what an allocation must never touch', () => {
   });
 
   it('net worth, because nothing has left', () => {
-    expect(netWorth(locked.accounts)).toBe(2000);
+    expect(netWorth(locked.accounts, [])).toBe(2000);
   });
 });

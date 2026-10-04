@@ -34,10 +34,13 @@ export const byDay = (rows: LedgerRow[], order: 'asc' | 'desc'): LedgerDay[] => 
   const days = [...map.entries()].map(([date, list]) => ({
     date,
     rows: order === 'desc' ? [...list].reverse() : list,
-    // A void line moves nothing, so it contributes nothing to the day either.
+    // What came in less what was spent. A void line moved nothing; a transfer
+    // moved money between your own accounts, which made a day you saved £200
+    // read as a day you lost it; an opening balance is money that was already
+    // there. None of them is the day's in or out.
     total: round2(
       list
-        .filter((row) => row.status !== 'void')
+        .filter((row) => row.status !== 'void' && !row.toAccountId && !row.transaction?.isOpening)
         .reduce((sum, row) => sum + (row.direction === 'in' ? row.amount : -row.amount), 0),
     ),
   }));

@@ -135,9 +135,9 @@ describe('balances', () => {
 
   it('reports debt and utilisation from credit accounts', () => {
     const { accounts } = minimal();
-    expect(totalDebt(accounts)).toBe(400);
+    expect(totalDebt(accounts, [])).toBe(400);
     expect(creditUtilisation(accounts)).toBe(40);
-    expect(netWorth(accounts)).toBe(600);
+    expect(netWorth(accounts, [])).toBe(600);
   });
 
   it('returns zero utilisation rather than dividing by zero with no cards', () => {

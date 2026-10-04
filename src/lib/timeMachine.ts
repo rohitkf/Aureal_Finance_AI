@@ -88,8 +88,6 @@ export interface TimeMachineLine {
   predicted: boolean;
   /** Scheduled, and its date has gone by. Still owed. */
   overdue: boolean;
-  /** An account's opening balance: real money, but not money that arrived. */
-  isOpening: boolean;
   /** The balance of each chosen account this line touched, immediately after it. */
   balances: Array<{ accountId: string; after: number }>;
   /** Every chosen account together, immediately after this line. */
@@ -147,7 +145,6 @@ interface Movement {
   projected: boolean;
   predicted: boolean;
   overdue: boolean;
-  isOpening: boolean;
 }
 
 /**
@@ -199,6 +196,11 @@ export const timeMachine = (
   for (const t of state.transactions) {
     if (t.recurringId) claimed.add(`${t.recurringId}|${t.recurringDate ?? t.date}`);
     if (t.status === 'void') continue;
+    // An opening balance is what the account held before it was added here.
+    // It is part of every balance the window can start from, never money that
+    // arrived inside it — counted as "money in" it inflated the month the
+    // account was added in by everything that was already there.
+    if (t.isOpening) continue;
     const touches = chosenIds.has(t.accountId) || (t.type === 'transfer' && !!t.toAccountId && chosenIds.has(t.toAccountId));
     if (!touches) continue;
 
@@ -219,7 +221,6 @@ export const timeMachine = (
       projected: scheduled,
       predicted: false,
       overdue,
-      isOpening: !!t.isOpening,
     };
     (scheduled ? pending : settled).push(movement);
   }
@@ -249,7 +250,6 @@ export const timeMachine = (
         projected: true,
         predicted: true,
         overdue: false,
-        isOpening: false,
       });
     }
   }

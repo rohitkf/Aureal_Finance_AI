@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { daysBetween, formatMonthYear } from '@/lib/date';
+import { addMonths, formatMonthYear } from '@/lib/date';
 import { money, percent } from '@/lib/format';
 import { newId, useAppState, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, Eyebrow } from '@/components/ui/Card';
 import { MoneyDial } from '@/components/ui/MoneyDial';
-import { isDepository } from '@/lib/finance';
+import { goalOutlook, goalTotals, isDepository } from '@/lib/finance';
 import { DateField, SelectField, TextField } from '@/components/ui/Field';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
@@ -40,23 +40,16 @@ export const Goals = () => {
   const [contributing, setContributing] = useState<{ goal: Goal; amount: string; error?: string } | null>(null);
   const [deleting, setDeleting] = useState<Goal | null>(null);
 
-  const totals = useMemo(
-    () => ({
-      target: state.goals.reduce((s, g) => s + g.target, 0),
-      saved: state.goals.reduce((s, g) => s + g.saved, 0),
-      monthly: state.goals.reduce((s, g) => s + g.monthlyContribution, 0),
-    }),
-    [state.goals],
-  );
-
-  /** Whether the current contribution rate actually gets there in time. */
-  const projection = (goal: Goal) => {
-    const remaining = goal.target - goal.saved;
-    if (remaining <= 0) return { onTrack: true, monthsNeeded: 0, monthsLeft: 0 };
-    const monthsLeft = Math.max(0, Math.round(daysBetween(today, goal.targetDate) / 30.44));
-    const monthsNeeded = goal.monthlyContribution > 0 ? Math.ceil(remaining / goal.monthlyContribution) : Infinity;
-    return { onTrack: monthsNeeded <= monthsLeft, monthsNeeded, monthsLeft };
-  };
+  const totals = useMemo(() => goalTotals(state.goals), [state.goals]);
+  /** A year out, from whenever the form is opened — not a fixed date that goes stale. */
+  const blank = (): Draft => ({
+    name: '',
+    target: '',
+    saved: '0',
+    targetDate: addMonths(today, 12),
+    monthlyContribution: '',
+    linkedAccountId: '',
+  });
 
   const save = () => {
     if (!draft) return;
@@ -116,7 +109,7 @@ export const Goals = () => {
           variant="primary"
           icon="plus"
           onClick={() =>
-            setDraft({ name: '', target: '', saved: '0', targetDate: '2027-12-01', monthlyContribution: '', linkedAccountId: '' })
+            setDraft(blank())
           }
         >
           New goal
@@ -163,7 +156,7 @@ export const Goals = () => {
             description="Set a target and a date, and Aureal will tell you whether you’re on track to reach it."
             action={{
               label: 'Create your first goal',
-              onClick: () => setDraft({ name: '', target: '', saved: '0', targetDate: '2027-12-01', monthlyContribution: '', linkedAccountId: '' }),
+              onClick: () => setDraft(blank()),
             }}
           />
         </Card>
@@ -171,9 +164,8 @@ export const Goals = () => {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {state.goals.map((goal) => {
             const pct = (goal.saved / goal.target) * 100;
-            const remaining = Math.max(0, goal.target - goal.saved);
-            const p = projection(goal);
-            const complete = remaining === 0;
+            const p = goalOutlook(goal, today);
+            const { remaining, complete } = p;
 
             return (
               <Card key={goal.id} className="flex flex-col gap-4">
@@ -182,7 +174,7 @@ export const Goals = () => {
                     <Icon name={(goal.icon as IconName) ?? 'target'} size={20} />
                   </span>
                   <Badge tone={complete ? 'success' : p.onTrack ? 'primary' : 'warning'}>
-                    {complete ? 'Complete' : p.onTrack ? 'On track' : 'Behind schedule'}
+                    {complete ? 'Complete' : p.late ? 'Date passed' : p.onTrack ? 'On track' : 'Behind schedule'}
                   </Badge>
                 </div>
 
@@ -222,11 +214,13 @@ export const Goals = () => {
                   </div>
                   {!complete && (
                     <p className={cn('pt-1 text-body-sm', p.onTrack ? 'text-success' : 'text-warning')}>
-                      {p.monthsNeeded === Infinity
-                        ? 'Add a monthly contribution to start making progress.'
-                        : p.onTrack
-                          ? `At this rate you’ll get there in ${p.monthsNeeded} month${p.monthsNeeded === 1 ? '' : 's'}.`
-                          : `You’d need about ${money(remaining / Math.max(p.monthsLeft, 1), { compact: true })} a month to hit your date.`}
+                      {p.late
+                        ? `${formatMonthYear(goal.targetDate)} has passed — pick a new date to see what it takes.`
+                        : p.monthsNeeded === null
+                          ? 'Add a monthly contribution to start making progress.'
+                          : p.onTrack
+                            ? `At this rate you’ll get there in ${p.monthsNeeded} month${p.monthsNeeded === 1 ? '' : 's'}.`
+                            : `You’d need about ${money(p.neededPerMonth ?? remaining, { compact: true })} a month to hit your date.`}
                     </p>
                   )}
                 </div>

@@ -28,6 +28,7 @@ export const LedgerLine = ({
   today,
   masked,
   accountName,
+  toAccountName,
   categoryName,
   labels,
   accents,
@@ -38,6 +39,8 @@ export const LedgerLine = ({
   today: string;
   masked: boolean;
   accountName: string;
+  /** The account a transfer arrives in, when the line is one. */
+  toAccountName?: string;
   categoryName: string;
   labels: Label[];
   /** Which colour each kind of line is drawn in — the person's choice. */
@@ -62,8 +65,9 @@ export const LedgerLine = ({
    */
   const context = [
     categoryName,
-    accountName,
-    row.toAccountId ? 'transfer' : null,
+    // A transfer says where it went. "Everyday · transfer" left the one thing
+    // worth knowing about it out.
+    row.toAccountId && toAccountName ? `${accountName} → ${toAccountName}` : accountName,
     row.projected ? 'not yet recorded' : null,
   ]
     .filter(Boolean)

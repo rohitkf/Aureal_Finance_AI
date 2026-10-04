@@ -2,7 +2,7 @@ import type { Account, AppState, Transaction, TransactionStatus } from './types'
 import { addMonths } from './date';
 import { expandRecurrence } from './recurrence';
 import { round2 } from './format';
-import { skippedOccurrences } from './finance';
+import { owesMoney, skippedOccurrences } from './finance';
 
 /**
  * One line of the register.
@@ -66,11 +66,25 @@ const deltaFor = (
   // has not moved anything *yet*, and the forward walk exists precisely to
   // show where the balance lands once it does.
   if (row.status === 'void') return 0;
-  const owed = account?.type === 'credit';
+  // A loan inverts exactly as a card does; the trigger tests for both.
+  const owed = account ? owesMoney(account) : false;
   const leaving = row.direction === 'out';
   if (owed) return leaving ? row.amount : -row.amount;
   return leaving ? -row.amount : row.amount;
 };
+
+/**
+ * The far end of a transfer, seen from the account it arrives in.
+ *
+ * A transfer is drawn once, against the account it leaves. The account it
+ * arrives in still moved, and walking that account's column without it put
+ * every line before the transfer off by its amount.
+ */
+const arrivalOf = (row: LedgerRow) => ({ ...row, direction: 'in' as const });
+
+/** Only a transfer has a far end. A stored row says so itself; a projection carries one only if it is one. */
+const isTransfer = (row: LedgerRow): boolean =>
+  row.transaction ? row.transaction.type === 'transfer' : !!row.toAccountId;
 
 const byDateThenTime = (a: LedgerRow, b: LedgerRow): number => {
   if (a.date !== b.date) return a.date < b.date ? -1 : 1;
@@ -164,7 +178,13 @@ export const ledgerRows = (state: AppState, today: string, from: string, to: str
   const accountOf = new Map(state.accounts.map((a) => [a.id, a]));
 
   for (const account of state.accounts) {
-    const mine = rows.filter((r) => r.accountId === account.id);
+    // Its own lines, and transfers arriving from elsewhere — which move this
+    // balance without being drawn in this account's name.
+    const mine = rows.filter(
+      (r) => r.accountId === account.id || (r.toAccountId === account.id && r.accountId !== account.id && isTransfer(r)),
+    );
+    const effectOf = (row: LedgerRow) =>
+      deltaFor(row.accountId === account.id ? row : arrivalOf(row), accountOf.get(account.id));
 
     // Backwards through what has already happened: each settled line closes on
     // the balance that follows it, which is today's balance less everything
@@ -173,16 +193,16 @@ export const ledgerRows = (state: AppState, today: string, from: string, to: str
     for (let i = mine.length - 1; i >= 0; i -= 1) {
       const row = mine[i]!;
       if (!row.settled) continue;
-      row.balanceAfter = round2(running);
-      running = round2(running - deltaFor(row, accountOf.get(account.id)));
+      if (row.accountId === account.id) row.balanceAfter = round2(running);
+      running = round2(running - effectOf(row));
     }
 
     // Forwards through what has not: each unsettled line builds on the last.
     let ahead = account.balance;
     for (const row of mine) {
       if (row.settled) continue;
-      ahead = round2(ahead + deltaFor(row, accountOf.get(account.id)));
-      row.balanceAfter = ahead;
+      ahead = round2(ahead + effectOf(row));
+      if (row.accountId === account.id) row.balanceAfter = ahead;
     }
   }
 

@@ -286,3 +286,19 @@ describe('a rule occurrence that already has a transaction', () => {
     expect(tm.moneyIn).toBe(2000);
   });
 });
+
+describe('an account added inside the window', () => {
+  it('starts with what it held, rather than counting it as money in', () => {
+    const s = state({
+      accounts: [...ACCOUNTS, account('new-pot', 'savings', 3000)],
+      transactions: [
+        ...TRANSACTIONS,
+        tx({ id: 'opening', date: '2026-10-02', amount: 3000, type: 'income', accountId: 'new-pot', isOpening: true }),
+      ],
+    });
+    const tm = timeMachine(s, TODAY, OCTOBER);
+    expect(tm.start).toBe(1350 + 3000);
+    expect(tm.moneyIn).toBe(2200);
+    expect(tm.lines.some((l) => l.id === 'opening')).toBe(false);
+  });
+});

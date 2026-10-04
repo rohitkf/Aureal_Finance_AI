@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { budgetProgress, monthIncome, safeToSpend, spendByCategory } from '@/lib/finance';
-import { daysBetween, endOfMonth, formatMonthYear, monthKey } from '@/lib/date';
-import { money, percent } from '@/lib/format';
+import { budgetProgress, effectiveBudgets, monthIncome, safeToSpend, spendByCategory } from '@/lib/finance';
+import { formatMonthYear, monthKey } from '@/lib/date';
+import { money, percent, round2 } from '@/lib/format';
 import { useAppState, useCategories, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { SafeToSpendCard } from '@/components/SafeToSpendCard';
@@ -45,10 +45,14 @@ export const Budget = () => {
   const sts = useMemo(() => safeToSpend(state, today), [state, today]);
   const spend = useMemo(() => spendByCategory(state, month), [state, month]);
 
-  const planned = progress.reduce((s, b) => s + b.limit, 0);
-  const spent = progress.reduce((s, b) => s + b.spent, 0);
-  const income = monthIncome(state, month) + sts.expectedIncome;
-  const daysLeft = Math.max(0, daysBetween(today, endOfMonth(today)));
+  const planned = round2(progress.reduce((s, b) => s + b.limit, 0));
+  const spent = round2(progress.reduce((s, b) => s + b.spent, 0));
+  const income = round2(monthIncome(state, month) + sts.expectedIncome);
+  // Today included: on the last day of the month there is one day left, not
+  // none, and the daily allowance is not divided by zero.
+  const daysLeft = sts.daysLeft;
+  /** The limits in force this month, whether set now or carried forward. */
+  const current = useMemo(() => effectiveBudgets(state.budgets, month), [state.budgets, month]);
 
   // Anything you're spending on that has no limit set yet.
   const unbudgeted = useMemo(
@@ -60,7 +64,7 @@ export const Budget = () => {
   );
 
   const available = expenseCategories.filter(
-    (c) => c.kind === 'expense' && !state.budgets.some((b) => b.month === month && b.categoryId === c.id),
+    (c) => c.kind === 'expense' && !current.some((b) => b.categoryId === c.id),
   );
 
   const saveBudget = () => {
@@ -140,7 +144,7 @@ export const Budget = () => {
             <p className="mt-2 text-body-sm text-muted">
               {spent > planned
                 ? `You're ${money(spent - planned, { compact: true })} over plan with ${daysLeft} days left.`
-                : `That leaves about ${money((planned - spent) / Math.max(daysLeft, 1), { compact: true })} a day for the rest of the month.`}
+                : `That leaves about ${money((planned - spent) / daysLeft, { compact: true })} a day for the ${daysLeft === 1 ? 'rest of today' : `next ${daysLeft} days`}.`}
             </p>
           </Card>
         </div>
@@ -259,11 +263,11 @@ export const Budget = () => {
         open={Boolean(editing)}
         onClose={() => setEditing(null)}
         title={
-          editing && state.budgets.some((b) => b.month === month && b.categoryId === editing.categoryId)
+          editing && current.some((b) => b.categoryId === editing.categoryId)
             ? 'Edit budget'
             : 'Add a budget'
         }
-        description={`Monthly limit for ${formatMonthYear(today)}`}
+        description={`A monthly limit, from ${formatMonthYear(today)} until you change it`}
         size="sm"
         footer={
           <>
@@ -318,7 +322,7 @@ export const Budget = () => {
             </div>
           )
         }
-        consequence="You’ll stop seeing progress and warnings for this category."
+        consequence="The limit stops carrying into future months, and you’ll stop seeing progress and warnings for this category."
         preserved="Your transactions and spending history are not affected."
         confirmLabel="Remove budget"
       />

@@ -838,11 +838,14 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
 
         case 'delete-budget':
           run('remove that budget', async () => {
+            // A limit carries forward from the month it was set in, so this
+            // month's row and every earlier one go: otherwise last month's
+            // limit would simply reappear as this month's.
             check(
               await supabase
                 .from('budgets')
                 .delete()
-                .eq('month', action.month)
+                .lte('month', action.month)
                 .eq('category_id', action.categoryId),
             );
             return ['budgets'];

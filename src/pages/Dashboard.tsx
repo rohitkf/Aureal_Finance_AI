@@ -1,17 +1,17 @@
 import { useMemo, useState } from 'react';
 import { cn, pillClass } from '@/lib/cn';
 import {
-  availableNow,
   balanceHistory,
   buildForecast,
   budgetProgress,
   isSpendable,
   monthIncome,
   monthSpend,
+  reported,
   safeToSpend,
 } from '@/lib/finance';
 import { formatDay, formatMonthYear, greeting, monthKey, relativeDueLabel } from '@/lib/date';
-import { money, moneyParts } from '@/lib/format';
+import { money, moneyParts, round2 } from '@/lib/format';
 import { useAppState, useCategoryLookup, useLoading, useSettings, useToday } from '@/lib/store';
 import { BalanceChart } from '@/components/charts/BalanceChart';
 import { Sparkline } from '@/components/charts/Sparkline';
@@ -53,6 +53,7 @@ export const Dashboard = () => {
   const { maskBalances } = useSettings();
   const loading = useLoading();
   const lookupCategory = useCategoryLookup();
+  const accountName = (id: string) => state.accounts.find((a) => a.id === id)?.name ?? 'Closed account';
   const [horizon, setHorizon] = useState<Horizon>('30');
   const [filter, setFilter] = useState<AccountType | 'all'>('all');
 
@@ -61,12 +62,14 @@ export const Dashboard = () => {
   const forecast = useMemo(() => buildForecast(state, today, Number(horizon)), [state, today, horizon]);
   const budgets = useMemo(() => budgetProgress(state, month), [state, month]);
 
+  // Excluded accounts are in no figure; see `reported`. "All" is the cash you
+  // can spend, so its count is of exactly the accounts in that sum — counting
+  // a pension in "Across 4 accounts" beside a total that leaves it out made
+  // the tile look wrong when it was not.
+  const counted = useMemo(() => reported(state).accounts, [state]);
   const filteredAccounts =
-    filter === 'all' ? state.accounts : state.accounts.filter((a) => a.type === filter);
-  const filteredTotal =
-    filter === 'credit'
-      ? -filteredAccounts.reduce((s, a) => s + a.balance, 0)
-      : availableNow(filteredAccounts);
+    filter === 'all' ? counted.filter(isSpendable) : counted.filter((a) => a.type === filter);
+  const filteredTotal = round2(filteredAccounts.reduce((s, a) => s + a.balance, 0));
 
   const monthToDateIncome = monthIncome(state, month);
   const trend = useMemo(() => balanceHistory(state, today, 30), [state, today]);
@@ -85,14 +88,14 @@ export const Dashboard = () => {
 
   const allocation = useMemo(
     () =>
-      state.accounts
+      counted
         .filter(isSpendable)
         .map((a): Segment => ({
           value: Math.max(a.balance, 0),
           tone: a.type === 'savings' ? 'success' : a.type === 'cash' ? 'secondary' : 'primary',
           label: `${a.name}: ${money(a.balance)}`,
         })),
-    [state.accounts],
+    [counted],
   );
 
   if (loading) {
@@ -166,11 +169,11 @@ export const Dashboard = () => {
               Below `lg` every span collapses to a single column. */}
           <Reveal delay={60}>
             <section className="grid gap-4 lg:grid-cols-12 lg:grid-rows-[auto_auto]">
-              <Card
-                tone="bezel"
-                className="min-w-0 lg:col-span-7 lg:row-span-2"
-                bodyClassName="flex flex-col justify-between"
-              >
+              {/* The balance plate and the two flow tiles share the left
+                  column; Safe to Spend, which shows its working, takes the
+                  full height of the right. Spanning the plate instead left a
+                  hole in it as tall as the working. */}
+              <Card tone="bezel" className="min-w-0 lg:col-span-7" bodyClassName="flex flex-col gap-8">
                 <div>
                   <div className="flex items-start justify-between gap-3">
                     <Eyebrow>{filter === 'credit' ? 'Total owed' : 'Total balance'}</Eyebrow>
@@ -179,7 +182,8 @@ export const Dashboard = () => {
                         tone={monthChange >= 0 ? 'success' : 'danger'}
                         icon={monthChange >= 0 ? 'arrow-up' : 'arrow-down'}
                       >
-                        {money(Math.abs(monthChange), { compact: true })} this month
+                        {monthChange >= 0 ? '+' : '−'}
+                        {money(Math.abs(monthChange), { compact: true })} net this month
                       </Badge>
                     )}
                   </div>
@@ -191,8 +195,9 @@ export const Dashboard = () => {
                     </span>
                   </p>
                   <p className="mt-3 text-[13px] text-muted">
-                    Across {filteredAccounts.length} {filter === 'all' ? 'connected ' : ''}account
-                    {filteredAccounts.length === 1 ? '' : 's'}
+                    {filter === 'all'
+                      ? `Across the ${filteredAccounts.length === 1 ? 'account' : `${filteredAccounts.length} accounts`} in your cash flow`
+                      : `Across ${filteredAccounts.length} account${filteredAccounts.length === 1 ? '' : 's'}`}
                   </p>
 
                   {/* The tile spans two rows, so it carries a real trend
@@ -231,14 +236,14 @@ export const Dashboard = () => {
                 </div>
 
                 {filter === 'all' && (
-                  <div className="mt-8 space-y-3">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <Label>Where it sits</Label>
                       <span className="text-[11px] text-faint">{allocation.length} accounts</span>
                     </div>
                     <SegmentedBar segments={allocation} />
                     <div className="grid grid-cols-2 gap-x-5 gap-y-2 pt-1 sm:grid-cols-4">
-                      {state.accounts.filter(isSpendable).map((a) => (
+                      {counted.filter(isSpendable).map((a) => (
                         <div key={a.id}>
                           <span className="block truncate text-[11px] text-faint">{a.name}</span>
                           <span className="tnum block text-[13px] font-medium text-text">
@@ -251,22 +256,22 @@ export const Dashboard = () => {
                 )}
               </Card>
 
-              <SafeToSpendCard data={sts} className="min-w-0 lg:col-span-5" />
+              <SafeToSpendCard data={sts} className="min-w-0 lg:col-span-5 lg:row-span-2" />
 
-              <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:col-span-5 lg:grid-cols-1 xl:grid-cols-2">
+              <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:col-span-7">
                 <MetricCard
-                  label="Expected income"
+                  label="Still coming in"
                   value={sts.expectedIncome}
                   icon="arrow-down"
                   tone="success"
                   hint={`${money(monthToDateIncome, { compact: true })} received so far`}
                 />
                 <MetricCard
-                  label="Upcoming expenses"
+                  label="Still to pay this month"
                   value={sts.committed}
                   icon="arrow-up"
                   tone="danger"
-                  hint={upcoming.length > 0 ? `Next: ${upcoming[0]!.label}` : 'Nothing scheduled'}
+                  hint={sts.outgoing.length > 0 ? `Next: ${sts.outgoing[0]!.label}, ${formatDay(sts.outgoing[0]!.date)}` : 'Nothing left to pay this month'}
                 />
               </div>
             </section>
@@ -348,7 +353,7 @@ export const Dashboard = () => {
                   />
                   <div className="min-w-0">
                     <p className="text-[14px] font-medium tracking-[-0.01em] text-text">Today’s balance</p>
-                    <p className="text-[12.5px] text-muted">Reconciled across your connected accounts</p>
+                    <p className="text-[12.5px] text-muted">Across the accounts in your cash flow</p>
                   </div>
                   <p className="tnum shrink-0 font-display text-[17px] font-semibold tracking-[-0.02em] text-text">
                     {money(forecast.start, { masked: maskBalances })}
@@ -383,16 +388,25 @@ export const Dashboard = () => {
                           )}
                         </div>
                         <p className="text-body-sm text-muted">
-                          {relativeDueLabel(event.date, today)} · {formatDay(event.date)}
+                          {[
+                            relativeDueLabel(event.date, today),
+                            formatDay(event.date),
+                            // Not from your cash: say where it is happening instead.
+                            event.affectsAvailable ? null : accountName(event.accountId),
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
                         </p>
                       </div>
                       <p
                         className={cn(
                           'tnum shrink-0 text-metric-sm font-semibold',
-                          event.direction === 'in' ? 'text-success' : 'text-text',
+                          !event.affectsAvailable ? 'text-muted' : event.direction === 'in' ? 'text-success' : 'text-text',
                         )}
                       >
-                        {event.direction === 'in' ? '+' : '-'}
+                        {/* A move between two of your own spendable accounts
+                            changes nothing you can spend, so it carries no sign. */}
+                        {!event.affectsAvailable ? '' : event.direction === 'in' ? '+' : '−'}
                         {money(event.amount, { masked: maskBalances })}
                       </p>
                     </li>

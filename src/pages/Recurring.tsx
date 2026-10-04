@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
-import { formatMediumDate, relativeDueLabel } from '@/lib/date';
+import { formatMediumDate, ordinal, relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
 import { FREQUENCY_LABELS, WEEKEND_LABELS, cadencePhrase, monthlyEquivalent, previewOccurrences } from '@/lib/recurrence';
-import { isSelectable, monthlyCommitments, monthlyTransfers, subscriptionTotals } from '@/lib/finance';
+import { isSelectable, monthlyCommitments, monthlyRecurringIncome, monthlyTransfers, subscriptionTotals } from '@/lib/finance';
 import { newId, useAppState, useCategories, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { Badge } from '@/components/ui/Badge';
@@ -166,9 +166,7 @@ export const Recurring = () => {
 
   const totalMonthly = monthlyCommitments(state);
   const activeCount = state.recurring.filter((r) => r.status === 'active' && r.direction === 'out').length;
-  const incoming = state.recurring
-    .filter((r) => r.status === 'active' && r.direction === 'in')
-    .reduce((s, r) => s + monthlyEquivalent(r), 0);
+  const incoming = monthlyRecurringIncome(state);
   // Money moved between your own accounts is not a commitment — it is still
   // yours — so it is counted apart from what actually leaves.
   const moved = monthlyTransfers(state);
@@ -266,7 +264,7 @@ export const Recurring = () => {
           </p>
           <p className="mt-0.5 text-body-sm text-muted">
             {transferCount > 0
-              ? `${transferCount} standing ${transferCount === 1 ? 'order' : 'orders'} · still your money`
+              ? `${transferCount} standing ${transferCount === 1 ? 'order' : 'orders'} between your own accounts`
               : 'Before any discretionary spending'}
           </p>
         </Card>
@@ -832,7 +830,3 @@ const RecurringForm = ({
   );
 };
 
-const ordinal = (n: number): string => {
-  if (n > 3 && n < 21) return 'th';
-  return ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th';
-};

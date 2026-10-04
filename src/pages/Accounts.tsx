@@ -114,13 +114,14 @@ export const Accounts = () => {
 
   // The headline is spendable cash, so its count must be of the same accounts.
   // An investment sits in the list below but is not money you can spend today.
-  const spendable = state.accounts.filter(isSpendable);
-  const credit = state.accounts.filter((a) => a.type === 'credit' && isCounted(a));
+  const spendable = state.accounts.filter((a) => isCounted(a) && isSpendable(a));
+  // Everything the "Total owed" figure adds up, so the count and the sum agree.
+  const owing = state.accounts.filter((a) => isCounted(a) && sideOf(a, state.accountGroups) === 'liability');
   const liquid = availableNow(state.accounts);
   const debt = totalDebt(state.accounts, state.accountGroups);
 
   const allocated = useMemo(
-    () => state.virtualAccounts.reduce((s, v) => s + v.allocated, 0),
+    () => round2(state.virtualAccounts.reduce((s, v) => s + v.allocated, 0)),
     [state.virtualAccounts],
   );
 
@@ -195,7 +196,7 @@ export const Accounts = () => {
         <Card>
           <div className="flex items-center justify-between">
             <Eyebrow>Total owed</Eyebrow>
-            <Badge tone="danger">{credit.length === 1 ? '1 facility' : `${credit.length} facilities`}</Badge>
+            <Badge tone="danger">{owing.length === 1 ? '1 account' : `${owing.length} accounts`}</Badge>
           </div>
           <p className="tnum mt-3 font-display text-metric-lg text-danger">
             {money(debt, { masked: maskBalances })}
@@ -211,7 +212,7 @@ export const Accounts = () => {
             <Icon name="wallet" size={18} className="text-primary" />
           </div>
           <p className="tnum mt-3 font-display text-metric-lg text-primary">
-            {money(netWorth(state.accounts), { signed: true, masked: maskBalances })}
+            {money(netWorth(state.accounts, state.accountGroups), { signed: true, masked: maskBalances })}
           </p>
           <p className="mt-1 text-body-sm text-muted">What’s left after clearing every balance owed</p>
         </Card>

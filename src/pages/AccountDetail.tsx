@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { accountUtilisation, availableCredit } from '@/lib/finance';
-import { addDays, formatMediumDate, monthKey } from '@/lib/date';
+import { accountTrace, accountUtilisation, availableCredit, inAndOut, isSpendable, owesMoney } from '@/lib/finance';
+import { formatMediumDate, monthKey, nextMonthlyDate, ordinal } from '@/lib/date';
 import { money, percent } from '@/lib/format';
-import { expandRecurrence } from '@/lib/recurrence';
 import { useAppState, useSettings, useToday } from '@/lib/store';
 import { BalanceChart } from '@/components/charts/BalanceChart';
 import { TransactionRow } from '@/components/TransactionRow';
@@ -13,7 +12,6 @@ import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Progress } from '@/components/ui/Progress';
 import { EmptyState, ErrorState } from '@/components/ui/States';
-import type { ForecastDay } from '@/lib/types';
 
 export const AccountDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -31,87 +29,19 @@ export const AccountDetail = () => {
     [state.transactions, id],
   );
 
-  /**
-   * A 30-day balance trace for this account alone: today's balance walked
-   * backwards through its cleared transactions, then forwards through anything
-   * scheduled against it.
-   */
-  const series = useMemo<ForecastDay[]>(() => {
-    if (!account) return [];
-    const days: ForecastDay[] = [];
-    const history = 21;
+  /** Three weeks back and a month ahead — see `accountTrace`. */
+  const series = useMemo(() => (id ? accountTrace(state, id, today) : []), [state, id, today]);
 
-    // Walk back to reconstruct where the balance was.
-    let balance = account.balance;
-    const past: Array<{ date: string; value: number }> = [{ date: today, value: balance }];
-    for (let i = 1; i <= history; i += 1) {
-      const date = addDays(today, -i + 1);
-      const onDay = transactions.filter((t) => t.date === date && t.status !== 'scheduled');
-      for (const t of onDay) {
-        const isCredit = account.type === 'credit';
-        if (t.accountId === account.id) {
-          if (t.type === 'expense') balance += isCredit ? -t.amount : t.amount;
-          else if (t.type === 'income') balance += isCredit ? t.amount : -t.amount;
-          else balance += t.amount;
-        } else if (t.toAccountId === account.id) {
-          balance -= t.amount;
-        }
-      }
-      past.push({ date: addDays(today, -i), value: balance });
-    }
-    past.reverse();
-
-    for (const p of past) {
-      days.push({ date: p.date, opening: p.value, income: 0, expenses: 0, closing: p.value, events: [], projected: false });
-    }
-
-    // Then project forward from today's balance.
-    let running = account.balance;
-    const horizonEnd = addDays(today, 30);
-    const rules = state.recurring.filter((r) => r.accountId === account.id);
-
-    for (let i = 1; i <= 30; i += 1) {
-      const date = addDays(today, i);
-      let income = 0;
-      let expenses = 0;
-
-      for (const t of transactions.filter((t) => t.date === date && t.status === 'scheduled')) {
-        if (t.type === 'income') income += t.amount;
-        else if (t.type === 'expense') expenses += t.amount;
-      }
-      for (const rule of rules) {
-        if (!expandRecurrence(rule, date, date).length) continue;
-        const already = transactions.some(
-          (t) => t.date === date && t.recurringId === rule.id && t.status === 'scheduled',
-        );
-        if (already) continue;
-        if (rule.direction === 'in') income += rule.amount;
-        else expenses += rule.amount;
-      }
-
-      const opening = running;
-      running =
-        account.type === 'credit'
-          ? Math.round((opening - income + expenses) * 100) / 100
-          : Math.round((opening + income - expenses) * 100) / 100;
-      days.push({ date, opening, income, expenses, closing: running, events: [], projected: true });
-      if (date >= horizonEnd) break;
-    }
-
-    return days;
-  }, [account, transactions, state.recurring, today]);
-
+  // Rules paying in count too: a card bill or a standing order into savings
+  // is as much this account's schedule as anything leaving it.
   const linkedRecurring = useMemo(
-    () => state.recurring.filter((r) => r.accountId === id && r.status === 'active'),
+    () => state.recurring.filter((r) => (r.accountId === id || r.toAccountId === id) && r.status === 'active'),
     [state.recurring, id],
   );
 
   const spentThisMonth = useMemo(
-    () =>
-      transactions
-        .filter((t) => t.type === 'expense' && t.status !== 'scheduled' && monthKey(t.date) === monthKey(today))
-        .reduce((s, t) => s + t.amount, 0),
-    [transactions, today],
+    () => inAndOut(transactions.filter((t) => t.accountId === id && monthKey(t.date) === monthKey(today))).spent,
+    [transactions, today, id],
   );
 
   if (!account) {
@@ -166,8 +96,8 @@ export const AccountDetail = () => {
         </div>
 
         <div className="text-left lg:text-right">
-          <Eyebrow>{isCredit ? 'Balance owed' : 'Current balance'}</Eyebrow>
-          <p className={`tnum font-display text-hero-mobile ${isCredit ? 'text-danger' : 'text-text'}`}>
+          <Eyebrow>{owesMoney(account) ? 'Balance owed' : 'Current balance'}</Eyebrow>
+          <p className={`tnum font-display text-hero-mobile ${owesMoney(account) ? 'text-danger' : 'text-text'}`}>
             {money(account.balance, { masked: maskBalances })}
           </p>
         </div>
@@ -206,11 +136,15 @@ export const AccountDetail = () => {
           <dl className="grid gap-4 sm:grid-cols-3">
             <div>
               <dt className="text-label-sm text-faint">Statement date</dt>
-              <dd className="text-body-md text-text">{account.statementDay}th of each month</dd>
+              <dd className="text-body-md text-text">
+                {account.statementDay ? `${account.statementDay}${ordinal(account.statementDay)} of each month` : 'Not set'}
+              </dd>
             </div>
             <div>
               <dt className="text-label-sm text-faint">Payment due</dt>
-              <dd className="text-body-md text-text">{account.paymentDueDay}th of each month</dd>
+              <dd className="text-body-md text-text">
+                {account.paymentDueDay ? `${account.paymentDueDay}${ordinal(account.paymentDueDay)} of each month` : 'Not set'}
+              </dd>
             </div>
             <div>
               <dt className="text-label-sm text-faint">Interest rate</dt>
@@ -222,13 +156,17 @@ export const AccountDetail = () => {
 
       <Card className="space-y-4">
         <CardHeader
-          title={isCredit ? 'Balance owed over time' : 'Balance over time'}
+          title={owesMoney(account) ? 'Balance owed over time' : 'Balance over time'}
           description="The last three weeks, and where it’s heading for the next 30 days."
         />
         {series.length > 1 ? (
           <BalanceChart
             days={series}
             minimumBalance={isCredit ? (account.creditLimit ?? 0) : state.settings.minimumBalance}
+            floorLabel={isCredit ? 'Credit limit' : 'Minimum balance'}
+            // A loan has no limit and no minimum; and only cash-flow accounts
+            // are held to the minimum balance at all.
+            hideFloor={isCredit ? !account.creditLimit : !isSpendable(account)}
             projectedFrom={series.findIndex((d) => d.date === today)}
             height={260}
           />
@@ -277,20 +215,20 @@ export const AccountDetail = () => {
                   <div className="min-w-0">
                     <p className="truncate text-body-md font-medium text-text">{r.name}</p>
                     <p className="text-body-sm text-muted">
-                      {r.frequency === 'monthly' ? `Monthly · ${r.anchorDay}th` : r.frequency}
+                      {r.frequency === 'monthly' ? `Monthly · ${r.anchorDay}${ordinal(r.anchorDay)}` : r.frequency}
                     </p>
                   </div>
-                  <p className={`tnum shrink-0 text-body-md font-semibold ${r.direction === 'in' ? 'text-success' : 'text-text'}`}>
-                    {r.direction === 'in' ? '+' : '-'}
+                  <p className={`tnum shrink-0 text-body-md font-semibold ${r.direction === 'in' || r.toAccountId === id ? 'text-success' : 'text-text'}`}>
+                    {r.direction === 'in' || r.toAccountId === id ? '+' : '−'}
                     {money(r.amount)}
                   </p>
                 </li>
               ))}
             </ul>
           )}
-          {isCredit && (
+          {isCredit && account.statementDay && (
             <p className="text-body-sm text-faint">
-              Next statement {formatMediumDate(`${today.slice(0, 7)}-${`${account.statementDay}`.padStart(2, '0')}`)}
+              Next statement {formatMediumDate(nextMonthlyDate(account.statementDay, today))}
             </p>
           )}
         </Card>

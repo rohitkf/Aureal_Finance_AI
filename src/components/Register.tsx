@@ -83,6 +83,7 @@ export const Register = ({
                   masked={maskBalances}
                   accents={accents}
                   accountName={accountName(row.accountId)}
+                  toAccountName={row.toAccountId ? accountName(row.toAccountId) : undefined}
                   categoryName={categoryName(row.categoryId)}
                   labels={labelsFor(row)}
                   onOpen={() => onOpen(row)}

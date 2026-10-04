@@ -190,8 +190,10 @@ describe('positionAsOf against the trigger that owns the arithmetic', () => {
     const { positionAsOf } = await import('@/lib/finance');
     const { toAccount, toTransaction, emptyAppState } = await import('@/lib/mappers');
 
+    // psql hands every column back as text, and the string 'f' is truthy:
+    // read raw, every account came back excluded and the sums were empty.
     const accounts = rows('select * from public.accounts').map((r) =>
-      toAccount(r as never),
+      toAccount({ ...r, excluded: r.excluded === 't', archived: r.archived === 't' } as never),
     );
     const transactions = rows(
       'select *, null::json as transaction_splits from public.transactions',
@@ -215,8 +217,8 @@ describe('positionAsOf against the trigger that owns the arithmetic', () => {
     const cutoff = rows(`select (current_date - 30) as d`, false)[0]!.d!;
     const [, ...actual] = psql(
       `delete from public.transactions where occurred_on > '${cutoff}';
-       select coalesce(sum(balance) filter (where type <> 'credit'), 0) as assets,
-              coalesce(sum(balance) filter (where type = 'credit'), 0) as liabilities
+       select coalesce(sum(balance) filter (where type not in ('credit', 'liability')), 0) as assets,
+              coalesce(sum(balance) filter (where type in ('credit', 'liability')), 0) as liabilities
          from public.accounts;
        rollback`,
       false,

@@ -25,7 +25,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 862 tests
+npm run test         # vitest — 907 tests
 npm run build        # resolves project references and builds the worker
 ```
 
@@ -60,7 +60,14 @@ available now
   + income still expected this month
   − commitments still due this month
   − the minimum balance you said to leave alone
+  − locked allocations in cash-flow accounts
 ```
+
+On screen it reads as that sum, in plain words — "in your accounts now",
+"still coming in", "bills still to pay", "safety cushion", "locked pots" —
+with the two lists behind it openable, a figure per day, and what is free
+before the expected income arrives (`beforeIncome`). The card is the
+explanation; do not move the working somewhere else.
 
 Vocabulary that is easy to get wrong:
 
@@ -90,6 +97,8 @@ Vocabulary that is easy to get wrong:
 | **An account split** | One payment taken out of several accounts. Ordinary sibling transactions sharing `split_group_id`, never a side table: each part genuinely moves its own account's balance, and the trigger works off `account_id`. |
 | **An occurrence** | One date a recurring rule produces. `transactions.recurring_date` says which one a row stands in for; `recurring_skips` says one does not happen. |
 | **Time Machine** | The screen that was Forecast (`/forecast` redirects). A window and a set of cash-flow accounts; `timeMachine()` replays what happened inside it from the ledger, projects the rest exactly as `forecastEvents` would, and gives each line the balance of every chosen account it touched. A transfer between two chosen accounts is a `move`: both balances change, the total does not. |
+| **A movement** | `isMovement()`: it counts and it is not an opening balance. Every "what came in / what went out" figure — month income and spend, budgets, savings rate, list totals — uses it. An opening balance is what an account already held, never income or spending. |
+| **A budget** | A category's monthly limit. Stored against the month it was set in and **carried forward** until changed (`effectiveBudgets`); removing one deletes that month's row and every earlier one, or last month's would reappear. |
 | **The register** | The transactions page's default view: every line with the balance of its account afterwards, history behind and projections ahead. |
 
 Other things that are true and not guessable:
@@ -402,6 +411,19 @@ Each of these has already cost real time here.
   today. A prediction about a period we already have facts for invents history,
   and worse, the register's balance column would then count money that is not in
   the account. Scrolling back shows what happened, not what was expected.
+- **A counted transaction dated ahead is already in the balance.** The trigger
+  ignores the date, so a row marked "none" for next week moved the balance
+  today. `forecastEvents` therefore takes only `scheduled` rows as events;
+  counting the others again took them off Safe to Spend twice. Every row,
+  whatever its status, still claims its rule occurrence.
+- **A charge on a card is not cash leaving.** Netflix on the Amex reaches your
+  cash when the card bill is paid, and that transfer is already an event. An
+  income or expense counts against Safe to Spend only on an `isSpendable`
+  account (`affectsAvailable`). Counting both took the charge off twice.
+- **Net worth and debt take the groups, always.** `totalAssets`, `totalDebt`
+  and `netWorth` require them; a default of none let three screens count an
+  account in a liability group as an asset. `positionAsOf` uses `sideOf`
+  too, so the chart's last point is the headline figure.
 - **A transaction created alongside a rule must name it.** `forecastEvents`
   suppresses a rule's occurrence only where a transaction already claims
   `recurringId|date` — so a scheduled payment created beside its own rule and

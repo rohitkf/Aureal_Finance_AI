@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { formatMediumDate } from '@/lib/date';
+import { addMonths, formatMediumDate, monthKey, startOfMonth } from '@/lib/date';
+import { spendByCategory } from '@/lib/finance';
 import { money } from '@/lib/format';
 import { monthlyEquivalent } from '@/lib/recurrence';
-import { useAppState, useCategoryLookup } from '@/lib/store';
+import { useAppState, useCategoryLookup, useToday } from '@/lib/store';
 import { cn } from '@/lib/cn';
 import { MORE_NAV, PRIMARY_NAV } from './nav';
 import { CategoryIcon } from './CategoryIcon';
@@ -26,6 +27,7 @@ interface Result {
  */
 export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   const state = useAppState();
+  const today = useToday();
   const lookupCategory = useCategoryLookup();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -44,19 +46,20 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
 
     // A light natural-language layer: pick out a category name from a sentence
     // like "show me everything I spent on food last month".
-    const matchedCategory = state.categories.find(
-      (c) => q.includes(c.name.toLowerCase()) || (c.id === 'groceries' && q.includes('food')),
-    );
+    // "Food" is how people ask about groceries, whatever the category is called.
+    const matchedCategory =
+      state.categories.find((c) => c.kind === 'expense' && q.includes(c.name.toLowerCase())) ??
+      (/\bfood\b/.test(q) ? state.categories.find((c) => c.kind === 'expense' && /grocer|food/i.test(c.name)) : undefined);
     const isSpendQuestion = /spent|spend|spending|how much/.test(q);
 
     const out: Result[] = [];
 
     if (isSpendQuestion && matchedCategory) {
       const lastMonth = /last month/.test(q);
-      const month = lastMonth ? '2026-08' : '2026-09';
-      const total = state.transactions
-        .filter((t) => t.type === 'expense' && t.categoryId === matchedCategory.id && t.date.startsWith(month))
-        .reduce((s, t) => s + t.amount, 0);
+      // Counted from today. These were two fixed months, right for exactly
+      // one September and wrong ever after.
+      const month = monthKey(lastMonth ? addMonths(startOfMonth(today), -1) : today);
+      const total = spendByCategory(state, month).get(matchedCategory.id) ?? 0;
       out.push({
         id: 'answer',
         group: 'Answer',
@@ -130,7 +133,7 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
       seen.add(key);
       return true;
     });
-  }, [query, state, lookupCategory]);
+  }, [query, state, lookupCategory, today]);
 
   useEffect(() => setCursor(0), [query]);
 
