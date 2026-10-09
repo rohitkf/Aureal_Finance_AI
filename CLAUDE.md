@@ -9,14 +9,17 @@ This file is deliberately a pointer and not a second copy. A second list of
 house rules would drift out of step with the first, and then there would be
 two answers and no way to tell which one was current.
 
-## The three that apply every session
+## The four that apply every session
 
 1. **Work on `develop`, and only `develop`.** Never create a branch. Never
    push to `main` — it is production and moves only by a pull request, which
    merges itself once CI is green.
-2. **Before pushing**: `npm run verify` (lint, typecheck, 914 tests, build).
+2. **Every push to `develop` gets a pull request into `main`.** Open one if
+   none is open; a push to `develop` alone is not shipped and is not done.
+   Then see it through CI to merged.
+3. **Before pushing**: `npm run verify` (lint, typecheck, 915 tests, build).
    All clean, every time.
-3. **The app cannot reach Supabase from a sandbox** — outbound traffic to
+4. **The app cannot reach Supabase from a sandbox** — outbound traffic to
    `*.supabase.co` is usually blocked, so the signed-in app cannot be
    exercised by eye. Check claims against real output — tests, the build,
    `dist/`, a live query through the Supabase tools — and say plainly what

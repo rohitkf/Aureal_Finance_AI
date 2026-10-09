@@ -16,6 +16,11 @@ Keep this file current in the same pull request that changes what it says.
 - **Never push to `main`.** It is production, and it moves only by a pull
   request from `develop`. `.github/workflows/auto-merge.yml` merges that
   pull request itself once CI is green.
+- **Every push to `develop` gets a pull request into `main`.** If none is
+  open, open one; if one is, the push updates it. Work sitting on `develop`
+  is not in production, and nobody asked for it to stop there. The job ends
+  when that pull request has merged, not when the push lands — watch CI and
+  fix what it finds.
 - A merged pull request is finished. Follow-up work is a new pull request.
 
 ## 2. Commands
@@ -25,7 +30,7 @@ All four must be clean before you push:
 ```bash
 npm run lint         # eslint
 npm run typecheck    # tsc -b --noEmit
-npm run test         # vitest — 914 tests
+npm run test         # vitest — 915 tests
 npm run build        # resolves project references and builds the worker
 ```
 
