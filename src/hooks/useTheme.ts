@@ -20,7 +20,7 @@ export const useTheme = () => {
     root.classList.toggle('dark', resolved === 'dark');
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', resolved === 'dark' ? '#060709' : '#f2f3f5');
+      ?.setAttribute('content', resolved === 'dark' ? '#07080c' : '#eceff5');
     try {
       // Mirrored so the boot script in index.html can apply it before paint,
       // including on the signed-out screens where no profile is loaded.

@@ -58,6 +58,15 @@ const OVERDUE: Transaction = {
   notes: 'Standing order',
 };
 
+/**
+ * The less common options — time, "hasn't happened yet", repeating, splitting,
+ * labels, notes — fold away behind one row until asked for. Open it.
+ */
+const moreOptions = async (user: ReturnType<typeof userEvent.setup>) => {
+  const toggle = screen.queryByRole('button', { name: /more options/i });
+  if (toggle && toggle.getAttribute('aria-expanded') !== 'true') await user.click(toggle);
+};
+
 const openEditing = (t: Transaction = OVERDUE) =>
   render(<AddTransactionSheet open onClose={vi.fn()} editing={t} />);
 
@@ -118,13 +127,19 @@ describe('editing a transaction', () => {
     expect(saved().transaction.status).toBe('scheduled');
   });
 
-  it('does not offer to make an edit repeat — that would be a second rule', () => {
+  it('does not offer to make an edit repeat — that would be a second rule', async () => {
+    const user = userEvent.setup();
     openEditing();
+    // Looked for with the less common options open, so its absence is real.
+    await moreOptions(user);
+    expect(screen.getByRole('button', { name: /split this payment/i })).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /this repeats/i })).not.toBeInTheDocument();
   });
 
-  it('offers the repeat option when adding, as before', () => {
+  it('offers the repeat option when adding, as before', async () => {
+    const user = userEvent.setup();
     render(<AddTransactionSheet open onClose={vi.fn()} />);
+    await moreOptions(user);
     expect(screen.getByRole('checkbox', { name: /this repeats/i })).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Cleared' })).not.toBeInTheDocument();
   });
@@ -134,6 +149,7 @@ describe('splitting a payment that already exists', () => {
   it('offers categories, because filing it differently is an ordinary edit', async () => {
     const user = userEvent.setup();
     openEditing();
+    await moreOptions(user);
     await user.click(screen.getByRole('button', { name: /split this payment/i }));
 
     expect(screen.getByLabelText('Part 1 amount')).toBeInTheDocument();
@@ -142,6 +158,7 @@ describe('splitting a payment that already exists', () => {
   it('does not offer accounts, because that is a delete and two writes', async () => {
     const user = userEvent.setup();
     openEditing();
+    await moreOptions(user);
     await user.click(screen.getByRole('button', { name: /split this payment/i }));
 
     expect(screen.queryByRole('radio', { name: /by account/i })).not.toBeInTheDocument();

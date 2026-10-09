@@ -28,7 +28,7 @@ export const DigitsField = ({ label, value, onChange, length = 4, hint }: Digits
 
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor={id} className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">
+      <label htmlFor={id} className="pl-1 text-[13px] font-medium tracking-[-0.005em] text-muted">
         {label}
       </label>
       <div className="relative w-fit">

@@ -7,26 +7,27 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'succ
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 /**
- * Surfaces are built from a hairline plus an inner top highlight rather than a
- * flat border, so a control reads as a raised physical key.
+ * iOS's button family. A filled blue for the one thing a screen is for, a
+ * grey fill for everything else, and plain text for the quiet ones. The
+ * glow under the primary is gone: on glass, colour alone already lifts it.
  */
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
-    'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.22),0_1px_2px_rgb(var(--ambient)/var(--ambient-a)),0_12px_28px_-14px_rgb(var(--primary-strong)/0.75)] hover:brightness-[1.07]',
+    'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2),0_6px_16px_-8px_rgb(var(--primary-strong)/0.55)] hover:brightness-[1.08]',
   secondary:
-    'bg-[rgb(var(--hairline)/0.05)] text-text shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha)),inset_0_1px_0_0_rgb(255_255_255/0.06)] hover:bg-[rgb(var(--hairline)/0.09)]',
-  ghost: 'text-muted hover:bg-[rgb(var(--hairline)/0.06)] hover:text-text',
+    'bg-fill text-text shadow-[inset_0_1px_0_0_rgb(255_255_255/calc(var(--specular)*0.5))] hover:bg-[rgb(var(--fill)/calc(var(--fill-alpha)*1.6))]',
+  ghost: 'text-muted hover:bg-fill hover:text-text',
   danger:
-    'bg-danger text-[rgb(var(--on-danger))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2),0_12px_28px_-14px_rgb(var(--danger)/0.6)] hover:brightness-[1.07]',
+    'bg-danger text-[rgb(var(--on-danger))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2)] hover:brightness-[1.07]',
   success:
-    'bg-success text-[rgb(var(--on-success))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2),0_12px_28px_-14px_rgb(var(--success)/0.6)] hover:brightness-[1.07]',
+    'bg-success text-[rgb(var(--on-success))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2)] hover:brightness-[1.07]',
 };
 
-// Fully rounded pills with generous padding; 44px tall from `md` up.
+// Capsules, as iOS draws them; 44px tall from `md` up, the size of a fingertip.
 const SIZES: Record<ButtonSize, string> = {
-  sm: 'h-9 pl-4 pr-4 text-[12.5px] gap-2',
-  md: 'h-11 pl-5 pr-5 text-[13.5px] gap-2.5',
-  lg: 'h-[52px] pl-7 pr-7 text-[15px] gap-3',
+  sm: 'h-9 pl-4 pr-4 text-[13px] gap-1.5',
+  md: 'h-11 pl-5 pr-5 text-[14px] gap-2',
+  lg: 'h-[52px] pl-7 pr-7 text-[16px] gap-2.5',
 };
 
 /** Trailing-icon sizes, when the icon sits in its own nested circle. */
@@ -37,8 +38,8 @@ const NEST = {
 };
 
 const BASE =
-  'group relative inline-flex select-none items-center justify-center whitespace-nowrap rounded-full font-medium tracking-[-0.01em] ' +
-  'transition-all duration-500 ease-fluid active:scale-[0.975] disabled:pointer-events-none disabled:opacity-45';
+  'group relative inline-flex select-none items-center justify-center whitespace-nowrap rounded-full font-semibold tracking-[-0.01em] ' +
+  'transition-all duration-300 ease-fluid active:scale-[0.97] active:opacity-80 disabled:pointer-events-none disabled:opacity-40';
 
 interface CommonProps {
   variant?: ButtonVariant;
@@ -55,8 +56,8 @@ const TrailingCircle = ({ icon, size }: { icon: IconName; size: ButtonSize }) =>
   return (
     <span
       className={cn(
-        'ml-1 flex shrink-0 items-center justify-center rounded-full bg-[rgb(var(--hairline)/0.14)] ' +
-          'transition-transform duration-500 ease-fluid group-hover:translate-x-[3px] group-hover:-translate-y-[1px] group-hover:scale-105',
+        'ml-1 flex shrink-0 items-center justify-center rounded-full bg-[rgb(var(--hairline)/0.1)] ' +
+          'transition-transform duration-500 ease-fluid group-hover:translate-x-[2px]',
         n.circle,
       )}
     >
@@ -150,7 +151,7 @@ export const IconButton = forwardRef<
     title={label}
     className={cn(
       'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
-      'transition-all duration-500 ease-fluid active:scale-[0.94]',
+      'transition-all duration-300 ease-fluid active:scale-[0.92] active:opacity-80',
       VARIANTS[variant],
       className,
     )}

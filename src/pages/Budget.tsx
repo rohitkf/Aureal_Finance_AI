@@ -8,7 +8,7 @@ import { CategoryIcon } from '@/components/CategoryIcon';
 import { SafeToSpendCard } from '@/components/SafeToSpendCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
+import { Card, CardHeader, Eyebrow, PageHeader } from '@/components/ui/Card';
 import { MoneyDial } from '@/components/ui/MoneyDial';
 import { SelectField } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
@@ -96,143 +96,146 @@ export const Budget = () => {
   }
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Eyebrow>Budget</Eyebrow>
-          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">{formatMonthYear(today)}</h1>
-          <p className="mt-3 text-[14px] leading-relaxed text-muted">
-            {daysLeft} day{daysLeft === 1 ? '' : 's'} left in the month
-          </p>
-        </div>
-        <Button
-          variant="primary"
-          icon="plus"
-          onClick={() => setEditing({ categoryId: available[0]?.id ?? 'groceries', limit: '' })}
-          disabled={available.length === 0}
-        >
-          Add a budget
-        </Button>
-      </header>
+    <div className="space-y-6 sm:space-y-8">
+      <PageHeader
+        title="Budget"
+        subtitle={`${formatMonthYear(today)} · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left in the month`}
+        actions={
+          <Button
+            size="sm"
+            variant="primary"
+            icon="plus"
+            onClick={() => setEditing({ categoryId: available[0]?.id ?? 'groceries', limit: '' })}
+            disabled={available.length === 0}
+          >
+            Add a budget
+          </Button>
+        }
+      />
 
+      {/* The month at a glance, then each category, with Safe to Spend beside
+          them from `lg`. On a phone the categories come before Safe to Spend:
+          they are what this screen is for, and Safe to Spend is on Home. */}
       <section className="grid gap-4 lg:grid-cols-12">
-        <div className="grid min-w-0 auto-rows-min content-start gap-4 sm:grid-cols-3 lg:col-span-7">
-          <Summary label="Income" value={money(income, { compact: true, masked: maskBalances })} tone="success" note="Received and expected" />
-          <Summary label="Planned" value={money(planned, { compact: true })} tone="text" note={`${progress.length} categories`} />
-          <Summary
-            label="Left to spend"
-            value={money(planned - spent, { compact: true, masked: maskBalances })}
-            tone={planned - spent < 0 ? 'danger' : 'primary'}
-            note={`${money(spent, { compact: true })} spent so far`}
-          />
-
-          <Card className="sm:col-span-3">
-            <div className="flex items-center justify-between">
-              <Label>Overall progress</Label>
-              <span className="tnum text-body-sm text-muted">
+        <Card tone="bezel" className="min-w-0 lg:col-span-7" bodyClassName="space-y-5">
+          <div>
+            <div className="flex items-baseline justify-between gap-3">
+              <Eyebrow>Left to spend</Eyebrow>
+              <span className="tnum text-[12.5px] text-muted">
                 {percent(planned === 0 ? 0 : (spent / planned) * 100)} of plan used
               </span>
             </div>
+            <p
+              className={cn(
+                'tnum mt-2 font-display text-[clamp(2.5rem,7vw,3.5rem)] font-bold leading-none tracking-[-0.045em]',
+                planned - spent < 0 ? 'text-danger' : 'text-text',
+              )}
+            >
+              {money(planned - spent, { compact: true, masked: maskBalances })}
+            </p>
             <Progress
-              className="mt-3"
+              className="mt-4"
               size="lg"
               value={spent}
               max={planned || 1}
               tone={spent > planned ? 'danger' : spent / (planned || 1) > 0.85 ? 'warning' : 'success'}
               label={`Overall budget: ${money(spent)} of ${money(planned)}`}
             />
-            <p className="mt-2 text-body-sm text-muted">
+            <p className="mt-2.5 text-[13.5px] text-muted">
               {spent > planned
                 ? `You're ${money(spent - planned, { compact: true })} over plan with ${daysLeft} days left.`
                 : `That leaves about ${money((planned - spent) / daysLeft, { compact: true })} a day for the ${daysLeft === 1 ? 'rest of today' : `next ${daysLeft} days`}.`}
             </p>
-          </Card>
-        </div>
-
-        <SafeToSpendCard data={sts} className="min-w-0 lg:col-span-5" />
-      </section>
-
-      <section className="space-y-3">
-        <CardHeader title="Category budgets" description="Sorted by how close each one is to its limit." />
-
-        {progress.length === 0 ? (
-          <Card className="p-0">
-            <EmptyState
-              icon="pie"
-              title="No budgets set for this month"
-              description="Pick a category and a monthly limit — you’ll see exactly how much is left, every day."
-              action={{
-                label: 'Create your first budget',
-                onClick: () => setEditing({ categoryId: available[0]?.id ?? 'groceries', limit: '' }),
-              }}
-            />
-          </Card>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {progress.map((b) => {
-              const category = lookupCategory(b.categoryId);
-              const tone = TONE[b.state];
-              return (
-                <Card key={b.categoryId} className="space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <CategoryIcon categoryId={b.categoryId} />
-                      <div className="min-w-0">
-                        <h3 className="truncate font-display text-headline-sm text-text">{category.name}</h3>
-                        <p className="text-body-sm text-muted">{percent(b.ratio * 100)} used</p>
-                      </div>
-                    </div>
-                    <Badge tone={tone.badge}>{tone.label}</Badge>
-                  </div>
-
-                  <div className="flex items-baseline justify-between">
-                    <span className="tnum font-display text-metric-md text-text">
-                      {money(b.spent, { compact: true, masked: maskBalances })}
-                    </span>
-                    <span className="tnum text-body-sm text-faint">of {money(b.limit, { compact: true })}</span>
-                  </div>
-
-                  <Progress
-                    value={b.spent}
-                    max={b.limit}
-                    tone={tone.bar}
-                    label={`${category.name}: ${money(b.spent)} of ${money(b.limit)} spent`}
-                  />
-
-                  <div className="flex items-center justify-between">
-                    <p className={cn('tnum text-body-sm font-semibold', tone.text)}>
-                      {b.remaining >= 0
-                        ? `${money(b.remaining, { compact: true })} remaining`
-                        : `${money(Math.abs(b.remaining), { compact: true })} over`}
-                    </p>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setEditing({ categoryId: b.categoryId, limit: String(b.limit) })}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors duration-400 ease-fluid hover:bg-surface-high hover:text-text"
-                        aria-label={`Edit ${category.name} budget`}
-                      >
-                        <Icon name="edit" size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleting(b.categoryId)}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors duration-400 ease-fluid hover:bg-surface-high hover:text-danger"
-                        aria-label={`Remove ${category.name} budget`}
-                      >
-                        <Icon name="trash" size={15} />
-                      </button>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
           </div>
-        )}
+
+          <dl className="grid grid-cols-3 gap-2 sm:gap-3">
+            <Summary label="Income" value={money(income, { compact: true, masked: maskBalances })} tone="success" note="Received and expected" />
+            <Summary label="Planned" value={money(planned, { compact: true })} tone="text" note={`${progress.length} categories`} />
+            <Summary label="Spent" value={money(spent, { compact: true, masked: maskBalances })} tone="text" note="So far this month" />
+          </dl>
+        </Card>
+
+        <SafeToSpendCard
+          data={sts}
+          className="order-last min-w-0 lg:order-none lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1"
+        />
+
+        <section className="min-w-0 space-y-3 lg:col-span-7">
+          <div className="px-1">
+            <h2 className="font-display text-[20px] font-bold tracking-[-0.02em] text-text">Categories</h2>
+            <p className="text-[13px] text-muted">Closest to its limit first. Tap one to change it.</p>
+          </div>
+
+          {progress.length === 0 ? (
+            <Card className="p-0">
+              <EmptyState
+                icon="pie"
+                title="No budgets set for this month"
+                description="Pick a category and a monthly limit, and you’ll see exactly how much is left, every day."
+                action={{
+                  label: 'Create your first budget',
+                  onClick: () => setEditing({ categoryId: available[0]?.id ?? 'groceries', limit: '' }),
+                }}
+              />
+            </Card>
+          ) : (
+            <ul className="plate divide-y divide-[rgb(var(--hairline)/0.07)] overflow-hidden p-0">
+              {progress.map((b) => {
+                const category = lookupCategory(b.categoryId);
+                const tone = TONE[b.state];
+                return (
+                  <li key={b.categoryId} className="flex items-center gap-1 pr-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditing({ categoryId: b.categoryId, limit: String(b.limit) })}
+                      aria-label={`Edit ${category.name} budget`}
+                      className="flex min-w-0 flex-1 items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-300 ease-fluid hover:bg-fill"
+                    >
+                      <CategoryIcon categoryId={b.categoryId} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-baseline justify-between gap-3">
+                          <span className="truncate text-[15px] font-medium text-text">{category.name}</span>
+                          <span className={cn('tnum shrink-0 text-[14px] font-semibold', tone.text)}>
+                            {b.remaining >= 0
+                              ? `${money(b.remaining, { compact: true })} left`
+                              : `${money(Math.abs(b.remaining), { compact: true })} over`}
+                          </span>
+                        </span>
+                        <Progress
+                          className="mt-2"
+                          size="sm"
+                          value={b.spent}
+                          max={b.limit}
+                          tone={tone.bar}
+                          label={`${category.name}: ${money(b.spent)} of ${money(b.limit)} spent`}
+                        />
+                        <span className="mt-1.5 flex items-center justify-between gap-3 text-[12.5px] text-muted">
+                          <span className="tnum">
+                            {money(b.spent, { compact: true, masked: maskBalances })} of {money(b.limit, { compact: true })} ·{' '}
+                            {percent(b.ratio * 100)} used
+                          </span>
+                          <Badge tone={tone.badge}>{tone.label}</Badge>
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleting(b.categoryId)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-faint transition-colors duration-300 ease-fluid hover:bg-fill hover:text-danger"
+                      aria-label={`Remove ${category.name} budget`}
+                    >
+                      <Icon name="trash" size={15} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       </section>
 
       {unbudgeted.length > 0 && (
-        <Card tone="well" className="space-y-3">
+        <Card className="space-y-3">
           <CardHeader
             title="Spending without a budget"
             description="You’re spending in these categories but haven’t set a limit."
@@ -341,16 +344,16 @@ const Summary = ({
   tone: 'success' | 'text' | 'primary' | 'danger';
   note: string;
 }) => (
-  <Card>
-    <Label>{label}</Label>
-    <p
+  <div className="well min-w-0 p-3 sm:p-4">
+    <dt className="truncate text-[12.5px] font-medium text-muted">{label}</dt>
+    <dd
       className={cn(
-        'tnum mt-2 font-display text-metric-md',
+        'tnum mt-1 whitespace-nowrap font-display text-[clamp(1rem,4.4vw,1.375rem)] font-semibold tracking-[-0.025em]',
         { success: 'text-success', text: 'text-text', primary: 'text-primary', danger: 'text-danger' }[tone],
       )}
     >
       {value}
-    </p>
-    <p className="mt-0.5 text-body-sm text-muted">{note}</p>
-  </Card>
+    </dd>
+    <dd className="mt-0.5 text-[12px] leading-snug text-muted">{note}</dd>
+  </div>
 );

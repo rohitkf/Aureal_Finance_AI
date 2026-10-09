@@ -76,7 +76,7 @@ export const StoreGate = ({ children }: { children: ReactNode }) => {
       <div className="plate w-full max-w-md p-2">
         <ErrorState
           title="We couldn’t load your data"
-          description={`${error} Your account is untouched — nothing has been changed or lost.`}
+          description={`${error} Your account is untouched. Nothing has been changed or lost.`}
         />
         <div className="flex justify-center pb-6">
           <Button

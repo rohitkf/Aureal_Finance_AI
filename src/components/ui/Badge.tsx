@@ -8,7 +8,7 @@ const TONES: Record<BadgeTone, string> = {
   neutral: 'bg-[rgb(var(--hairline)/0.05)] text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]',
   primary: 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.22)]',
   success: 'bg-success/10 text-success shadow-[inset_0_0_0_1px_rgb(var(--success)/0.22)]',
-  warning: 'bg-warning/12 text-warning shadow-[inset_0_0_0_1px_rgb(var(--warning)/0.26)]',
+  warning: 'bg-warning/15 text-warning shadow-[inset_0_0_0_1px_rgb(var(--warning)/0.26)]',
   danger: 'bg-danger/10 text-danger shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.22)]',
   secondary: 'bg-secondary/10 text-secondary shadow-[inset_0_0_0_1px_rgb(var(--secondary)/0.22)]',
 };

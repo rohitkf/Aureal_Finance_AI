@@ -164,7 +164,9 @@ Routes are in `src/App.tsx`. `/login`, `/signup`, `/forgot-password` and
 ## 5. Frontend rules
 
 - **Compose the primitives.** `Card`, `Button`, `Field`, `Modal`, `Badge`,
-  `Progress` from `components/ui/`. If you are typing a hex code, a `border`,
+  `Progress` from `components/ui/`, and for a screen's shape `PageHeader`,
+  `StatGroup` (`ui/Card.tsx`) and `GroupedList`/`ListRow`/`IconTile`
+  (`ui/List.tsx`). If you are typing a hex code, a `border`,
   or a shadow, the answer already has a name in `DESIGN.md`. Something
   missing? Add it to the primitive, do not inline it.
 - **No `1px solid` borders.** Every edge is an inset hairline. See DESIGN.md.
@@ -174,6 +176,10 @@ Routes are in `src/App.tsx`. `/login`, `/signup`, `/forgot-password` and
   bug here once.
 - **Never animate `filter`**, and never animate a blur. DESIGN.md §Performance
   says why.
+- **Simple on the surface, nothing removed.** A screen shows the common case;
+  the rest folds behind "How this works" (`About`) or a "More options" row, and
+  a folded section opens by itself whenever something inside it is set. Hiding
+  a field that holds a value is how somebody concludes the value is gone.
 - Every figure on screen comes from `finance.ts`. Do not compute money in a
   component.
 - Tests sit in `__tests__/` beside what they test and are named for the
@@ -372,6 +378,11 @@ Each of these has already cost real time here.
   whole class names at build time, so `text-${accent}` is simply absent from
   the stylesheet and the colour never appears. `accents.ts` writes all six out
   in full, and a test asserts no value in those maps contains `${`.
+- **A Tailwind opacity modifier off the scale is no class at all.** The scale
+  runs in fives — `bg-primary/15` exists, `bg-primary/12` does not, and nothing
+  warns: the tint simply never appears. Every category tile, the avatar and the
+  form notices shipped without their colour this way. Use a step of five or a
+  bracketed value, `bg-primary/[0.12]`.
 - **The accent bar is a border, not a shadow.** Every `shadow-*` utility sets
   the same `box-shadow`, and these rows already carry a selected ring, a
   scheduled outline and an overdue ring. Two shadow classes do not merge — one

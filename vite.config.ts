@@ -17,8 +17,8 @@ export default defineConfig({
         short_name: 'Aureal',
         description:
           'A premium personal financial operating system — balances, budgets, forecasts and safe-to-spend in one place.',
-        theme_color: '#051424',
-        background_color: '#051424',
+        theme_color: '#07080c',
+        background_color: '#07080c',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',

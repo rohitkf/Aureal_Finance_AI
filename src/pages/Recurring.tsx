@@ -9,7 +9,7 @@ import { newId, useAppState, useCategories, useLoading, useSettings, useStore, u
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
-import { Card, Eyebrow } from '@/components/ui/Card';
+import { Card, PageHeader, StatGroup } from '@/components/ui/Card';
 import {
   AmountField,
   CheckboxField,
@@ -38,12 +38,14 @@ const WEEKEND_HINTS: Record<WeekendMode, string> = {
   previous:
     'A payment due on a Saturday or Sunday shows on the Friday before, the way a salary actually arrives.',
   next: 'It shows on the Monday after, which is when most direct debits are actually taken.',
-  nearest: 'Saturday goes back to Friday, Sunday forward to Monday — whichever weekday is nearer.',
+  nearest: 'Saturday goes back to Friday, Sunday forward to Monday: whichever weekday is nearer.',
   skip: 'That period simply does not happen. The one after is unaffected.',
 };
 
+// Two rows of filters both starting "All" read as one row with a typo, so each
+// "all" says which question it is the answer to.
 const STATUS_TABS: Array<{ value: RecurringStatus | 'all'; label: string }> = [
-  { value: 'all', label: 'All' },
+  { value: 'all', label: 'Any status' },
   { value: 'active', label: 'Active' },
   { value: 'paused', label: 'Paused' },
   { value: 'ended', label: 'Ended' },
@@ -67,7 +69,7 @@ const STATUS_TABS: Array<{ value: RecurringStatus | 'all'; label: string }> = [
 type Kind = 'all' | 'subscriptions';
 
 const KIND_TABS: Array<{ value: Kind; label: string }> = [
-  { value: 'all', label: 'All' },
+  { value: 'all', label: 'All payments' },
   { value: 'subscriptions', label: 'Subscriptions' },
 ];
 
@@ -189,90 +191,76 @@ export const Recurring = () => {
   };
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Eyebrow>{subscriptionsOnly ? 'Subscriptions' : 'Recurring'}</Eyebrow>
-          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">
-            {subscriptionsOnly ? 'Subscriptions' : 'Recurring payments'}
-          </h1>
-          <p className="mt-3 text-[14px] leading-relaxed text-muted">
-            {subscriptionsOnly
-              ? 'What you pay for month after month, biggest first — and what each one actually costs you a year.'
-              : 'Everything that leaves or arrives on a schedule. These drive your forecast.'}
-          </p>
-        </div>
-        {/* The button makes the thing the page is currently showing. Add on a
-            subscriptions view that produced a plain recurring payment is the
-            bug this merge exists to make unwriteable. */}
-        <Button
-          variant="primary"
-          icon="plus"
-          onClick={() => setDraft(emptyDraft(today, state.accounts[0]?.id ?? '', '', subscriptionsOnly))}
-        >
-          {subscriptionsOnly ? 'Add subscription' : 'Add recurring payment'}
-        </Button>
-      </header>
+    <div className="space-y-6 sm:space-y-8">
+      <PageHeader
+        title={subscriptionsOnly ? 'Subscriptions' : 'Recurring'}
+        subtitle={
+          subscriptionsOnly
+            ? 'What you pay for month after month, biggest first, and what each costs a year.'
+            : 'Bills, income and transfers on a schedule. Your forecast is built from these.'
+        }
+        actions={
+          // The button makes the thing the page is currently showing. Add on a
+          // subscriptions view that produced a plain recurring payment is the
+          // bug this merge exists to make unwriteable.
+          <Button
+            size="sm"
+            variant="primary"
+            icon="plus"
+            onClick={() => setDraft(emptyDraft(today, state.accounts[0]?.id ?? '', '', subscriptionsOnly))}
+          >
+            {subscriptionsOnly ? 'Add subscription' : 'Add recurring payment'}
+          </Button>
+        }
+      />
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        {subscriptionsOnly ? (
-          <>
-            <Card>
-              <Eyebrow>Active subscriptions</Eyebrow>
-              <p className="tnum mt-2 font-display text-metric-lg text-text">{subs.count}</p>
-              <p className="mt-0.5 text-body-sm text-muted">Still being charged</p>
-            </Card>
-            <Card>
-              <Eyebrow>Monthly cost</Eyebrow>
-              <p className="tnum mt-2 font-display text-metric-lg text-text">
-                {money(subs.monthly, { masked: maskBalances })}
-              </p>
-              <p className="mt-0.5 text-body-sm text-muted">Everything, per month</p>
-            </Card>
-            <Card>
-              {/* The figure the whole view exists for. £14.99 a month reads as
-                  nothing; £180 a year is what gets something cancelled. */}
-              <Eyebrow>Annual cost</Eyebrow>
-              <p className="tnum mt-2 font-display text-metric-lg text-warning">
-                {money(subs.annual, { masked: maskBalances })}
-              </p>
-              <p className="mt-0.5 text-body-sm text-muted">What a year of these costs</p>
-            </Card>
-          </>
-        ) : (
-          <>
-        <Card>
-          <Eyebrow>Monthly commitments</Eyebrow>
-          <p className="tnum mt-2 font-display text-metric-lg text-text">
-            {money(totalMonthly, { masked: maskBalances })}
-          </p>
-          <p className="mt-0.5 text-body-sm text-muted">{activeCount} active payments</p>
-        </Card>
-        <Card>
-          <Eyebrow>Recurring income</Eyebrow>
-          <p className="tnum mt-2 font-display text-metric-lg text-success">
-            {money(incoming, { masked: maskBalances })}
-          </p>
-          <p className="mt-0.5 text-body-sm text-muted">Per month, on average</p>
-        </Card>
-        <Card>
-          <Eyebrow>{transferCount > 0 ? 'Moved between accounts' : 'Net committed'}</Eyebrow>
-          <p className="tnum mt-2 font-display text-metric-lg text-primary">
-            {transferCount > 0
-              ? money(moved, { masked: maskBalances })
-              : money(incoming - totalMonthly, { signed: true, masked: maskBalances })}
-          </p>
-          <p className="mt-0.5 text-body-sm text-muted">
-            {transferCount > 0
-              ? `${transferCount} standing ${transferCount === 1 ? 'order' : 'orders'} between your own accounts`
-              : 'Before any discretionary spending'}
-          </p>
-        </Card>
-          </>
-        )}
-      </section>
+      {subscriptionsOnly ? (
+        <StatGroup
+          stats={[
+            { label: 'Active subscriptions', value: subs.count, note: 'Still being charged' },
+            { label: 'Monthly cost', value: money(subs.monthly, { masked: maskBalances }), note: 'Everything, per month' },
+            // The figure the whole view exists for. £14.99 a month reads as
+            // nothing; £180 a year is what gets something cancelled.
+            {
+              label: 'Annual cost',
+              value: money(subs.annual, { masked: maskBalances }),
+              tone: 'warning',
+              note: 'What a year of these costs',
+            },
+          ]}
+        />
+      ) : (
+        <StatGroup
+          stats={[
+            {
+              label: 'Monthly commitments',
+              value: money(totalMonthly, { masked: maskBalances }),
+              note: `${activeCount} active payments`,
+            },
+            {
+              label: 'Recurring income',
+              value: money(incoming, { masked: maskBalances }),
+              tone: 'success',
+              note: 'Per month, on average',
+            },
+            transferCount > 0
+              ? {
+                  label: 'Moved between accounts',
+                  value: money(moved, { masked: maskBalances }),
+                  tone: 'primary',
+                  note: `${transferCount} standing ${transferCount === 1 ? 'order' : 'orders'} between your own accounts`,
+                }
+              : {
+                  label: 'Net committed',
+                  value: money(incoming - totalMonthly, { signed: true, masked: maskBalances }),
+                  tone: 'primary',
+                  note: 'Before any discretionary spending',
+                },
+          ]}
+        />
+      )}
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="hide-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Filter recurring payments">
         {KIND_TABS.map((t) => {
           const count =
             t.value === 'all' ? state.recurring.length : state.recurring.filter((r) => r.isSubscription).length;
@@ -291,11 +279,11 @@ export const Recurring = () => {
               aria-pressed={kind === t.value}
               className={pillClass(kind === t.value)}
             >
-              {t.label} <span className="tnum text-faint">({count})</span>
+              {t.label} <span className="tnum opacity-70">({count})</span>
             </button>
           );
         })}
-        <span aria-hidden="true" className="mx-1 h-5 w-px bg-[rgb(var(--hairline)/0.15)]" />
+        <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-[rgb(var(--hairline)/0.15)]" />
         {STATUS_TABS.map((t) => {
           const inKind = state.recurring.filter((r) => (subscriptionsOnly ? r.isSubscription : true));
           const count = t.value === 'all' ? inKind.length : inKind.filter((r) => r.status === t.value).length;
@@ -307,7 +295,7 @@ export const Recurring = () => {
               aria-pressed={tab === t.value}
               className={pillClass(tab === t.value)}
             >
-              {t.label} <span className="tnum text-faint">({count})</span>
+              {t.label} <span className="tnum opacity-70">({count})</span>
             </button>
           );
         })}
@@ -340,20 +328,23 @@ export const Recurring = () => {
           />
         </Card>
       ) : (
-        <ul className="space-y-1.5" aria-label={`${tab === 'all' ? 'All' : tab} recurring payments`}>
+        <ul
+          className="plate divide-y divide-[rgb(var(--hairline)/0.07)] overflow-hidden p-0"
+          aria-label={`${tab === 'all' ? 'All' : tab} recurring payments`}
+        >
           {rules.map((rule) => {
             const next = nextDates(rule)[0];
             const account = state.accounts.find((a) => a.id === rule.accountId);
             return (
               <li
                 key={rule.id}
-                className="flex flex-col gap-3 well p-4 transition-colors duration-400 ease-fluid hover:shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))] sm:flex-row sm:items-center"
+                className="flex flex-wrap items-center gap-x-3.5 gap-y-2 px-4 py-3.5 transition-colors duration-300 ease-fluid hover:bg-fill sm:flex-nowrap"
               >
-                <CategoryIcon categoryId={rule.categoryId} size="lg" />
+                <CategoryIcon categoryId={rule.categoryId} />
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="truncate font-display text-headline-sm text-text">{rule.name}</h2>
+                    <h2 className="truncate text-[16px] font-semibold tracking-[-0.015em] text-text">{rule.name}</h2>
                     {rule.isSubscription && <Badge tone="secondary">Subscription</Badge>}
                     {rule.direction === 'transfer' && (
                       <Badge tone="primary" icon="swap">
@@ -386,8 +377,8 @@ export const Recurring = () => {
                   )}
                 </div>
 
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="text-right">
+                <div className="ml-auto flex w-full items-center justify-between gap-3 pl-[3.25rem] sm:w-auto sm:justify-end sm:gap-4 sm:pl-0">
+                  <div className="sm:text-right">
                     <p
                       className={cn(
                         'tnum text-metric-sm font-semibold',
@@ -534,7 +525,7 @@ const RecurringForm = ({
       open
       onClose={() => setDraft(null)}
       title={draft.id ? 'Edit recurring payment' : 'New recurring payment'}
-      description="Set it once — your forecast keeps itself up to date."
+      description="Set it once and your forecast keeps itself up to date."
       footer={
         <>
           <Button onClick={() => setDraft(null)}>Cancel</Button>
@@ -585,9 +576,9 @@ const RecurringForm = ({
           hint={
             {
               out: 'A bill or payment that leaves on a schedule. Counted against Safe to Spend from the moment it is due.',
-              in: 'Money that arrives on a schedule — a salary, a pension. Counted towards what you have coming.',
+              in: 'Money that arrives on a schedule, like a salary or a pension. Counted towards what you have coming.',
               transfer:
-                'A standing order between two of your own accounts. The money stays yours, so it is not counted as a commitment — unless it lands somewhere you can’t spend from, like a credit card or an investment.',
+                'A standing order between two of your own accounts. The money stays yours, so it is not counted as a commitment, unless it lands somewhere you can’t spend from, like a credit card or an investment.',
             }[draft.direction]
           }
           className="w-full [&>button]:flex-1"

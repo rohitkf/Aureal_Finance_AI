@@ -58,7 +58,7 @@ export const AccountGroupsDialog = ({ open, onClose }: { open: boolean; onClose:
           {(['asset', 'liability'] as const).map((side) => (
             <section key={side} aria-labelledby={`groups-${side}`} className="space-y-1.5">
               <div className="flex items-center justify-between gap-3 border-b border-[rgb(var(--hairline)/0.12)] pb-2">
-                <h3 id={`groups-${side}`} className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">
+                <h3 id={`groups-${side}`} className="text-[13px] font-semibold tracking-[-0.005em] text-muted">
                   {side === 'asset' ? 'Assets' : 'Liabilities'}
                 </h3>
                 <Button size="sm" icon="plus" onClick={() => setAdding(side)}>

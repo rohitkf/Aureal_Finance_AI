@@ -1,5 +1,3 @@
-import { cn } from '@/lib/cn';
-
 /** The Aureal mark: an aperture "A" with an accent point of light. */
 export const Logo = ({ size = 32, className }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 40 40" fill="none" className={className} aria-hidden="true">
@@ -22,14 +20,4 @@ export const Logo = ({ size = 32, className }: { size?: number; className?: stri
       </linearGradient>
     </defs>
   </svg>
-);
-
-export const Wordmark = ({ className }: { className?: string }) => (
-  <span className={cn('flex items-center gap-2.5', className)}>
-    <Logo size={30} />
-    <span className="flex flex-col leading-none">
-      <span className="font-display text-[15px] font-bold tracking-tight text-text">Aureal</span>
-      <span className="text-label-sm font-semibold uppercase tracking-[0.18em] text-faint">Finance AI</span>
-    </span>
-  </span>
 );

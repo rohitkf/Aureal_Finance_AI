@@ -140,7 +140,7 @@ export const NewCategoryDialog = ({ open, onClose, kind, editing, onCreated }: N
         )}
 
         <div>
-          <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.18em] text-faint">Icon</p>
+          <p className="mb-3 pl-1 text-[13px] font-medium tracking-[-0.005em] text-muted">Icon</p>
           <div className="grid grid-cols-6 gap-2">
             {ICONS.map((option) => (
               <button
@@ -152,7 +152,7 @@ export const NewCategoryDialog = ({ open, onClose, kind, editing, onCreated }: N
                 className={cn(
                   'flex h-11 items-center justify-center rounded-xl transition-all duration-400 ease-fluid active:scale-95',
                   icon === option
-                    ? 'bg-primary/12 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.35)]'
+                    ? 'bg-primary/15 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.35)]'
                     : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)]',
                 )}
               >
@@ -163,7 +163,7 @@ export const NewCategoryDialog = ({ open, onClose, kind, editing, onCreated }: N
         </div>
 
         <div>
-          <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.18em] text-faint">Accent</p>
+          <p className="mb-3 pl-1 text-[13px] font-medium tracking-[-0.005em] text-muted">Accent</p>
           <div className="flex flex-wrap gap-2">
             {ACCENTS.map((option) => (
               <button

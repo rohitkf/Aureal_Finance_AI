@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
         <div className="plate w-full max-w-md p-2">
           <ErrorState
             title="Something went wrong"
-            description="We couldn’t load this screen. Your data is safe — nothing has been changed."
+            description="We couldn’t load this screen. Your data is safe. Nothing has been changed."
           />
           {/* The screen a person sees says nothing technical. With development
               mode on, the error that actually happened is right here — which is

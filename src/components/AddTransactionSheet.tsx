@@ -30,7 +30,7 @@ const WEEKEND_HINTS: Record<WeekendMode, string> = {
   none: 'It shows on the day it falls, weekend or not.',
   previous: 'A payment due on a Saturday or Sunday shows on the Friday before, the way a salary arrives.',
   next: 'It shows on the Monday after, which is when most direct debits are taken.',
-  nearest: 'Saturday goes back to Friday, Sunday forward to Monday — whichever weekday is nearer.',
+  nearest: 'Saturday goes back to Friday, Sunday forward to Monday: whichever weekday is nearer.',
   skip: 'That period simply does not happen. The one after is unaffected.',
 };
 import { Button } from './ui/Button';
@@ -48,6 +48,7 @@ import { Modal } from './ui/Modal';
 import { RangeField } from './ui/RangeField';
 import { useToast } from './ui/Toast';
 import { CategoryIcon } from './CategoryIcon';
+import { Icon } from './ui/Icon';
 import { NewCategoryDialog } from './NewCategoryDialog';
 import { AccountDialog } from './AccountDialog';
 import { LabelPicker } from './LabelPicker';
@@ -69,11 +70,11 @@ const STATUS_OPTIONS: Array<{ value: TransactionStatus; label: string }> = [
 ];
 
 const STATUS_HINTS: Record<TransactionStatus, string> = {
-  none: 'It happened and it counts — you just haven’t checked it off. The default for anything you enter yourself.',
+  none: 'It happened and it counts. You just haven’t checked it off. The default for anything you enter yourself.',
   cleared: 'You have seen it go through the account. Counts in full, same as None; this only records that you checked.',
   reconciled:
     'It matched your statement. Counts in full, and the row locks: the amount, the date and the type can’t change until you un-reconcile it.',
-  void: 'Cancelled. The record stays, struck through, so you can see it was there — but it moves no money at all.',
+  void: 'Cancelled. The record stays, struck through, so you can see it was there, but it moves no money at all.',
   scheduled: 'It hasn’t happened yet. Your balance is untouched and it waits on Reminders until you record it.',
 };
 
@@ -116,10 +117,8 @@ const Chip = ({
     type="button"
     onClick={onClick}
     aria-pressed={active}
-    className={`rounded-full px-3.5 py-1.5 text-[12.5px] transition-all duration-500 ease-fluid active:scale-[0.97] ${
-      active
-        ? 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.3)]'
-        : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)] hover:text-text'
+    className={`rounded-full px-3.5 py-1.5 text-[13px] transition-all duration-300 ease-fluid active:scale-[0.96] ${
+      active ? 'bg-primary/15 font-semibold text-primary' : 'bg-fill font-medium text-muted hover:text-text'
     }`}
   >
     {children}
@@ -238,6 +237,16 @@ export const AddTransactionSheet = ({
   // shows — otherwise "after 12 payments" on screen saves as "never".
   const [occurrences, setOccurrences] = useState('12');
   const [isSubscription, setIsSubscription] = useState(false);
+  /**
+   * Whether the less common options are showing: the time, "this hasn't
+   * happened yet", repeating, splitting, labels and notes.
+   *
+   * Most entries are an amount, a category and an account, and the sheet
+   * used to lay all eleven controls out for every one of them. They now fold
+   * away behind one row, and open by themselves whenever one of them is in
+   * use, so nothing set on a transaction is ever hidden on it.
+   */
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const categories = useMemo(
     () => allCategories.filter((c) => (type === 'transfer' ? c.kind === 'transfer' : c.kind === type)),
@@ -280,6 +289,7 @@ export const AddTransactionSheet = ({
     setEndDate('');
     setOccurrences('12');
     setIsSubscription(false);
+    setMoreOpen(false);
     setError(undefined);
     setLabelIds(editing?.labelIds ?? []);
     setSplitting(Boolean(editing?.splits?.length));
@@ -415,6 +425,10 @@ export const AddTransactionSheet = ({
   // A date input can be cleared, and an empty date is not something the
   // ledger can record against a day.
   const valid = Number.isFinite(parsed) && parsed > 0 && Boolean(accountId) && isValidISO(date);
+  /** Something behind More options is set, so it stays open and says so. */
+  const moreInUse =
+    splitting || repeats || labelIds.length > 0 || notes.trim() !== '' || (!editing && statusTouched && status === 'scheduled');
+  const showMore = moreOpen || moreInUse;
 
   const submit = () => {
     if (accounts.length === 0) {
@@ -661,7 +675,7 @@ export const AddTransactionSheet = ({
                 expense: 'Money leaving one of your accounts.',
                 income: 'Money arriving in one of your accounts.',
                 transfer:
-                  'Money moving between two of your own accounts. Your total doesn’t change, so this won’t reduce Safe to Spend — unless it lands somewhere you can’t spend from, like a credit card or an investment.',
+                  'Money moving between two of your own accounts. Your total doesn’t change, so this won’t reduce Safe to Spend, unless it lands somewhere you can’t spend from, like a credit card or an investment.',
               }[type]
             }
             className="w-full [&>button]:flex-1"
@@ -722,7 +736,7 @@ export const AddTransactionSheet = ({
 
           {type !== 'transfer' && accounts.length > 0 && (
             <div>
-              <p className="mb-3 text-[10px] font-medium uppercase tracking-[0.18em] text-faint">Quick categories</p>
+              <p className="mb-3 pl-1 text-[13px] font-medium tracking-[-0.005em] text-muted">Quick categories</p>
               <div className="flex flex-wrap gap-2">
                 {quickCategories.map((category) => {
                   const active = categoryId === category.id;
@@ -732,10 +746,10 @@ export const AddTransactionSheet = ({
                       type="button"
                       onClick={() => setCategoryId(category.id)}
                       aria-pressed={active}
-                      className={`flex items-center gap-2.5 rounded-full py-2 pl-2 pr-4 text-[13px] transition-all duration-500 ease-fluid active:scale-[0.97] ${
+                      className={`flex items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-4 text-[13.5px] transition-all duration-300 ease-fluid active:scale-[0.96] ${
                         active
-                          ? 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.3)]'
-                          : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)] hover:text-text'
+                          ? 'bg-primary/15 font-semibold text-primary shadow-[inset_0_0_0_1.5px_rgb(var(--primary)/0.45)]'
+                          : 'bg-fill font-medium text-muted hover:text-text'
                       }`}
                     >
                       <CategoryIcon categoryId={category.id} size="sm" />
@@ -765,12 +779,8 @@ export const AddTransactionSheet = ({
                   setDateMode('custom');
                   setDate(iso);
                 }}
-                hint={date > today ? 'Future date — this will appear in your forecast.' : undefined}
+                hint={date > today ? 'A future date, so this will appear in your forecast.' : undefined}
               />
-              {/* When, not only which day. Two coffees on the same afternoon
-                  read in the order they happened, and a statement that runs a
-                  balance down the page needs that order to be real. */}
-              <TimeField label="Time" value={time} onChange={setTime} containerClassName="mt-1" />
               <div className="flex flex-wrap gap-2">
                 <Chip active={dateMode === 'today'} onClick={() => setDateFromMode('today')}>
                   Today
@@ -788,27 +798,6 @@ export const AddTransactionSheet = ({
               )}
             </div>
           </div>
-
-          {/* On a new transaction this is the only status question worth
-              asking, and the date answers it: today or earlier has happened,
-              ahead has not. Tick it for a bill due today that has not gone
-              out; a date ahead leaves nothing to answer. */}
-          {!editing && (
-            <CheckboxField
-              checked={status === 'scheduled'}
-              disabled={dateAhead}
-              onChange={(on) => {
-                setStatus(on ? 'scheduled' : 'none');
-                setStatusTouched(true);
-              }}
-              label="This hasn’t happened yet"
-              description={
-                dateAhead
-                  ? 'A date that hasn’t come yet can’t have happened. It waits on Reminders and in Time Machine until then.'
-                  : 'Tick it for a bill due today that hasn’t gone out yet — it stays on Reminders and out of your balance until you record it.'
-              }
-            />
-          )}
 
           {editing && (
             <div className="space-y-4">
@@ -841,6 +830,60 @@ export const AddTransactionSheet = ({
             </div>
           )}
 
+          {/* ---------------- More options ---------------- */}
+          {moreInUse ? (
+            <p className="caption -mb-1 pl-1">More options</p>
+          ) : (
+            <button
+              type="button"
+              aria-expanded={moreOpen}
+              aria-controls="transaction-more"
+              onClick={() => setMoreOpen((v) => !v)}
+              className="well flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors duration-300 ease-fluid hover:bg-[rgb(var(--fill)/calc(var(--fill-alpha)*1.6))]"
+            >
+              <Icon name="sliders" size={17} className="shrink-0 text-primary" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-medium text-text">More options</span>
+                <span className="block truncate text-[12.5px] text-muted">
+                  Time, repeats, split, labels and notes
+                </span>
+              </span>
+              <Icon
+                name="chevron-down"
+                size={16}
+                className={`shrink-0 text-faint transition-transform duration-300 ease-fluid ${moreOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+          )}
+
+          {showMore && (
+            <div id="transaction-more" className="animate-fade-in space-y-5">
+          {/* When, not only which day. Two coffees on the same afternoon
+              read in the order they happened, and a statement that runs a
+              balance down the page needs that order to be real. */}
+          <TimeField label="Time" value={time} onChange={setTime} />
+
+          {/* On a new transaction this is the only status question worth
+              asking, and the date answers it: today or earlier has happened,
+              ahead has not. Tick it for a bill due today that has not gone
+              out; a date ahead leaves nothing to answer. */}
+          {!editing && (
+            <CheckboxField
+              checked={status === 'scheduled'}
+              disabled={dateAhead}
+              onChange={(on) => {
+                setStatus(on ? 'scheduled' : 'none');
+                setStatusTouched(true);
+              }}
+              label="This hasn’t happened yet"
+              description={
+                dateAhead
+                  ? 'A date that hasn’t come yet can’t have happened. It waits on Reminders and in Time Machine until then.'
+                  : 'For a bill due today that hasn’t gone out yet. It stays on Reminders and out of your balance until you record it.'
+              }
+            />
+          )}
+
           {/* Repeating lives here rather than only on the Recurring screen,
               because "this happens every month" is something you know at the
               moment you record it, not on a separate trip later. */}
@@ -850,7 +893,7 @@ export const AddTransactionSheet = ({
                 checked={repeats}
                 onChange={setRepeats}
                 label="This repeats"
-                description="Saves this payment and sets up a schedule. Every one after it appears in your forecast on its own — you won't need to enter it again. You'll find it on the Recurring screen to change or stop."
+                description="Saves this payment and sets up a schedule. Every one after it appears in your forecast on its own, so you won't need to enter it again. Change or stop it on the Recurring screen."
               />
 
               {repeats && (
@@ -859,7 +902,7 @@ export const AddTransactionSheet = ({
                     label="How often"
                     value={frequency}
                     onChange={(value) => setFrequency(value as Frequency)}
-                    hint="Anchored to the date above — change that and the schedule follows."
+                    hint="Anchored to the date above. Change that and the schedule follows."
                   >
                     {INLINE_FREQUENCIES.map((f) => (
                       <option key={f} value={f}>
@@ -975,7 +1018,7 @@ export const AddTransactionSheet = ({
                   Split this payment
                 </Button>
               ) : (
-                <div className="space-y-4 rounded-2xl bg-[rgb(var(--hairline)/0.03)] p-4">
+                <div className="well space-y-4 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-label-md text-text">Split</p>
                     <Button
@@ -1020,6 +1063,8 @@ export const AddTransactionSheet = ({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
+            </div>
+          )}
         </div>
       </Modal>
 

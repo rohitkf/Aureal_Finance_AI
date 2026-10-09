@@ -68,6 +68,16 @@ const { AddTransactionSheet } = await import('../AddTransactionSheet');
 
 const open = () => render(<AddTransactionSheet open onClose={vi.fn()} />);
 
+/**
+ * The less common options — time, "hasn't happened yet", repeating, splitting,
+ * labels, notes — fold away behind one row until asked for. Open it.
+ */
+const moreOptions = async (user: ReturnType<typeof userEvent.setup>) => {
+  const toggle = screen.queryByRole('button', { name: /more options/i });
+  if (toggle && toggle.getAttribute('aria-expanded') !== 'true') await user.click(toggle);
+};
+
+
 /** Drives the app's dropdown, which is a listbox rather than a <select>. */
 const choose = async (
   user: ReturnType<typeof userEvent.setup>,
@@ -285,8 +295,10 @@ describe('date shortcuts', () => {
 });
 
 describe('repeating a transaction', () => {
-  const tickRepeats = async (user: ReturnType<typeof userEvent.setup>) =>
-    user.click(screen.getByRole('checkbox', { name: /this repeats/i }));
+  const tickRepeats = async (user: ReturnType<typeof userEvent.setup>) => {
+    await moreOptions(user);
+    await user.click(screen.getByRole('checkbox', { name: /this repeats/i }));
+  };
 
   /** The rule the sheet dispatched, failing loudly if it dispatched none. */
   const savedRule = () => {
@@ -298,6 +310,7 @@ describe('repeating a transaction', () => {
   it('is offered for a transfer too — a standing order is the commonest one there is', async () => {
     const user = userEvent.setup();
     open();
+    await moreOptions(user);
 
     expect(screen.getByRole('checkbox', { name: /this repeats/i })).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: 'Transfer' }));
@@ -526,6 +539,7 @@ describe('what the form knows before you leave it', () => {
     open();
 
     await user.keyboard('3.20');
+    await moreOptions(user);
     await user.click(screen.getByLabelText('Time'));
     await user.click(screen.getByRole('button', { name: /^9\s*am$/ }));
     await user.click(screen.getByRole('button', { name: /^45$/ }));
@@ -602,11 +616,16 @@ describe('splitting a payment', () => {
   const partAmountBox = (n: number) => screen.getByLabelText(`Part ${n} amount`);
 
   const startSplit = async (user: ReturnType<typeof userEvent.setup>) => {
+    await moreOptions(user);
     await user.click(screen.getByRole('button', { name: /split this payment/i }));
   };
 
-  it('is not in the way until it is asked for', () => {
+  it('is not in the way until it is asked for', async () => {
+    const user = userEvent.setup();
     open();
+    // Not even the button, until the less common options are opened.
+    expect(screen.queryByRole('button', { name: /split this payment/i })).not.toBeInTheDocument();
+    await moreOptions(user);
     expect(screen.queryByRole('radio', { name: /by category/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /split this payment/i })).toBeInTheDocument();
   });
@@ -771,6 +790,7 @@ describe('whether a new transaction has happened yet', () => {
     open();
     await user.keyboard('12');
     // A bill due today that has not gone out yet.
+    await moreOptions(user);
     await user.click(screen.getByRole('checkbox', { name: /hasn.t happened yet/i }));
     await user.click(screen.getByRole('button', { name: /save transaction/i }));
 
@@ -782,6 +802,7 @@ describe('whether a new transaction has happened yet', () => {
     open();
     await user.keyboard('12');
     await pickDate(user, 'Date', '2026-04-20');
+    await moreOptions(user);
 
     const box = screen.getByRole('checkbox', { name: /hasn.t happened yet/i });
     expect(box).toBeChecked();
@@ -794,6 +815,7 @@ describe('whether a new transaction has happened yet', () => {
     open();
     await user.keyboard('12');
     // Said "not yet", then "yes it has", then moved the date into next month.
+    await moreOptions(user);
     await user.click(screen.getByRole('checkbox', { name: /hasn.t happened yet/i }));
     await user.click(screen.getByRole('checkbox', { name: /hasn.t happened yet/i }));
     await pickDate(user, 'Date', '2026-04-20');

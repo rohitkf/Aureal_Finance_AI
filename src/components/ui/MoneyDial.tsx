@@ -91,7 +91,7 @@ export const MoneyDial = ({
     <div className={cn('flex flex-col gap-2', className)}>
       <label
         htmlFor={id}
-        className={cn('text-[10px] font-medium uppercase tracking-[0.18em] text-faint', hideLabel && 'sr-only')}
+        className={cn('pl-1 text-[13px] font-medium tracking-[-0.005em] text-muted', hideLabel && 'sr-only')}
       >
         {label}
       </label>
@@ -101,8 +101,8 @@ export const MoneyDial = ({
           if (onCommit && !e.currentTarget.contains(e.relatedTarget as Node | null)) onCommit();
         }}
         className={cn(
-          'flex flex-col gap-4 rounded-2xl bg-[rgb(var(--hairline)/0.04)] px-4 pb-4 pt-3.5',
-          'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha)),inset_0_1px_2px_rgb(var(--ambient)/0.06)]',
+          'flex flex-col gap-4 rounded-2xl bg-fill px-4 pb-4 pt-3.5',
+          'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.04)]',
           'transition-all duration-400 ease-fluid',
           'focus-within:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.5),0_0_0_3px_rgb(var(--primary-strong)/0.16)]',
           error && 'shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.55)]',
@@ -160,7 +160,7 @@ export const MoneyDial = ({
           // The filled part of the track is a gradient stop, written inline:
           // a width computed at runtime cannot be a Tailwind class.
           style={{
-            background: `linear-gradient(to right, rgb(var(--primary-strong)/0.85) 0%, rgb(var(--primary-strong)/0.85) ${filled}%, rgb(var(--hairline)/0.08) ${filled}%, rgb(var(--hairline)/0.08) 100%)`,
+            background: `linear-gradient(to right, rgb(var(--primary-strong)/0.85) 0%, rgb(var(--primary-strong)/0.85) ${filled}%, rgb(var(--fill)/calc(var(--fill-alpha)*1.6)) ${filled}%, rgb(var(--fill)/calc(var(--fill-alpha)*1.6)) 100%)`,
           }}
           className="slider h-2 w-full cursor-pointer appearance-none rounded-full outline-none"
         />
@@ -190,7 +190,6 @@ export const MoneyDial = ({
 };
 
 const NUDGE =
-  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted ' +
-  'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] ' +
-  'transition-all duration-400 ease-fluid hover:bg-[rgb(var(--hairline)/0.06)] hover:text-text active:scale-[0.94] ' +
+  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-base text-text shadow-thumb dark:bg-surface-bright ' +
+  'transition-all duration-300 ease-fluid hover:brightness-[1.04] active:scale-[0.92] ' +
   'disabled:pointer-events-none disabled:opacity-35';

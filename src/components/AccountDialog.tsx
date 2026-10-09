@@ -216,7 +216,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
       description={
         editing
           ? 'Balances update from your transactions, so they can’t be edited directly.'
-          : 'Accounts are entered by hand for now — bank connections are coming.'
+          : 'Accounts are entered by hand for now. Bank connections are coming.'
       }
       footer={
         <>
@@ -332,7 +332,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
                 checked={excluded}
                 onChange={setExcluded}
                 label="And leave it out of every figure"
-                description="For an account that is yours but is not part of the picture — a business account, or one a partner actually runs. Its balance, its spending, its income and anything it has scheduled stop counting towards your totals, your reports and your forecast. Nothing is deleted, and turning this back off restores all of it."
+                description="For an account that is yours but is not part of the picture, like a business account or one a partner actually runs. Its balance, its spending, its income and anything it has scheduled stop counting towards your totals, your reports and your forecast. Nothing is deleted, and turning this back off restores all of it."
               />
             </div>
           )}

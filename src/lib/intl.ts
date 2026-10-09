@@ -95,14 +95,14 @@ export const CURRENCIES: Array<{ code: string; label: string }> = [
 
 /** How dates and thousands separators are written. */
 export const LOCALES: Array<{ code: string; label: string }> = [
-  { code: 'en-GB', label: 'United Kingdom — 22/09/2026' },
-  { code: 'en-IE', label: 'Ireland — 22/09/2026' },
-  { code: 'en-US', label: 'United States — 9/22/2026' },
-  { code: 'en-CA', label: 'Canada — 2026-09-22' },
-  { code: 'en-AU', label: 'Australia — 22/09/2026' },
-  { code: 'en-IN', label: 'India — 22/9/2026' },
-  { code: 'de-DE', label: 'Germany — 22.9.2026' },
-  { code: 'fr-FR', label: 'France — 22/09/2026' },
-  { code: 'es-ES', label: 'Spain — 22/9/2026' },
-  { code: 'nl-NL', label: 'Netherlands — 22-9-2026' },
+  { code: 'en-GB', label: 'United Kingdom (22/09/2026)' },
+  { code: 'en-IE', label: 'Ireland (22/09/2026)' },
+  { code: 'en-US', label: 'United States (9/22/2026)' },
+  { code: 'en-CA', label: 'Canada (2026-09-22)' },
+  { code: 'en-AU', label: 'Australia (22/09/2026)' },
+  { code: 'en-IN', label: 'India (22/9/2026)' },
+  { code: 'de-DE', label: 'Germany (22.9.2026)' },
+  { code: 'fr-FR', label: 'France (22/09/2026)' },
+  { code: 'es-ES', label: 'Spain (22/9/2026)' },
+  { code: 'nl-NL', label: 'Netherlands (22-9-2026)' },
 ];

@@ -48,14 +48,14 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
     <Wrapper
       {...(onSelect ? { type: 'button' as const, onClick: () => onSelect(transaction) } : {})}
       className={cn(
-        'flex w-full items-center gap-3.5 rounded-2xl p-3.5 text-left sm:gap-4 sm:p-4',
-        'transition-all duration-400 ease-fluid',
+        'flex w-full items-center gap-3.5 rounded-r-2xl rounded-l-[4px] p-3.5 text-left sm:gap-4 sm:p-4',
+        'transition-all duration-300 ease-fluid',
         selected
-          ? 'bg-[rgb(var(--hairline)/0.07)] shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.3)]'
-          : 'hover:bg-[rgb(var(--hairline)/0.05)]',
+          ? 'bg-[rgb(var(--glass)/var(--glass-strong-alpha))] shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.35)]'
+          : 'bg-[rgb(var(--glass)/var(--glass-alpha))] hover:bg-[rgb(var(--glass)/var(--glass-strong-alpha))]',
         // Scheduled money is drawn as an outline, never as a solid surface —
         // it has not happened yet.
-        scheduled && 'bg-transparent shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.09)] hover:bg-[rgb(var(--hairline)/0.03)]',
+        scheduled && 'bg-transparent shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.12)] hover:bg-fill',
         ACCENT_BAR[accent],
         overdue && 'shadow-[inset_0_0_0_1px_rgb(var(--warning)/0.35)]',
         // Cancelled. Kept, so the history is honest, and faded so it is never

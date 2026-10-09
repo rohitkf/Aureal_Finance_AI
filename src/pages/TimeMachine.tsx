@@ -15,7 +15,7 @@ import {
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
+import { Card, CardHeader, Label, PageHeader } from '@/components/ui/Card';
 import { DateField, SegmentedControl } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, SkeletonChart } from '@/components/ui/States';
@@ -32,7 +32,7 @@ const PRESETS: Array<{ value: TimeMachinePreset; label: string }> = [
 ];
 
 const PRESET_HINT: Record<TimeMachinePreset, string> = {
-  month: 'From the 1st to the last day of this month — what has already happened, then what is still to come.',
+  month: 'From the 1st to the last day of this month: what has already happened, then what is still to come.',
   '7d': 'From today to a week from today.',
   '30d': 'From today to 30 days from today.',
   '2m': 'From today to two months from today.',
@@ -153,27 +153,31 @@ export const TimeMachine = () => {
   const lineProps = { today, masked: maskBalances, nameOf, categoryOf: (id: string) => lookupCategory(id).name };
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-5">
-        <div className="max-w-2xl">
-          <Eyebrow>Time Machine</Eyebrow>
-          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">
-            What you’ll have left
-          </h1>
-          <p className="mt-3 text-[14px] leading-relaxed text-muted">
-            Pick a window and the accounts to look at. Every payment in and out is laid down a timeline, with what each
-            account holds after it — history replayed, then your schedule played forward.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          <SegmentedControl
-            label="Time window"
-            value={preset}
-            onChange={choosePreset}
-            options={PRESETS}
-            hint={PRESET_HINT[preset]}
-          />
+    <div className="space-y-6 sm:space-y-8">
+      <PageHeader
+        title="Time Machine"
+        subtitle="What you’ll have left, payment by payment."
+        about={
+          <>
+            Pick a window and the accounts to look at. Every payment in and out is laid along a timeline, with what
+            each account holds after it. Days already gone are replayed from what you recorded; days ahead are your
+            schedule played forward.
+          </>
+        }
+      >
+        {/* The two questions this screen asks, together in one pane: when,
+            and which accounts. */}
+        <Card className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <Label>When</Label>
+            <SegmentedControl
+              label="Time window"
+              value={preset}
+              onChange={choosePreset}
+              options={PRESETS}
+              hint={PRESET_HINT[preset]}
+            />
+          </div>
 
           {preset === 'custom' && (
             <div className="grid max-w-xl gap-3 sm:grid-cols-2">
@@ -223,18 +227,18 @@ export const TimeMachine = () => {
               })}
             </div>
             <p className="text-[12.5px] leading-snug text-faint">
-              The accounts in your cash flow — the money you can spend. Card spending shows up when you pay the card.
+              The accounts in your cash flow: the money you can spend. Card spending shows up when you pay the card.
             </p>
           </div>
-        </div>
-      </header>
+        </Card>
+      </PageHeader>
 
       {options.length === 0 ? (
         <Card>
           <EmptyState
             icon="bank"
             title="No spendable accounts yet"
-            description="Add a current, savings or cash account — or switch one on in Cash flow setup — and it will appear here."
+            description="Add a current, savings or cash account, or switch one on in Cash flow setup, and it will appear here."
           />
         </Card>
       ) : !tm ? (
@@ -303,8 +307,8 @@ export const TimeMachine = () => {
                 Lowest point {money(tm.lowest.value, { masked: maskBalances })} on {formatMediumDate(tm.lowest.date)}
                 {minimumBalance > 0 &&
                   (belowMinimum
-                    ? ` — ${money(minimumBalance - tm.lowest.value, { masked: maskBalances })} below your ${money(minimumBalance, { compact: true })} minimum.`
-                    : ` — still above your ${money(minimumBalance, { compact: true })} minimum.`)}
+                    ? `, ${money(minimumBalance - tm.lowest.value, { masked: maskBalances })} below your ${money(minimumBalance, { compact: true })} minimum.`
+                    : `, still above your ${money(minimumBalance, { compact: true })} minimum.`)}
               </span>
             </p>
           </Card>
@@ -416,16 +420,16 @@ export const TimeMachine = () => {
 
 const chipClass = (on: boolean) =>
   cn(
-    'inline-flex min-h-[32px] items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium',
-    'transition-all duration-400 ease-fluid active:scale-[0.97]',
+    'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px]',
+    'transition-all duration-300 ease-fluid active:scale-[0.96]',
     on
-      ? 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.3)]'
-      : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)] hover:text-text',
+      ? 'bg-primary/15 font-semibold text-primary'
+      : 'bg-fill font-medium text-muted hover:text-text',
   );
 
 const Figure = ({ label, value, tone = 'text-text' }: { label: string; value: string; tone?: string }) => (
   <div className="well min-w-0 p-4">
-    <dt className="text-[10px] font-medium uppercase tracking-[0.16em] text-faint">{label}</dt>
+    <dt className="text-[13px] font-semibold tracking-[-0.005em] text-muted">{label}</dt>
     <dd className={cn('tnum mt-1.5 font-display text-metric-md', tone)}>{value}</dd>
   </div>
 );
@@ -451,14 +455,14 @@ const Milestone = ({
       aria-hidden="true"
       className={cn(
         'absolute left-0 top-1 flex h-6 w-6 items-center justify-center rounded-full',
-        emphasis ? 'bg-primary-strong text-[rgb(var(--on-primary))]' : 'bg-primary/12 text-primary',
+        emphasis ? 'bg-primary-strong text-[rgb(var(--on-primary))]' : 'bg-primary/15 text-primary',
       )}
     >
       <Icon name={emphasis ? 'flag' : 'clock'} size={13} />
     </span>
     <div className="well flex flex-wrap items-center justify-between gap-x-4 gap-y-1 p-4">
       <div className="min-w-0">
-        <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-faint">
+        <p className="text-[13px] font-semibold tracking-[-0.005em] text-muted">
           {title} · {relativeDayLabel(date, today)}
         </p>
         <p className="mt-1 text-body-sm text-muted">{caption}</p>

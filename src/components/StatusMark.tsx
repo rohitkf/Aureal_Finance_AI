@@ -29,7 +29,7 @@ export const StatusMark = ({
   if (status === 'cleared') {
     return (
       <span
-        title="Cleared — you have seen this go through the account"
+        title="Cleared: you have seen this go through the account"
         aria-label="Cleared"
         role="img"
         className={cn(
@@ -46,7 +46,7 @@ export const StatusMark = ({
   if (status === 'reconciled') {
     return (
       <span
-        title="Reconciled — this matched your statement, and the row is locked"
+        title="Reconciled: this matched your statement, and the row is locked"
         aria-label="Reconciled"
         role="img"
         className={cn(

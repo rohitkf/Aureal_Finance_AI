@@ -12,12 +12,10 @@ interface BezelProps {
 }
 
 /**
- * The double-bezel: an outer tray holding an inner plate, with concentric
- * radii and an inner highlight along the top edge.
- *
- * This is what makes a card read as machined hardware — a glass plate seated
- * in an aluminium tray — instead of a rectangle with a border. It is reserved
- * for surfaces that lead a screen; using it on every row would flatten the
+ * The hero pane: the one or two surfaces that lead a screen, in a stronger
+ * tint of glass with a specular sheen across the top. It was once a plate
+ * seated in a tray; the tray is gone and the name stayed, so nothing that
+ * composes it had to change. Using it on every card would flatten the
  * hierarchy it exists to create.
  */
 export const Bezel = ({ children, className, coreClassName, as: Tag = 'div', ...rest }: BezelProps) => (

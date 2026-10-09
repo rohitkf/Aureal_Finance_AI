@@ -8,7 +8,8 @@ import { BalanceChart } from '@/components/charts/BalanceChart';
 import { TransactionRow } from '@/components/TransactionRow';
 import { Badge } from '@/components/ui/Badge';
 import { ButtonLink } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
+import { Card, CardHeader, Eyebrow, StatGroup } from '@/components/ui/Card';
+import { IconTile } from '@/components/ui/List';
 import { Icon } from '@/components/ui/Icon';
 import { Progress } from '@/components/ui/Progress';
 import { EmptyState, ErrorState } from '@/components/ui/States';
@@ -64,22 +65,21 @@ export const AccountDetail = () => {
   const util = accountUtilisation(account);
 
   return (
-    <div className="space-y-8">
-      <nav className="flex items-center gap-1.5 text-body-sm text-muted" aria-label="Breadcrumb">
-        <Link to="/accounts" className="inline-flex min-h-[24px] items-center hover:text-text hover:underline">
+    <div className="space-y-6 sm:space-y-8">
+      {/* iOS's back link: where you came from, with a chevron, in blue. */}
+      <nav className="-ml-1 flex items-center gap-0.5 text-[15px]" aria-label="Breadcrumb">
+        <Link to="/accounts" className="inline-flex min-h-[32px] items-center gap-0.5 rounded-full pr-2 font-medium text-primary hover:opacity-80">
+          <Icon name="chevron-left" size={18} />
           Accounts
         </Link>
-        <Icon name="chevron-right" size={13} />
-        <span className="text-text">{account.name}</span>
+        <span className="sr-only">/ {account.name}</span>
       </nav>
 
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-4">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Icon name={isCredit ? 'card' : account.type === 'savings' ? 'savings' : 'bank'} size={26} />
-          </span>
+          <IconTile icon={isCredit ? 'card' : account.type === 'savings' ? 'savings' : 'bank'} tint="primary" size="lg" />
           <div>
-            <h1 className="font-display text-headline-lg text-text">{account.name}</h1>
+            <h1 className="font-display text-[clamp(1.75rem,4vw,2.25rem)] font-bold leading-tight tracking-[-0.03em] text-text">{account.name}</h1>
             <p className="tnum text-body-md text-muted">
               {account.institution} · {account.maskedNumber}
             </p>
@@ -97,30 +97,34 @@ export const AccountDetail = () => {
 
         <div className="text-left lg:text-right">
           <Eyebrow>{owesMoney(account) ? 'Balance owed' : 'Current balance'}</Eyebrow>
-          <p className={`tnum font-display text-hero-mobile ${owesMoney(account) ? 'text-danger' : 'text-text'}`}>
+          <p className={`tnum mt-1 font-display text-hero-mobile ${owesMoney(account) ? 'text-danger' : 'text-text'}`}>
             {money(account.balance, { masked: maskBalances })}
           </p>
         </div>
       </header>
 
       {isCredit ? (
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Available credit" value={money(availableCredit(account), { masked: maskBalances })} />
-          <Stat label="Credit limit" value={money(account.creditLimit ?? 0, { compact: true })} />
-          <Stat label="Utilisation" value={percent(util, 1)} tone={util >= 80 ? 'danger' : 'text'} />
-          <Stat label="Minimum payment" value={money(account.minimumPayment ?? 0, { compact: true })} tone="danger" />
-        </section>
+        <StatGroup
+          stats={[
+            { label: 'Available credit', value: money(availableCredit(account), { masked: maskBalances }) },
+            { label: 'Credit limit', value: money(account.creditLimit ?? 0, { compact: true }) },
+            { label: 'Utilisation', value: percent(util, 1), tone: util >= 80 ? 'danger' : 'text' },
+            { label: 'Minimum payment', value: money(account.minimumPayment ?? 0, { compact: true }), tone: 'danger' },
+          ]}
+        />
       ) : (
-        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Spent this month" value={money(spentThisMonth, { masked: maskBalances })} />
-          <Stat label="Transactions" value={`${transactions.length}`} />
-          <Stat label="Linked commitments" value={`${linkedRecurring.length}`} />
-          <Stat
-            label="Projected in 30 days"
-            value={money(series[series.length - 1]?.closing ?? account.balance, { masked: maskBalances })}
-            tone="primary"
-          />
-        </section>
+        <StatGroup
+          stats={[
+            { label: 'Spent this month', value: money(spentThisMonth, { masked: maskBalances }) },
+            { label: 'Transactions', value: `${transactions.length}` },
+            { label: 'Linked commitments', value: `${linkedRecurring.length}` },
+            {
+              label: 'Projected in 30 days',
+              value: money(series[series.length - 1]?.closing ?? account.balance, { masked: maskBalances }),
+              tone: 'primary',
+            },
+          ]}
+        />
       )}
 
       {isCredit && (
@@ -176,7 +180,7 @@ export const AccountDetail = () => {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-12">
-        <Card className="space-y-4 lg:col-span-7">
+        <Card className="min-w-0 space-y-4 lg:col-span-7">
           <CardHeader
             title="Recent transactions"
             action={
@@ -200,7 +204,7 @@ export const AccountDetail = () => {
           )}
         </Card>
 
-        <Card className="space-y-4 lg:col-span-5">
+        <Card className="min-w-0 space-y-4 lg:col-span-5">
           <CardHeader title="Linked recurring payments" description={`${linkedRecurring.length} active on this account`} />
           {linkedRecurring.length === 0 ? (
             <EmptyState
@@ -236,16 +240,3 @@ export const AccountDetail = () => {
     </div>
   );
 };
-
-const Stat = ({ label, value, tone = 'text' }: { label: string; value: string; tone?: 'text' | 'danger' | 'primary' }) => (
-  <Card tone="well">
-    <Label>{label}</Label>
-    <p
-      className={`tnum mt-1 font-display text-metric-md ${
-        { text: 'text-text', danger: 'text-danger', primary: 'text-primary' }[tone]
-      }`}
-    >
-      {value}
-    </p>
-  </Card>
-);

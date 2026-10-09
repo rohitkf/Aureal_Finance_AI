@@ -82,7 +82,7 @@ export const SplitEditor = ({
           hint={
             kind === 'category'
               ? 'One payment out of one account, filed under several headings. Your balance is unaffected; your category totals are not.'
-              : 'One payment taken out of several accounts — half on the card, half in cash. Each part moves its own account, and they are saved as one payment split in two.'
+              : 'One payment taken out of several accounts, like half on the card and half in cash. Each part moves its own account, and they are saved as one payment split in two.'
           }
           className="w-full [&>button]:flex-1"
         />

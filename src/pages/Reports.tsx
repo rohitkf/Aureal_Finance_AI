@@ -23,7 +23,7 @@ import { IncomeExpenseChart } from '@/components/charts/BarChart';
 import { NetWorthChart } from '@/components/charts/NetWorthChart';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
+import { Card, CardHeader, PageHeader, StatGroup } from '@/components/ui/Card';
 import { SegmentedControl } from '@/components/ui/Field';
 import { Progress } from '@/components/ui/Progress';
 import { EmptyState, SkeletonChart } from '@/components/ui/States';
@@ -126,30 +126,29 @@ export const Reports = () => {
   if (loading) return <SkeletonChart />;
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Eyebrow>Reports</Eyebrow>
-          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">How your money behaves</h1>
-          <p className="mt-3 text-[14px] leading-relaxed text-muted">Trends, categories and net worth over time.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <SegmentedControl
-            label="Reporting range"
-            value={range}
-            onChange={setRange}
-            size="sm"
-            options={[
-              { value: '3', label: '3M' },
-              { value: '6', label: '6M' },
-              { value: '12', label: '12M' },
-            ]}
-          />
-          <Button icon="download" size="sm" onClick={exportCsv} disabled={!hasData}>
-            Export
-          </Button>
-        </div>
-      </header>
+    <div className="space-y-6 sm:space-y-8">
+      <PageHeader
+        title="Reports"
+        subtitle="How your money behaves: trends, categories and net worth over time."
+        actions={
+          <>
+            <SegmentedControl
+              label="Reporting range"
+              value={range}
+              onChange={setRange}
+              size="sm"
+              options={[
+                { value: '3', label: '3M' },
+                { value: '6', label: '6M' },
+                { value: '12', label: '12M' },
+              ]}
+            />
+            <Button icon="download" size="sm" onClick={exportCsv} disabled={!hasData}>
+              Export
+            </Button>
+          </>
+        }
+      />
 
       {!hasData ? (
         <Card className="p-0">
@@ -161,27 +160,29 @@ export const Reports = () => {
         </Card>
       ) : (
         <>
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Kpi label="Spent this month" value={money(spent, { compact: true, masked: maskBalances })} note="Cleared transactions" />
-            <Kpi
-              label="Income this month"
-              value={money(income, { compact: true, masked: maskBalances })}
-              tone="success"
-              note="Received so far"
-            />
-            <Kpi
-              label="Savings rate"
-              value={percent(rate)}
-              tone={rate >= 20 ? 'success' : rate >= 0 ? 'warning' : 'danger'}
-              note={`${formatMonthYear(`${lastMonth}-01`)} · ${rate >= 20 ? 'healthy' : rate >= 0 ? 'room to improve' : 'spending exceeded income'}`}
-            />
-            <Kpi
-              label="Net worth"
-              value={money(netWorth(state.accounts, state.accountGroups), { compact: true, masked: maskBalances })}
-              tone="primary"
-              note="Assets minus what you owe"
-            />
-          </section>
+          <StatGroup
+            stats={[
+              { label: 'Spent this month', value: money(spent, { compact: true, masked: maskBalances }), note: 'Cleared transactions' },
+              {
+                label: 'Income this month',
+                value: money(income, { compact: true, masked: maskBalances }),
+                tone: 'success',
+                note: 'Received so far',
+              },
+              {
+                label: 'Savings rate',
+                value: percent(rate),
+                tone: rate >= 20 ? 'success' : rate >= 0 ? 'warning' : 'danger',
+                note: `${formatMonthYear(`${lastMonth}-01`)} · ${rate >= 20 ? 'healthy' : rate >= 0 ? 'room to improve' : 'spending exceeded income'}`,
+              },
+              {
+                label: 'Net worth',
+                value: money(netWorth(state.accounts, state.accountGroups), { compact: true, masked: maskBalances }),
+                tone: 'primary',
+                note: 'Assets minus what you owe',
+              },
+            ]}
+          />
 
           <div className="grid gap-4 xl:grid-cols-2">
             <Card className="space-y-5">
@@ -264,31 +265,6 @@ export const Reports = () => {
     </div>
   );
 };
-
-const Kpi = ({
-  label,
-  value,
-  tone = 'text',
-  note,
-}: {
-  label: string;
-  value: string;
-  tone?: 'text' | 'success' | 'warning' | 'danger' | 'primary';
-  note?: string;
-}) => (
-  <Card>
-    <Label>{label}</Label>
-    <p
-      className={cn(
-        'tnum mt-2 font-display text-metric-lg',
-        { text: 'text-text', success: 'text-success', warning: 'text-warning', danger: 'text-danger', primary: 'text-primary' }[tone],
-      )}
-    >
-      {value}
-    </p>
-    {note && <p className="mt-0.5 text-body-sm text-muted">{note}</p>}
-  </Card>
-);
 
 const Line = ({
   label,

@@ -118,8 +118,11 @@ Plus: global search (`⌘K` / `Ctrl+K`) including natural-language questions suc
   state, sync status and utilisation all read without colour perception (WCAG 1.4.1).
 - **Virtual accounts are allocations, not extra money.** The Accounts screen says so explicitly and
   never presents an envelope as a separate balance.
-- **Light and dark are two designed palettes**, not an inversion — "Ethereal Glass" and "Soft
-  Structuralism" respectively. See [DESIGN.md](./DESIGN.md).
+- **Simple on the surface, everything still there.** Each screen shows the common case; the
+  rest is one tap away behind "How this works" or "More options", and opens by itself whenever
+  something in it is set.
+- **Light and dark are two designed palettes**, not an inversion — iPhone-style glass over a
+  colour wallpaper in both. See [DESIGN.md](./DESIGN.md).
 - **Motion never hides content.** Scroll-entry animations are gated behind a flag the app sets at
   runtime, with a timeout backstop, so a failed observer can never leave a balance invisible.
 
@@ -142,13 +145,13 @@ src/
   components/
     ui/             Design system: Button, Card, Badge, Field, Modal, Toast, States, Icon
     charts/         Balance, net worth, income/expense and donut charts
-    ...             TransactionRow, MetricCard, SafeToSpendCard, AppShell, CommandPalette
+    ...             TransactionRow, SafeToSpendCard, AppShell, CommandPalette
   pages/            One file per screen
   pages/auth/       Sign in, sign up, forgot and reset password
 supabase/migrations/  The schema, RLS policies and triggers
   data/sample.ts    Opt-in sample data, dated relative to today
   hooks/            Theme, media queries, element width, online status
-public/fonts/       Self-hosted variable woff2 (Geist, Plus Jakarta Sans) — 108KB
+public/fonts/       Self-hosted variable woff2 (Geist) — 46KB
 ```
 
 ### The finance engine
@@ -174,7 +177,7 @@ Everything on screen derives from pure functions in `src/lib`, which makes the n
 
 One transaction row component is used on the dashboard, the ledger, account detail, subscription
 detail and search results — so a merchant looks identical everywhere it appears. The same applies
-to metric cards, progress bars, badges, empty states and skeletons.
+to stat panes, progress bars, badges, empty states and skeletons.
 
 ### Charts
 
@@ -184,10 +187,11 @@ stretched. Every chart also exposes its full data as a screen-reader table (WCAG
 
 ### Surfaces
 
-Cards that lead a screen use a **double-bezel**: an outer tray holding an inner plate, with
-concentric radii and an inner top highlight, so they read as machined hardware rather than
-rectangles with borders. There are no 1px solid grey borders in the product — every edge is an
-inset hairline that works in both themes. See [DESIGN.md](./DESIGN.md).
+Every card is a pane of frosted **glass** over a colour wallpaper — a tint, a rim of light and a
+specular line across the top — laid out the way an iPhone lays things out: large titles, grouped
+lists, capsule buttons and a floating tab bar. Real backdrop blur is kept to the fixed chrome, so
+scrolling never pays for it. There are no 1px solid grey borders in the product. See
+[DESIGN.md](./DESIGN.md).
 
 ---
 

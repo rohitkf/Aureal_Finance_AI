@@ -299,9 +299,9 @@ export const Select = ({
         onClick={() => (open ? close(false) : openList())}
         onKeyDown={onKeyDown}
         className={cn(
-          'flex h-12 w-full items-center justify-between gap-3 rounded-2xl bg-[rgb(var(--hairline)/0.04)] px-4 text-left',
+          'flex h-12 w-full items-center justify-between gap-3 rounded-2xl bg-fill px-4 text-left',
           'text-[14px] tracking-[-0.01em] text-text',
-          'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha)),inset_0_1px_2px_rgb(var(--ambient)/0.06)]',
+          'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.04)]',
           'outline-none transition-all duration-400 ease-fluid',
           'focus-visible:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.55),0_0_0_3px_rgb(var(--primary-strong)/0.18)]',
           'disabled:opacity-50',
@@ -343,7 +343,7 @@ export const Select = ({
                 // list holds one more choice than it does.
                 <li
                   role="presentation"
-                  className="px-3 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.18em] text-faint first:pt-1.5"
+                  className="px-3 pb-1 pt-3 text-[12.5px] font-semibold text-faint first:pt-1.5"
                 >
                   {heading}
                 </li>

@@ -34,24 +34,17 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
 
   return (
     <section className={cn('bezel', className)} aria-labelledby="sts-heading">
-      <div className="bezel-core relative flex h-full flex-col overflow-hidden p-6 sm:p-7">
-        {/* A single band of colour along the top edge, rather than a tinted card. */}
-        <span
-          aria-hidden="true"
-          className={cn(
-            'absolute inset-x-8 top-0 h-px',
-            negative
-              ? 'bg-gradient-to-r from-transparent via-danger to-transparent'
-              : 'bg-gradient-to-r from-transparent via-primary to-transparent',
-          )}
-        />
+      <div className="bezel-core relative flex h-full flex-col overflow-hidden p-5 sm:p-7">
 
         <div className="relative">
           <div className="flex items-center justify-between gap-3">
             <h2 id="sts-heading">
-              <Eyebrow tone="accent">Safe to spend</Eyebrow>
+              <Eyebrow tone={negative ? 'quiet' : 'accent'}>
+                <Icon name="shield" size={15} />
+                Safe to spend
+              </Eyebrow>
             </h2>
-            <span className="text-[11px] tracking-[-0.005em] text-faint">until {formatMediumDate(data.through)}</span>
+            <span className="text-[12.5px] tracking-[-0.005em] text-faint">until {formatMediumDate(data.through)}</span>
           </div>
 
           <p
@@ -89,11 +82,11 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
           {/* The headline counts income that has not arrived. Say what that
               means for today rather than leaving it to be discovered. */}
           {nextIncome && data.expectedIncome > 0 && (
-            <p className="mt-3 flex items-start gap-2 rounded-xl bg-[rgb(var(--hairline)/0.04)] p-3 text-[12.5px] leading-relaxed text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]">
-              <Icon name="info" size={14} className="mt-0.5 shrink-0 text-primary" />
+            <p className="well mt-3 flex items-start gap-2.5 p-3.5 text-[13px] leading-relaxed text-muted">
+              <Icon name="info" size={15} className="mt-0.5 shrink-0 text-primary" />
               <span>
-                That includes {m(data.expectedIncome)} you’re still expecting — next is {nextIncome.label} on{' '}
-                {formatDay(nextIncome.date)}. Until it arrives,{' '}
+                That includes {m(data.expectedIncome)} you’re still expecting. Next is {nextIncome.label} on{' '}
+                {formatDay(nextIncome.date)}, and until it arrives{' '}
                 {data.beforeIncome >= 0 ? (
                   <strong className="tnum font-medium text-text">{m(data.beforeIncome)} is safe to spend</strong>
                 ) : (
@@ -106,8 +99,8 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
         </div>
 
         <div className="relative mt-6">
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.16em] text-faint">How it’s worked out</p>
-          <dl className="well space-y-1 p-3">
+          <p className="mb-2 text-[13px] font-semibold tracking-[-0.005em] text-muted">How it’s worked out</p>
+          <dl className="well space-y-0.5 p-2.5">
             <Row label="In your accounts now" value={m(data.available)} />
             <Row
               label="Still coming in"
@@ -143,7 +136,7 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
             {data.allocated > 0 && (
               <Row label="Locked pots" value={`−${m(data.allocated)}`} note="Money you’ve set aside and locked" />
             )}
-            <div className="!my-2 h-px bg-[rgb(var(--hairline)/0.1)]" />
+            <div className="!my-1.5 mx-2 h-px bg-[rgb(var(--hairline)/0.1)]" />
             <Row label="Safe to spend" value={m(data.amount)} strong tone={negative ? 'danger' : 'neutral'} />
           </dl>
         </div>
@@ -186,7 +179,7 @@ const Row = ({
   const body = (
     <>
       <dt className="min-w-0">
-        <span className={cn('flex items-center gap-1.5 text-[13px]', strong ? 'font-semibold text-text' : 'text-muted')}>
+        <span className={cn('flex items-center gap-1.5 text-[14px]', strong ? 'font-semibold text-text' : 'text-muted')}>
           {label}
           {onToggle && count !== undefined && count > 0 && (
             <>
@@ -199,9 +192,9 @@ const Row = ({
             </>
           )}
         </span>
-        {note && <span className="mt-0.5 block text-[11.5px] text-faint">{note}</span>}
+        {note && <span className="mt-0.5 block text-[12px] text-faint">{note}</span>}
       </dt>
-      <dd className={cn('tnum shrink-0 text-right', strong ? 'text-[15px] font-semibold' : 'text-[13px] font-medium', TONE[tone])}>
+      <dd className={cn('tnum shrink-0 text-right', strong ? 'text-[16px] font-semibold' : 'text-[14px] font-medium', TONE[tone])}>
         {value}
       </dd>
     </>
@@ -213,14 +206,14 @@ const Row = ({
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          className="flex min-h-[36px] w-full items-start justify-between gap-4 rounded-lg px-1.5 py-1.5 text-left transition-colors duration-300 ease-fluid hover:bg-[rgb(var(--hairline)/0.04)]"
+          className="flex min-h-[40px] w-full items-start justify-between gap-4 rounded-xl px-2 py-2 text-left transition-colors duration-300 ease-fluid hover:bg-fill"
         >
           {body}
         </button>
       </div>
     );
   }
-  return <div className="flex min-h-[36px] items-start justify-between gap-4 px-1.5 py-1.5">{body}</div>;
+  return <div className="flex min-h-[40px] items-start justify-between gap-4 px-2 py-2">{body}</div>;
 };
 
 /** The payments behind a line, so the total is never taken on trust. */

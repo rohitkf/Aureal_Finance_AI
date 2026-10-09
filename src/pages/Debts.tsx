@@ -7,7 +7,8 @@ import { money, percent } from '@/lib/format';
 import { useAppState, useLoading, useSettings, useToday } from '@/lib/store';
 import { Badge } from '@/components/ui/Badge';
 import { ButtonLink } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow } from '@/components/ui/Card';
+import { Card, CardHeader, PageHeader, StatGroup } from '@/components/ui/Card';
+import { IconTile } from '@/components/ui/List';
 import { Icon } from '@/components/ui/Icon';
 import { Progress } from '@/components/ui/Progress';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
@@ -46,73 +47,65 @@ export const Debts = () => {
   }
 
   return (
-    <div className="space-y-8">
-      <header>
-        <Eyebrow>Debt</Eyebrow>
-        <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">What you owe</h1>
-        <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-muted">
-          Balances, utilisation and how long your current payments would take to clear everything.
-        </p>
-      </header>
+    <div className="space-y-6 sm:space-y-8">
+      <PageHeader
+        title="Debts"
+        subtitle="What you owe, how much of your limits it uses, and how long it would take to clear."
+      />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <Eyebrow>Total debt</Eyebrow>
-          <p className="tnum mt-2 font-display text-metric-lg text-danger">{money(debt, { masked: maskBalances })}</p>
-          <p className="mt-0.5 text-body-sm text-muted">
-            Across {facilities.length === 1 ? '1 account' : `${facilities.length} accounts`} you owe on
-          </p>
-        </Card>
-        <Card>
-          <Eyebrow>Monthly payments</Eyebrow>
-          <p className="tnum mt-2 font-display text-metric-lg text-text">{money(monthlyPayments, { compact: true })}</p>
-          <p className="mt-0.5 text-body-sm text-muted">
-            {monthlyPayments > 0
-              ? 'Standing orders into what you owe'
-              : 'None scheduled — set a recurring transfer to a card or loan'}
-          </p>
-        </Card>
-        <Card>
-          <Eyebrow>Credit utilisation</Eyebrow>
-          <p
-            className={cn(
-              'tnum mt-2 font-display text-metric-lg',
-              utilisation >= 80 ? 'text-danger' : utilisation >= 30 ? 'text-warning' : 'text-success',
-            )}
-          >
-            {percent(utilisation, 1)}
-          </p>
-          <Progress
-            className="mt-3"
-            value={summary.cardDebt}
-            max={limit || 1}
-            tone={utilisation >= 80 ? 'danger' : utilisation >= 30 ? 'warning' : 'success'}
-            label={`Overall credit utilisation ${percent(utilisation, 1)}`}
-          />
-        </Card>
-        <Card>
-          <Eyebrow>Estimated payoff</Eyebrow>
-          <p className="tnum mt-2 font-display text-metric-lg text-primary">
-            {payoffMonths === null ? '—' : payoffLabel(payoffMonths)}
-          </p>
-          <p className="mt-0.5 text-body-sm text-muted">
-            {payoffMonths !== null
-              ? `At ${money(monthlyPayments, { compact: true })} a month, including about ${money(summary.monthlyInterest, { compact: true })} of interest now.`
-              : monthlyPayments > 0
-                ? 'Your scheduled payments don’t cover the interest.'
-                : 'Schedule a payment to see when you’d be clear.'}
-          </p>
-        </Card>
-      </section>
+      <StatGroup
+        stats={[
+          {
+            label: 'Total debt',
+            value: money(debt, { masked: maskBalances }),
+            tone: 'danger',
+            note: `Across ${facilities.length === 1 ? '1 account' : `${facilities.length} accounts`} you owe on`,
+          },
+          {
+            label: 'Monthly payments',
+            value: money(monthlyPayments, { compact: true }),
+            note:
+              monthlyPayments > 0
+                ? 'Standing orders into what you owe'
+                : 'None scheduled. Set a recurring transfer to a card or loan.',
+          },
+          {
+            label: 'Credit utilisation',
+            value: percent(utilisation, 1),
+            tone: utilisation >= 80 ? 'danger' : utilisation >= 30 ? 'warning' : 'success',
+            note: (
+              <Progress
+                className="mt-1.5"
+                size="sm"
+                value={summary.cardDebt}
+                max={limit || 1}
+                tone={utilisation >= 80 ? 'danger' : utilisation >= 30 ? 'warning' : 'success'}
+                label={`Overall credit utilisation ${percent(utilisation, 1)}`}
+              />
+            ),
+          },
+          {
+            label: 'Estimated payoff',
+            value: payoffMonths === null ? 'Not yet' : payoffLabel(payoffMonths),
+            tone: 'primary',
+            note:
+              payoffMonths !== null
+                ? `At ${money(monthlyPayments, { compact: true })} a month, including about ${money(summary.monthlyInterest, { compact: true })} of interest now.`
+                : monthlyPayments > 0
+                  ? 'Your scheduled payments don’t cover the interest.'
+                  : 'Schedule a payment to see when you’d be clear.',
+          },
+        ]}
+      />
 
       {utilisation >= 50 && (
-        <div className="flex items-start gap-3 rounded-xl bg-warning/8 p-4 shadow-[inset_0_0_0_1px_rgb(var(--warning)/0.3)]">
+        <div className="plate flex items-start gap-3 p-4">
           <Icon name="info" size={18} className="mt-0.5 shrink-0 text-warning" />
           <p className="text-body-sm text-muted">
             <strong className="text-text">Your utilisation is {percent(utilisation, 1)}.</strong> Lenders generally
             look for under 30%. Paying{' '}
             {money(summary.toThirtyPercent, { compact: true })} off your cards would bring you under
-            that line — no rush, just something worth knowing.
+            that line. No rush, just something worth knowing.
           </p>
         </div>
       )}
@@ -134,9 +127,7 @@ export const Debts = () => {
                 <Card key={card.id} className="space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-high text-primary">
-                        <Icon name="card" size={20} />
-                      </span>
+                      <IconTile icon="card" tint="primary" size="lg" />
                       <div className="min-w-0">
                         <Link to={`/accounts/${card.id}`} className="inline-flex min-h-[24px] items-center font-display text-headline-sm text-text hover:underline">
                           {card.name}
@@ -164,7 +155,7 @@ export const Debts = () => {
                     label={`${card.name}: ${percent(util, 1)} of limit used`}
                   />
 
-                  <dl className="grid grid-cols-2 gap-3 border-t border-[rgb(var(--hairline)/0.08)] pt-3 text-body-sm sm:grid-cols-4">
+                  <dl className="well grid grid-cols-2 gap-3 p-3.5 text-body-sm sm:grid-cols-4">
                     <Item label="Available" value={money(availableCredit(card), { compact: true })} />
                     <Item label="Payment due" value={due ? formatMediumDate(due) : 'Not set'} />
                     <Item label="Minimum" value={money(card.minimumPayment ?? 0, { compact: true })} tone="danger" />
@@ -205,7 +196,7 @@ export const Debts = () => {
         </section>
       )}
 
-      <Card tone="well" className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+      <Card className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h3 className="font-display text-headline-sm text-text">Want to clear this faster?</h3>
           <p className="text-body-sm text-muted">

@@ -42,27 +42,33 @@ export default {
         danger: token('danger'),
         'on-danger': token('on-danger'),
         info: token('info'),
+        // iOS's grey fill, for wells, tracks and quiet buttons.
+        fill: 'rgb(var(--fill) / var(--fill-alpha))',
       },
       fontFamily: {
-        // Geist carries the interface and every figure; Jakarta is reserved
-        // for display type, where its wider geometry earns its place.
+        // One family, as on an iPhone: Geist carries the interface, every
+        // figure and the large titles. `display` is kept as a name so the
+        // places that ask for display type still read as such in the source.
         sans: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        display: ['Jakarta', 'Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       fontSize: {
-        'label-sm': ['11px', { lineHeight: '14px', letterSpacing: '0.05em', fontWeight: '500' }],
-        'label-md': ['12px', { lineHeight: '16px', letterSpacing: '0.04em', fontWeight: '600' }],
-        'body-sm': ['13px', { lineHeight: '18px' }],
-        'body-md': ['14px', { lineHeight: '22px' }],
-        'body-lg': ['16px', { lineHeight: '26px' }],
+        // Sized for reading at arm's length on a phone, as iOS sizes its text
+        // styles: nothing that carries meaning goes below 12px, and labels
+        // are not letter-spaced — tracking only slows small type down.
+        'label-sm': ['12px', { lineHeight: '16px', letterSpacing: '-0.003em', fontWeight: '500' }],
+        'label-md': ['12.5px', { lineHeight: '17px', letterSpacing: '-0.005em', fontWeight: '600' }],
+        'body-sm': ['13.5px', { lineHeight: '19px', letterSpacing: '-0.005em' }],
+        'body-md': ['15px', { lineHeight: '22px', letterSpacing: '-0.01em' }],
+        'body-lg': ['17px', { lineHeight: '26px', letterSpacing: '-0.012em' }],
         'metric-sm': ['16px', { lineHeight: '24px', letterSpacing: '-0.01em', fontWeight: '600' }],
-        'metric-md': ['24px', { lineHeight: '32px', letterSpacing: '-0.015em', fontWeight: '600' }],
-        'metric-lg': ['36px', { lineHeight: '44px', letterSpacing: '-0.02em', fontWeight: '700' }],
-        'headline-sm': ['18px', { lineHeight: '26px', letterSpacing: '-0.01em', fontWeight: '600' }],
-        'headline-md': ['24px', { lineHeight: '32px', letterSpacing: '-0.015em', fontWeight: '600' }],
-        'headline-lg': ['32px', { lineHeight: '40px', letterSpacing: '-0.02em', fontWeight: '600' }],
-        hero: ['48px', { lineHeight: '56px', letterSpacing: '-0.03em', fontWeight: '700' }],
-        'hero-mobile': ['36px', { lineHeight: '44px', letterSpacing: '-0.025em', fontWeight: '700' }],
+        'metric-md': ['24px', { lineHeight: '30px', letterSpacing: '-0.02em', fontWeight: '600' }],
+        'metric-lg': ['34px', { lineHeight: '40px', letterSpacing: '-0.03em', fontWeight: '700' }],
+        'headline-sm': ['19px', { lineHeight: '26px', letterSpacing: '-0.02em', fontWeight: '600' }],
+        'headline-md': ['24px', { lineHeight: '30px', letterSpacing: '-0.022em', fontWeight: '700' }],
+        'headline-lg': ['32px', { lineHeight: '38px', letterSpacing: '-0.028em', fontWeight: '700' }],
+        hero: ['48px', { lineHeight: '54px', letterSpacing: '-0.035em', fontWeight: '700' }],
+        'hero-mobile': ['36px', { lineHeight: '42px', letterSpacing: '-0.03em', fontWeight: '700' }],
       },
       borderRadius: {
         xl: '0.75rem',
@@ -80,6 +86,8 @@ export default {
         float: '0 2px 6px rgb(var(--ambient) / var(--ambient-a)), 0 32px 64px -28px rgb(var(--ambient) / var(--ambient-b))',
         sheet: '0 -12px 60px -18px rgb(var(--ambient) / var(--ambient-b))',
         'inner-top': 'inset 0 1px 0 0 rgb(255 255 255 / 0.08)',
+        // A raised thumb: the selected segment, a switch knob.
+        thumb: '0 1px 2px rgb(0 0 0 / 0.12), 0 3px 8px -2px rgb(0 0 0 / 0.16)',
       },
       transitionTimingFunction: {
         // The house curve: heavy start, long glide out.
