@@ -135,8 +135,8 @@ export const AccountGroupDialog = ({
             ]}
             hint={
               side === 'asset'
-                ? 'What you own — adds to your net worth. A bank account here can count as spendable money; switch it on in Cash flow setup.'
-                : 'What you owe — taken off your net worth. Spending on an account here adds to the debt, and a payment brings it down.'
+                ? 'What you own. It adds to your net worth. A bank account here can count as spendable money; switch it on in Cash flow setup.'
+                : 'What you owe. It comes off your net worth. Spending on an account here adds to the debt, and a payment brings it down.'
             }
             className="w-full [&>button]:flex-1"
           />

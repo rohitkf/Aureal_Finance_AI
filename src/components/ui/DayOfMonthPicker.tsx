@@ -69,7 +69,7 @@ export const DayOfMonthPicker = ({ value, onChange, label, hint, id, optional }:
           span, span && 'px-3',
           active
             ? 'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.22),0_6px_16px_-8px_rgb(var(--primary-strong)/0.8)]'
-            : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.06)] hover:text-text',
+            : 'bg-fill text-muted hover:text-text',
         )}
       >
         {children}
@@ -79,7 +79,7 @@ export const DayOfMonthPicker = ({ value, onChange, label, hint, id, optional }:
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-faint">{label}</span>
+      <span className="pl-1 text-[13px] font-medium tracking-[-0.005em] text-muted">{label}</span>
       <div
         ref={groupRef}
         id={id}

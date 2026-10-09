@@ -16,6 +16,7 @@ import type { AppState } from '@/lib/types';
 
 const dispatch = vi.fn();
 let minimumBalance = 0;
+let userName = 'Rohit';
 
 const state = () =>
   ({
@@ -32,7 +33,7 @@ const state = () =>
       currency: 'GBP',
       locale: 'en-GB',
       minimumBalance,
-      userName: 'Rohit',
+      userName,
       maskBalances: false,
       theme: 'system',
       accents: DEFAULT_ACCENTS,
@@ -60,6 +61,7 @@ const page = () => (
 beforeEach(() => {
   dispatch.mockClear();
   minimumBalance = 0;
+  userName = 'Rohit';
 });
 
 describe('the minimum balance, when Settings draws before the profile loads', () => {
@@ -82,5 +84,23 @@ describe('the minimum balance, when Settings draws before the profile loads', ()
     await user.click(document.body);
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'update-settings', settings: { minimumBalance: 260 } });
+  });
+});
+
+describe('your name, when Settings draws before the profile loads', () => {
+  it('shows the stored name once it arrives, so leaving the field cannot save the placeholder over it', async () => {
+    const user = userEvent.setup();
+    // The empty state's name, before the profile has loaded.
+    userName = 'You';
+    const { rerender } = render(page());
+    expect(screen.getByLabelText('Name')).toHaveValue('You');
+
+    userName = 'Rohit Kumar';
+    rerender(page());
+    expect(screen.getByLabelText('Name')).toHaveValue('Rohit Kumar');
+
+    await user.click(screen.getByLabelText('Name'));
+    await user.click(document.body);
+    expect(dispatch).not.toHaveBeenCalledWith({ type: 'update-settings', settings: { userName: 'You' } });
   });
 });

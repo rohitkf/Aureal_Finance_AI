@@ -90,7 +90,7 @@ you can edit or clear like anything else.
 | **Account detail** | How has this account behaved, and what's scheduled against it? |
 | **Transactions** | What did I spend, filtered any way I like? |
 | **Budget** | Am I on track this month, category by category? |
-| **Forecast** | What will my balance look like, and when is it tightest? |
+| **Time Machine** | Over any window I pick, and the accounts I pick, what will I have left at the end? |
 | **Recurring** | What leaves and arrives on a schedule? |
 | **Subscriptions** | What am I paying for, and what does it cost over a year? |
 | **Goals** | Am I actually on track to reach them? |
@@ -100,8 +100,7 @@ you can edit or clear like anything else.
 | **Sign in / up / reset** | Email and password, with a proper forgotten-password flow. |
 
 Plus: global search (`⌘K` / `Ctrl+K`) including natural-language questions such as
-*"how much did I spend on food last month"*, a quick-add flow behind the floating **+**, and a
-what-if simulator on the forecast screen.
+*"how much did I spend on food last month"*, and a quick-add flow behind the floating **+**.
 
 ---
 
@@ -119,8 +118,11 @@ what-if simulator on the forecast screen.
   state, sync status and utilisation all read without colour perception (WCAG 1.4.1).
 - **Virtual accounts are allocations, not extra money.** The Accounts screen says so explicitly and
   never presents an envelope as a separate balance.
-- **Light and dark are two designed palettes**, not an inversion — "Ethereal Glass" and "Soft
-  Structuralism" respectively. See [DESIGN.md](./DESIGN.md).
+- **Simple on the surface, everything still there.** Each screen shows the common case; the
+  rest is one tap away behind "How this works" or "More options", and opens by itself whenever
+  something in it is set.
+- **Light and dark are two designed palettes**, not an inversion — iPhone-style glass over a
+  colour wallpaper in both. See [DESIGN.md](./DESIGN.md).
 - **Motion never hides content.** Scroll-entry animations are gated behind a flag the app sets at
   runtime, with a timeout backstop, so a failed observer can never leave a balance invisible.
 
@@ -143,13 +145,13 @@ src/
   components/
     ui/             Design system: Button, Card, Badge, Field, Modal, Toast, States, Icon
     charts/         Balance, net worth, income/expense and donut charts
-    ...             TransactionRow, MetricCard, SafeToSpendCard, AppShell, CommandPalette
+    ...             TransactionRow, SafeToSpendCard, AppShell, CommandPalette
   pages/            One file per screen
   pages/auth/       Sign in, sign up, forgot and reset password
 supabase/migrations/  The schema, RLS policies and triggers
   data/sample.ts    Opt-in sample data, dated relative to today
   hooks/            Theme, media queries, element width, online status
-public/fonts/       Self-hosted variable woff2 (Geist, Plus Jakarta Sans) — 108KB
+public/fonts/       Self-hosted variable woff2 (Geist) — 46KB
 ```
 
 ### The finance engine
@@ -163,6 +165,9 @@ Everything on screen derives from pure functions in `src/lib`, which makes the n
 - **`buildForecast(state, today, days)`** — walks the horizon day by day, applying scheduled
   transactions and generated recurrences, and never double-counts a scheduled transaction against
   the rule that produced it. Returns the daily series plus the peak, trough and totals.
+- **`timeMachine(state, today, { from, to, accountIds })`** — the Time Machine screen. Replays
+  what happened in the window from the ledger and projects what has not, line by line, with each
+  chosen account's balance after every line. Start, plus money in, less money out, is the end.
 - **`safeToSpend(state, today)`** — available cash, plus income expected before month end, minus
   everything committed, minus the minimum balance.
 - **`budgetProgress(state, month)`** — spend against limits, honouring category splits, sorted by
@@ -172,7 +177,7 @@ Everything on screen derives from pure functions in `src/lib`, which makes the n
 
 One transaction row component is used on the dashboard, the ledger, account detail, subscription
 detail and search results — so a merchant looks identical everywhere it appears. The same applies
-to metric cards, progress bars, badges, empty states and skeletons.
+to stat panes, progress bars, badges, empty states and skeletons.
 
 ### Charts
 
@@ -182,10 +187,11 @@ stretched. Every chart also exposes its full data as a screen-reader table (WCAG
 
 ### Surfaces
 
-Cards that lead a screen use a **double-bezel**: an outer tray holding an inner plate, with
-concentric radii and an inner top highlight, so they read as machined hardware rather than
-rectangles with borders. There are no 1px solid grey borders in the product — every edge is an
-inset hairline that works in both themes. See [DESIGN.md](./DESIGN.md).
+Every card is a pane of frosted **glass** over a colour wallpaper — a tint, a rim of light and a
+specular line across the top — laid out the way an iPhone lays things out: large titles, grouped
+lists, capsule buttons and a floating tab bar. Real backdrop blur is kept to the fixed chrome, so
+scrolling never pays for it. There are no 1px solid grey borders in the product. See
+[DESIGN.md](./DESIGN.md).
 
 ---
 
@@ -252,7 +258,7 @@ QA_EMAIL=you@example.com QA_PASSWORD=… npm run qa   # in another
 | --- | --- |
 | `qa:responsive` | No horizontal overflow on any screen at any of the six widths |
 | `qa:a11y` | Names, labels, headings, target sizes, AA contrast in both themes, keyboard operation |
-| `qa:flows` | Sign in → add expense → numbers move; recurring payment → forecast changes; budget → counts existing spend; search; destructive confirmation |
+| `qa:flows` | Sign in → add expense → numbers move; recurring payment → Time Machine changes; budget → counts existing spend; search; destructive confirmation |
 | `qa:states` | Every empty state, the 404 screen, service-worker registration and offline loading |
 | — | Suites needing sign-in skip cleanly when `QA_EMAIL` / `QA_PASSWORD` are unset |
 | `qa:screenshots` | Captures every screen in both themes at desktop and phone widths |

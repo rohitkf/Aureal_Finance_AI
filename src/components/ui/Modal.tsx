@@ -2,7 +2,8 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/cn';
 import { useIsDesktop } from '@/hooks/useMediaQuery';
-import { Button, IconButton } from './Button';
+import { Button } from './Button';
+import { Icon } from './Icon';
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -132,8 +133,10 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
 
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
+      {/* A dim, as iOS dims behind a sheet. The blur here is a fixed layer
+          that never moves, so it is composited once. */}
       <div
-        className="absolute inset-0 animate-fade-in bg-black/55 backdrop-blur-xl"
+        className="absolute inset-0 animate-fade-in bg-black/40 backdrop-blur-[3px]"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -145,23 +148,36 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
         // A dialog with no field of its own (a confirmation) focuses the panel
         // rather than its destructive button.
         tabIndex={-1}
+        // A sheet of glass: the one surface besides the bars that is allowed
+        // a real backdrop blur, because it is fixed and its content scrolls
+        // inside it rather than it scrolling over anything.
         className={cn(
-          'relative flex max-h-[92vh] w-full flex-col bg-[rgb(var(--surface-base))] shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),inset_0_1px_0_0_rgb(255_255_255/0.06),0_32px_80px_-24px_rgb(var(--ambient)/0.8)]',
+          'glass-bar relative flex max-h-[92vh] w-full flex-col [--bar-alpha:0.9]',
           widths[size],
-          isDesktop ? 'animate-slide-up rounded-[1.75rem]' : 'animate-sheet-up rounded-t-[2rem] pb-[env(safe-area-inset-bottom)]',
+          isDesktop ? 'animate-slide-up rounded-[2rem]' : 'animate-sheet-up rounded-t-[2rem] pb-[env(safe-area-inset-bottom)]',
         )}
       >
-        {!isDesktop && <div className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-[rgb(var(--hairline)/0.2)]" />}
-        <div className="flex items-start justify-between gap-4 px-6 pb-4 pt-5">
-          <div className="min-w-0">
-            <h2 className="font-display text-[19px] font-semibold tracking-[-0.02em] text-text">{title}</h2>
-            {description && <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{description}</p>}
+        {!isDesktop && <div className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-[rgb(var(--hairline)/0.22)]" />}
+        <div className="flex items-start justify-between gap-4 px-6 pb-3 pt-4">
+          <div className="min-w-0 pt-1">
+            <h2 className="font-display text-[20px] font-bold tracking-[-0.025em] text-text">{title}</h2>
+            {description && <p className="mt-1 text-[13px] leading-relaxed text-muted">{description}</p>}
           </div>
-          <IconButton icon="close" label="Close" onClick={onClose} />
+          {/* iOS's close: a small grey disc with a cross, out of the way of
+              the title and never the thing that takes focus. */}
+          <button
+            type="button"
+            aria-label="Close"
+            title="Close"
+            onClick={onClose}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fill text-muted transition-all duration-300 ease-fluid hover:text-text active:scale-[0.92]"
+          >
+            <Icon name="close" size={15} />
+          </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">{children}</div>
         {footer && (
-          <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-[rgb(var(--hairline)/0.08)] px-6 py-4">
+          <div className="flex shrink-0 items-center justify-end gap-2.5 px-6 py-4 shadow-[inset_0_1px_0_0_rgb(var(--hairline)/var(--hairline-alpha))]">
             {footer}
           </div>
         )}

@@ -66,7 +66,7 @@ export const SignUp = () => {
       >
         <div className="mt-8 space-y-5">
           <FormNotice tone="success">
-            Your account is created. The link expires in an hour — if it does, sign up again with the same email.
+            Your account is created. The link expires in an hour. If it does, sign up again with the same email.
           </FormNotice>
           <p className="text-[13px] leading-relaxed text-muted">
             Nothing in your inbox after a minute or two? Check the spam folder, and make sure the address above is
@@ -80,7 +80,7 @@ export const SignUp = () => {
   return (
     <AuthLayout
       title="Create your account"
-      description="It starts empty — your numbers, from your first transaction."
+      description="It starts empty: your numbers, from your first transaction."
       footer={
         <>
           Already have an account? <AuthLink to="/login">Sign in</AuthLink>

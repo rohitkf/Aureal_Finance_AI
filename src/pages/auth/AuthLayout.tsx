@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { Atmosphere } from '@/components/Atmosphere';
 import { Logo } from '@/components/Logo';
 import { Eyebrow } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { Reveal } from '@/components/ui/Reveal';
 
 const PROMISES: Array<[string, string]> = [
-  ['Safe to Spend', 'One figure, worked out for you — no mental arithmetic.'],
+  ['Safe to Spend', 'One figure, worked out for you. No mental arithmetic.'],
   ['Balance forecasting', 'See your lowest point long before you reach it.'],
   ['Your data, yours alone', 'Every row is locked to your account at the database.'],
 ];
@@ -27,24 +28,10 @@ export const AuthLayout = ({
   footer?: ReactNode;
 }) => (
   <div className="relative grid min-h-[100dvh] bg-background lg:grid-cols-[1.05fr_1fr]">
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
-      <div
-        className="absolute -left-[15%] top-[5%] h-[65vmax] w-[65vmax] animate-drift rounded-full blur-[130px]"
-        style={{ background: 'rgb(var(--mesh-1) / calc(var(--mesh-opacity) * 1.6))' }}
-      />
-      <div
-        className="absolute -bottom-[25%] left-[5%] h-[55vmax] w-[55vmax] animate-drift rounded-full blur-[130px]"
-        style={{ background: 'rgb(var(--mesh-2) / calc(var(--mesh-opacity) * 1.3))', animationDelay: '-10s' }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          opacity: 'var(--grain-opacity)',
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E\")",
-        }}
-      />
-    </div>
+    {/* The same wallpaper as inside the app, so signing in does not feel
+        like arriving somewhere else. It used to be two blurred circles,
+        which re-rasterised on every frame of their drift. */}
+    <Atmosphere />
 
     {/* ---------------- Brand panel ---------------- */}
     <div className="relative hidden flex-col justify-between px-16 py-24 lg:flex xl:px-24 xl:py-32">
@@ -71,7 +58,7 @@ export const AuthLayout = ({
         </Reveal>
         <Reveal delay={240}>
           <p className="mt-8 max-w-md text-[16px] leading-relaxed text-muted">
-            Aureal reads your accounts, subtracts everything already committed, protects your minimum balance — and
+            Aureal reads your accounts, subtracts everything already committed, protects your minimum balance, and
             gives you the one number that matters.
           </p>
         </Reveal>
@@ -80,7 +67,7 @@ export const AuthLayout = ({
           {PROMISES.map(([heading, body], i) => (
             <Reveal key={heading} delay={320 + i * 90}>
               <div className="flex gap-4">
-                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-success/12 text-success shadow-[inset_0_0_0_1px_rgb(var(--success)/0.25)]">
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
                   <Icon name="check" size={13} />
                 </span>
                 <div>
@@ -96,7 +83,7 @@ export const AuthLayout = ({
       <Reveal delay={600}>
         <p className="flex items-center gap-2.5 text-[12px] text-faint">
           <Icon name="lock" size={13} />
-          Encrypted in transit and at rest · row-level security on every table
+          Encrypted in transit and at rest, with row-level security on every table
         </p>
       </Reveal>
     </div>
@@ -105,7 +92,7 @@ export const AuthLayout = ({
     <div className="relative flex items-center justify-center px-5 py-20 sm:px-10 lg:py-24">
       <Reveal className="w-full max-w-[420px]">
         <div className="bezel">
-          <div className="bezel-core p-8 sm:p-10">
+          <div className="bezel-core p-7 sm:p-10">
             <Link to="/login" className="mb-10 flex items-center gap-3 lg:hidden">
               <Logo size={34} />
               <span className="font-display text-[16px] font-bold tracking-[-0.02em] text-text">
@@ -144,9 +131,9 @@ export const FormNotice = ({
   children: ReactNode;
 }) => {
   const styles = {
-    error: 'bg-danger/10 text-danger shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.25)]',
-    success: 'bg-success/10 text-success shadow-[inset_0_0_0_1px_rgb(var(--success)/0.25)]',
-    info: 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.25)]',
+    error: 'bg-danger/15 text-danger',
+    success: 'bg-success/15 text-success',
+    info: 'bg-primary/15 text-primary',
   }[tone];
   return (
     <div

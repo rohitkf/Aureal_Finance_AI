@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { daysBetween, formatMonthYear } from '@/lib/date';
+import { addMonths, formatMonthYear } from '@/lib/date';
 import { money, percent } from '@/lib/format';
 import { newId, useAppState, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
-import { Card, Eyebrow } from '@/components/ui/Card';
+import { Card, PageHeader, StatGroup } from '@/components/ui/Card';
+import { IconTile } from '@/components/ui/List';
 import { MoneyDial } from '@/components/ui/MoneyDial';
-import { isDepository } from '@/lib/finance';
+import { goalOutlook, goalTotals, isDepository } from '@/lib/finance';
 import { DateField, SelectField, TextField } from '@/components/ui/Field';
-import { Icon, type IconName } from '@/components/ui/Icon';
+import type { IconName } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { Progress } from '@/components/ui/Progress';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
@@ -40,23 +41,16 @@ export const Goals = () => {
   const [contributing, setContributing] = useState<{ goal: Goal; amount: string; error?: string } | null>(null);
   const [deleting, setDeleting] = useState<Goal | null>(null);
 
-  const totals = useMemo(
-    () => ({
-      target: state.goals.reduce((s, g) => s + g.target, 0),
-      saved: state.goals.reduce((s, g) => s + g.saved, 0),
-      monthly: state.goals.reduce((s, g) => s + g.monthlyContribution, 0),
-    }),
-    [state.goals],
-  );
-
-  /** Whether the current contribution rate actually gets there in time. */
-  const projection = (goal: Goal) => {
-    const remaining = goal.target - goal.saved;
-    if (remaining <= 0) return { onTrack: true, monthsNeeded: 0, monthsLeft: 0 };
-    const monthsLeft = Math.max(0, Math.round(daysBetween(today, goal.targetDate) / 30.44));
-    const monthsNeeded = goal.monthlyContribution > 0 ? Math.ceil(remaining / goal.monthlyContribution) : Infinity;
-    return { onTrack: monthsNeeded <= monthsLeft, monthsNeeded, monthsLeft };
-  };
+  const totals = useMemo(() => goalTotals(state.goals), [state.goals]);
+  /** A year out, from whenever the form is opened — not a fixed date that goes stale. */
+  const blank = (): Draft => ({
+    name: '',
+    target: '',
+    saved: '0',
+    targetDate: addMonths(today, 12),
+    monthlyContribution: '',
+    linkedAccountId: '',
+  });
 
   const save = () => {
     if (!draft) return;
@@ -103,56 +97,48 @@ export const Goals = () => {
   }
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Eyebrow>Goals</Eyebrow>
-          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">What you’re saving for</h1>
-          <p className="mt-3 text-[14px] leading-relaxed text-muted">
-            Each goal shows whether your current contributions actually get you there in time.
-          </p>
-        </div>
-        <Button
-          variant="primary"
-          icon="plus"
-          onClick={() =>
-            setDraft({ name: '', target: '', saved: '0', targetDate: '2027-12-01', monthlyContribution: '', linkedAccountId: '' })
-          }
-        >
-          New goal
-        </Button>
-      </header>
+    <div className="space-y-6 sm:space-y-8">
+      <PageHeader
+        title="Goals"
+        subtitle="What you’re saving for, and whether you’ll get there in time."
+        actions={
+          <Button size="sm" variant="primary" icon="plus" onClick={() => setDraft(blank())}>
+            New goal
+          </Button>
+        }
+      />
 
       {state.goals.length > 0 && (
-        <section className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <Eyebrow>Saved so far</Eyebrow>
-            <p className="tnum mt-2 font-display text-metric-lg text-success">
-              {money(totals.saved, { compact: true, masked: maskBalances })}
-            </p>
-            <Progress
-              className="mt-3"
-              value={totals.saved}
-              max={totals.target || 1}
-              tone="success"
-              label={`Total saved: ${money(totals.saved)} of ${money(totals.target)}`}
-            />
-          </Card>
-          <Card>
-            <Eyebrow>Total target</Eyebrow>
-            <p className="tnum mt-2 font-display text-metric-lg text-text">
-              {money(totals.target, { compact: true })}
-            </p>
-            <p className="mt-0.5 text-body-sm text-muted">Across {state.goals.length} goals</p>
-          </Card>
-          <Card>
-            <Eyebrow>Monthly contributions</Eyebrow>
-            <p className="tnum mt-2 font-display text-metric-lg text-primary">
-              {money(totals.monthly, { compact: true })}
-            </p>
-            <p className="mt-0.5 text-body-sm text-muted">Set aside every month</p>
-          </Card>
-        </section>
+        <StatGroup
+          stats={[
+            {
+              label: 'Saved so far',
+              value: money(totals.saved, { compact: true, masked: maskBalances }),
+              tone: 'success',
+              note: (
+                <Progress
+                  className="mt-1.5"
+                  size="sm"
+                  value={totals.saved}
+                  max={totals.target || 1}
+                  tone="success"
+                  label={`Total saved: ${money(totals.saved)} of ${money(totals.target)}`}
+                />
+              ),
+            },
+            {
+              label: 'Total target',
+              value: money(totals.target, { compact: true }),
+              note: `Across ${state.goals.length} goals`,
+            },
+            {
+              label: 'Monthly contributions',
+              value: money(totals.monthly, { compact: true }),
+              tone: 'primary',
+              note: 'Set aside every month',
+            },
+          ]}
+        />
       )}
 
       {state.goals.length === 0 ? (
@@ -163,7 +149,7 @@ export const Goals = () => {
             description="Set a target and a date, and Aureal will tell you whether you’re on track to reach it."
             action={{
               label: 'Create your first goal',
-              onClick: () => setDraft({ name: '', target: '', saved: '0', targetDate: '2027-12-01', monthlyContribution: '', linkedAccountId: '' }),
+              onClick: () => setDraft(blank()),
             }}
           />
         </Card>
@@ -171,18 +157,15 @@ export const Goals = () => {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {state.goals.map((goal) => {
             const pct = (goal.saved / goal.target) * 100;
-            const remaining = Math.max(0, goal.target - goal.saved);
-            const p = projection(goal);
-            const complete = remaining === 0;
+            const p = goalOutlook(goal, today);
+            const { remaining, complete } = p;
 
             return (
               <Card key={goal.id} className="flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-2">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <Icon name={(goal.icon as IconName) ?? 'target'} size={20} />
-                  </span>
+                  <IconTile icon={(goal.icon as IconName) || 'target'} tint="primary" size="lg" />
                   <Badge tone={complete ? 'success' : p.onTrack ? 'primary' : 'warning'}>
-                    {complete ? 'Complete' : p.onTrack ? 'On track' : 'Behind schedule'}
+                    {complete ? 'Complete' : p.late ? 'Date passed' : p.onTrack ? 'On track' : 'Behind schedule'}
                   </Badge>
                 </div>
 
@@ -211,7 +194,7 @@ export const Goals = () => {
                   </div>
                 </div>
 
-                <div className="space-y-1 border-t border-[rgb(var(--hairline)/0.08)] pt-3 text-body-sm">
+                <div className="well space-y-1 p-3.5 text-body-sm">
                   <div className="flex justify-between">
                     <span className="text-muted">Target date</span>
                     <span className="font-medium text-text">{formatMonthYear(goal.targetDate)}</span>
@@ -222,11 +205,13 @@ export const Goals = () => {
                   </div>
                   {!complete && (
                     <p className={cn('pt-1 text-body-sm', p.onTrack ? 'text-success' : 'text-warning')}>
-                      {p.monthsNeeded === Infinity
-                        ? 'Add a monthly contribution to start making progress.'
-                        : p.onTrack
-                          ? `At this rate you’ll get there in ${p.monthsNeeded} month${p.monthsNeeded === 1 ? '' : 's'}.`
-                          : `You’d need about ${money(remaining / Math.max(p.monthsLeft, 1), { compact: true })} a month to hit your date.`}
+                      {p.late
+                        ? `${formatMonthYear(goal.targetDate)} has passed. Pick a new date to see what it takes.`
+                        : p.monthsNeeded === null
+                          ? 'Add a monthly contribution to start making progress.'
+                          : p.onTrack
+                            ? `At this rate you’ll get there in ${p.monthsNeeded} month${p.monthsNeeded === 1 ? '' : 's'}.`
+                            : `You’d need about ${money(p.neededPerMonth ?? remaining, { compact: true })} a month to hit your date.`}
                     </p>
                   )}
                 </div>

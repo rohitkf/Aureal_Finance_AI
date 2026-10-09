@@ -43,6 +43,28 @@ export const endOfMonth = (iso: string): string => {
   return ISO(new Date(d.getFullYear(), d.getMonth() + 1, 0));
 };
 
+/**
+ * The next time a day of the month comes round, today included.
+ *
+ * Clamped the way a recurrence is: a card due on the 31st is due on the 30th
+ * in November, not on a "2026-11-31" that every formatter rejects.
+ */
+export const nextMonthlyDate = (day: number, today: string): string => {
+  const on = (iso: string) => {
+    const last = Number(endOfMonth(iso).slice(8));
+    return `${iso.slice(0, 7)}-${String(Math.min(day, last)).padStart(2, '0')}`;
+  };
+  const thisMonth = on(today);
+  return thisMonth >= today ? thisMonth : on(addMonths(startOfMonth(today), 1));
+};
+
+/** "st", "nd", "rd" or "th" — so the 1st, 2nd and 3rd stop reading "1th". */
+export const ordinal = (n: number): string => {
+  const teen = n % 100;
+  if (teen > 10 && teen < 14) return 'th';
+  return ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th';
+};
+
 /* ------------------------------------------------------------------ */
 /* Working days                                                        */
 /* ------------------------------------------------------------------ */

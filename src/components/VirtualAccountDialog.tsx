@@ -232,7 +232,7 @@ export const VirtualAccountDialog = ({
                   setTarget(next);
                   setError(undefined);
                 }}
-                hint="Optional — what you are building towards."
+                hint="Optional. What you are building towards."
               />
 
               <DateField

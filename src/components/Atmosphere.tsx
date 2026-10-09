@@ -1,31 +1,38 @@
 /**
- * The backdrop: a mesh of out-of-focus colour, plus a fine film grain.
+ * The wallpaper: four soft fields of colour the glass sits on, plus a fine
+ * film grain.
  *
- * The colour fields are radial gradients, not blurred circles. They used to be
- * solid circles under `blur(120px)`, which is the same picture by a far more
- * expensive route: a Gaussian blur of a filled circle *is* a radial falloff,
- * but the browser has to re-rasterise it — three times, each 70vmax across —
- * on every frame of the drift. That was the app's background cost on every
- * screen. A gradient is painted once and moved on the compositor thereafter.
+ * The glass reads as glass because there is something behind it with colour
+ * in it — on a flat grey, a translucent card is just a paler grey card. So
+ * the fields are stronger than the old backdrop's, and placed so a phone
+ * screen always has one under its top half and one under its bottom.
  *
- * Both layers are `fixed` and `pointer-events-none`; `will-change: transform`
- * promotes each field so the drift only ever composites.
+ * They are radial gradients, not blurred circles. A Gaussian blur of a filled
+ * circle *is* a radial falloff, but the browser would re-rasterise it on every
+ * frame of the drift; a gradient is painted once and moved on the compositor
+ * thereafter. Both layers are `fixed` and `pointer-events-none`, and
+ * `will-change: transform` promotes each field so the drift only composites.
  */
 const FIELDS = [
   {
-    className: '-left-[20%] -top-[30%] h-[70vmax] w-[70vmax]',
+    className: '-left-[25%] -top-[20%] h-[75vmax] w-[75vmax]',
     token: '--mesh-1',
     delay: '0s',
   },
   {
-    className: '-right-[25%] top-[10%] h-[60vmax] w-[60vmax]',
+    className: '-right-[30%] top-[5%] h-[65vmax] w-[65vmax]',
     token: '--mesh-2',
     delay: '-8s',
   },
   {
-    className: '-bottom-[30%] left-[15%] h-[55vmax] w-[55vmax]',
+    className: '-bottom-[25%] -left-[10%] h-[60vmax] w-[60vmax]',
     token: '--mesh-3',
     delay: '-16s',
+  },
+  {
+    className: '-bottom-[30%] -right-[20%] h-[50vmax] w-[50vmax]',
+    token: '--mesh-4',
+    delay: '-4s',
   },
 ] as const;
 
@@ -36,7 +43,7 @@ export const Atmosphere = () => (
         key={field.token}
         className={`absolute animate-drift rounded-full will-change-transform ${field.className}`}
         style={{
-          background: `radial-gradient(circle at 50% 50%, rgb(var(${field.token}) / var(--mesh-opacity)) 0%, rgb(var(${field.token}) / calc(var(--mesh-opacity) * 0.55)) 35%, transparent 70%)`,
+          background: `radial-gradient(circle at 50% 50%, rgb(var(${field.token}) / var(--mesh-opacity)) 0%, rgb(var(${field.token}) / calc(var(--mesh-opacity) * 0.6)) 38%, transparent 70%)`,
           animationDelay: field.delay,
         }}
       />

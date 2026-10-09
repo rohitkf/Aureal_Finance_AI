@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { formatMediumDate } from '@/lib/date';
+import { addMonths, formatMediumDate, monthKey, startOfMonth } from '@/lib/date';
+import { spendByCategory } from '@/lib/finance';
 import { money } from '@/lib/format';
 import { monthlyEquivalent } from '@/lib/recurrence';
-import { useAppState, useCategoryLookup } from '@/lib/store';
+import { useAppState, useCategoryLookup, useToday } from '@/lib/store';
 import { cn } from '@/lib/cn';
 import { MORE_NAV, PRIMARY_NAV } from './nav';
 import { CategoryIcon } from './CategoryIcon';
@@ -26,6 +27,7 @@ interface Result {
  */
 export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   const state = useAppState();
+  const today = useToday();
   const lookupCategory = useCategoryLookup();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
@@ -44,19 +46,20 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
 
     // A light natural-language layer: pick out a category name from a sentence
     // like "show me everything I spent on food last month".
-    const matchedCategory = state.categories.find(
-      (c) => q.includes(c.name.toLowerCase()) || (c.id === 'groceries' && q.includes('food')),
-    );
+    // "Food" is how people ask about groceries, whatever the category is called.
+    const matchedCategory =
+      state.categories.find((c) => c.kind === 'expense' && q.includes(c.name.toLowerCase())) ??
+      (/\bfood\b/.test(q) ? state.categories.find((c) => c.kind === 'expense' && /grocer|food/i.test(c.name)) : undefined);
     const isSpendQuestion = /spent|spend|spending|how much/.test(q);
 
     const out: Result[] = [];
 
     if (isSpendQuestion && matchedCategory) {
       const lastMonth = /last month/.test(q);
-      const month = lastMonth ? '2026-08' : '2026-09';
-      const total = state.transactions
-        .filter((t) => t.type === 'expense' && t.categoryId === matchedCategory.id && t.date.startsWith(month))
-        .reduce((s, t) => s + t.amount, 0);
+      // Counted from today. These were two fixed months, right for exactly
+      // one September and wrong ever after.
+      const month = monthKey(lastMonth ? addMonths(startOfMonth(today), -1) : today);
+      const total = spendByCategory(state, month).get(matchedCategory.id) ?? 0;
       out.push({
         id: 'answer',
         group: 'Answer',
@@ -130,7 +133,7 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
       seen.add(key);
       return true;
     });
-  }, [query, state, lookupCategory]);
+  }, [query, state, lookupCategory, today]);
 
   useEffect(() => setCursor(0), [query]);
 
@@ -167,14 +170,15 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
 
   return (
     <div className="fixed inset-0 z-[110] flex items-start justify-center p-4 pt-[10vh]">
-      <div className="absolute inset-0 animate-fade-in bg-black/55 backdrop-blur-xl" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 animate-fade-in bg-black/40 backdrop-blur-[3px]" onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Search"
-        className="relative flex max-h-[70vh] w-full max-w-xl animate-slide-up flex-col overflow-hidden rounded-[1.75rem] bg-[rgb(var(--surface-base))] shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),inset_0_1px_0_0_rgb(255_255_255/0.06),0_32px_80px_-24px_rgb(var(--ambient)/0.8)]"
+        // Spotlight's shape: one pane of glass, the field across its top.
+        className="glass-bar relative flex max-h-[70vh] w-full max-w-xl animate-slide-up flex-col overflow-hidden rounded-[1.75rem] [--bar-alpha:0.9]"
       >
-        <div className="flex items-center gap-3 border-b border-[rgb(var(--hairline)/0.08)] px-4">
+        <div className="flex items-center gap-3 px-4 shadow-[inset_0_-1px_0_0_rgb(var(--hairline)/var(--hairline-alpha))]">
           <Icon name="search" size={18} className="shrink-0 text-faint" />
           <input
             autoFocus
@@ -184,7 +188,7 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
             aria-label="Search everything"
             className="h-14 w-full border-0 bg-transparent text-body-lg text-text placeholder:text-faint focus:outline-none focus:ring-0"
           />
-          <kbd className="hidden shrink-0 rounded shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] px-1.5 py-0.5 text-label-sm text-faint sm:block">
+          <kbd className="hidden shrink-0 rounded-full bg-fill px-2.5 py-1 font-sans text-label-sm text-muted sm:block">
             Esc
           </kbd>
         </div>
@@ -206,7 +210,7 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
           )}
           {Object.entries(groups).map(([group, items]) => (
             <div key={group} className="mb-1">
-              <p className="px-3 py-1.5 text-label-sm uppercase tracking-wider text-faint">
+              <p className="px-3 py-1.5 text-[12.5px] font-semibold text-faint">
                 {group} · {items.length}
               </p>
               {items.map((r) => {
@@ -223,13 +227,13 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
                     }}
                     className={cn(
                       'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors duration-400 ease-fluid',
-                      active ? 'bg-surface-high' : 'hover:bg-[rgb(var(--hairline)/0.045)]',
+                      active ? 'bg-fill' : 'hover:bg-fill',
                     )}
                   >
                     {r.categoryId ? (
                       <CategoryIcon categoryId={r.categoryId} size="sm" />
                     ) : (
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[rgb(var(--hairline)/0.08)] text-muted">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-fill text-muted">
                         <Icon name="arrow-right" size={14} />
                       </span>
                     )}

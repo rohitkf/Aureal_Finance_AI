@@ -481,6 +481,9 @@ export const Icon = ({ name, size = 20, title, className, ...rest }: IconProps) 
     {...rest}
   >
     {title ? <title>{title}</title> : null}
-    {PATHS[name]}
+    {/* A name from the database this set does not draw — a goal's icon
+        chosen elsewhere, an old category — gets a neutral box rather than
+        an empty tile. */}
+    {PATHS[name] ?? PATHS.box}
   </svg>
 );

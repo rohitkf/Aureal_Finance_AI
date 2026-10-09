@@ -9,6 +9,10 @@ interface BalanceChartProps {
   days: ForecastDay[];
   /** The floor the user never wants to go below. Drawn as a reference line. */
   minimumBalance: number;
+  /** What the dashed line is called. A card's line is its limit, not a minimum. */
+  floorLabel?: string;
+  /** Leave the dashed line off — a loan has neither a minimum nor a limit. */
+  hideFloor?: boolean;
   height?: number;
   className?: string;
   /** Index at which confirmed history ends and projection begins. */
@@ -28,6 +32,8 @@ interface BalanceChartProps {
 export const BalanceChart = ({
   days,
   minimumBalance,
+  floorLabel = 'Minimum balance',
+  hideFloor = false,
   height,
   className,
   projectedFrom = 0,
@@ -45,8 +51,9 @@ export const BalanceChart = ({
   const geometry = useMemo(() => {
     if (days.length === 0) return null;
     const values = days.map((d) => d.closing);
-    const lo = Math.min(...values, minimumBalance);
-    const hi = Math.max(...values, minimumBalance);
+    const floor = hideFloor ? [] : [minimumBalance];
+    const lo = Math.min(...values, ...floor);
+    const hi = Math.max(...values, ...floor);
 
     // Pad the domain so the line never hugs the frame, but never invent a
     // negative axis when every balance in the series is positive.
@@ -67,9 +74,9 @@ export const BalanceChart = ({
       points: days.map((d, i) => ({ x: sx(i), y: sy(d.closing), day: d })),
       sy,
       ticks,
-      floorVisible: minimumBalance >= minV && minimumBalance <= maxV,
+      floorVisible: !hideFloor && minimumBalance >= minV && minimumBalance <= maxV,
     };
-  }, [days, minimumBalance, width, chartHeight, pad.left, pad.right, pad.top, pad.bottom, compact]);
+  }, [days, minimumBalance, hideFloor, width, chartHeight, pad.left, pad.right, pad.top, pad.bottom, compact]);
 
   if (!geometry || days.length === 0) {
     return <div ref={ref} className={className} style={{ height: chartHeight }} />;
@@ -155,7 +162,7 @@ export const BalanceChart = ({
               opacity={0.85}
             />
             <text x={pad.left + 4} y={floorY - 6} className="fill-[rgb(var(--warning))]" fontSize={11} fontWeight={500}>
-              {compact ? `Min ${moneyAxis(minimumBalance)}` : `Minimum balance ${moneyAxis(minimumBalance)}`}
+              {compact ? `${floorLabel.split(' ')[0]} ${moneyAxis(minimumBalance)}` : `${floorLabel} ${moneyAxis(minimumBalance)}`}
             </text>
           </>
         )}
@@ -229,7 +236,7 @@ export const BalanceChart = ({
           className="plate pointer-events-none absolute top-1 z-10 max-w-[190px] -translate-x-1/2 px-3.5 py-2.5"
           style={{ left: `${Math.min(Math.max((active.x / width) * 100, 18), 82)}%` }}
         >
-          <p className="text-label-sm uppercase tracking-wider text-faint">{formatMediumDate(active.day.date)}</p>
+          <p className="text-[12.5px] font-medium text-faint">{formatMediumDate(active.day.date)}</p>
           <p className="tnum font-display text-metric-sm text-text">{money(active.day.closing)}</p>
           {(active.day.income > 0 || active.day.expenses > 0) && (
             <p className="tnum text-label-sm text-muted">

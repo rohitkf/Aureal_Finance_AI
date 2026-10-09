@@ -43,14 +43,22 @@ const { AddTransactionSheet } = await import('../AddTransactionSheet');
 
 const open = () => render(<AddTransactionSheet open onClose={vi.fn()} />);
 
+/** Repeating sits behind "More options" with the other less common choices. */
+const openWithMore = async () => {
+  const user = userEvent.setup();
+  open();
+  await user.click(screen.getByRole('button', { name: /more options/i }));
+  return user;
+};
+
 beforeEach(() => {
   dispatch.mockClear();
   toast.mockClear();
 });
 
 describe('"This repeats"', () => {
-  it('says that a schedule is created and where to find it', () => {
-    open();
+  it('says that a schedule is created and where to find it', async () => {
+    await openWithMore();
     const checkbox = screen.getByRole('checkbox', { name: /this repeats/i });
     const text = checkbox.textContent ?? '';
     expect(text).toMatch(/schedule/i);
@@ -58,8 +66,8 @@ describe('"This repeats"', () => {
     expect(text).toMatch(/recurring/i);
   });
 
-  it('says you will not have to enter it again', () => {
-    open();
+  it('says you will not have to enter it again', async () => {
+    await openWithMore();
     expect(screen.getByRole('checkbox', { name: /this repeats/i }).textContent).toMatch(
       /won.t need to enter it again/i,
     );
@@ -88,8 +96,7 @@ describe('the transaction type', () => {
 
 describe('the weekend rule', () => {
   it('says which way the payment moves, in the words of the payment', async () => {
-    const user = userEvent.setup();
-    open();
+    const user = await openWithMore();
     await user.click(screen.getByRole('checkbox', { name: /this repeats/i }));
 
     // The default is how a salary behaves, and the hint says so.
@@ -97,8 +104,7 @@ describe('the weekend rule', () => {
   });
 
   it('offers all four things a weekend can do to it, plus leaving it alone', async () => {
-    const user = userEvent.setup();
-    open();
+    const user = await openWithMore();
     await user.click(screen.getByRole('checkbox', { name: /this repeats/i }));
     await user.click(screen.getByRole('combobox', { name: /lands at a weekend/i }));
 
@@ -115,8 +121,7 @@ describe('the weekend rule', () => {
 
 describe('the subscription option', () => {
   it('says what it adds it to and why that is useful', async () => {
-    const user = userEvent.setup();
-    open();
+    const user = await openWithMore();
     await user.click(screen.getByRole('checkbox', { name: /this repeats/i }));
 
     // Subscriptions is a filter on Recurring rather than a screen of its own,

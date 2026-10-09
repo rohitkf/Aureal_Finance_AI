@@ -68,9 +68,9 @@ export const TimePicker = ({ value, onChange, id, describedBy, invalid, disabled
           }
         }}
         className={cn(
-          'flex h-12 w-full items-center justify-between gap-3 rounded-2xl bg-[rgb(var(--hairline)/0.04)] px-4 text-left',
+          'flex h-12 w-full items-center justify-between gap-3 rounded-2xl bg-fill px-4 text-left',
           'text-[14px] tracking-[-0.01em] text-text',
-          'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha)),inset_0_1px_2px_rgb(var(--ambient)/0.06)]',
+          'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.04)]',
           'outline-none transition-all duration-400 ease-fluid',
           'focus-visible:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.55),0_0_0_3px_rgb(var(--primary-strong)/0.18)]',
           'disabled:opacity-50',
@@ -94,7 +94,7 @@ export const TimePicker = ({ value, onChange, id, describedBy, invalid, disabled
                 onChange(nowTime());
                 close();
               }}
-              className="rounded-full px-3 py-1.5 text-[12.5px] text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.3)] transition-all duration-400 ease-fluid hover:bg-primary/10"
+              className="rounded-full bg-primary/15 px-3 py-1.5 text-[13px] font-semibold text-primary transition-all duration-300 ease-fluid hover:bg-primary/20"
             >
               Now
             </button>

@@ -105,7 +105,7 @@ describe('positionAsOf', () => {
   it('agrees with netWorth on today', () => {
     const s = state({ transactions: [txn({ date: '2026-09-15', amount: 250 })] });
     const { assets, liabilities } = positionAsOf(s, TODAY);
-    expect(assets - liabilities).toBe(netWorth(s.accounts));
+    expect(assets - liabilities).toBe(netWorth(s.accounts, []));
   });
 });
 

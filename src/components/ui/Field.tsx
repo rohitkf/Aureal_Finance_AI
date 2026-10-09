@@ -12,14 +12,15 @@ import { DatePicker } from './DatePicker';
 import { TimePicker } from './TimePicker';
 
 /**
- * Controls are wells pressed into their surface — an inset hairline and a
- * faint inner shadow — that lift to a ring on focus. No flat grey borders.
+ * Controls are iOS fills: a grey pressed into the glass, no outline at rest,
+ * that lifts to a blue ring on focus. 15px text, because a field you type
+ * into on a phone is read at arm's length.
  */
 const CONTROL =
-  'w-full rounded-2xl bg-[rgb(var(--hairline)/0.04)] px-4 text-[14px] tracking-[-0.01em] text-text placeholder:text-faint ' +
-  'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha)),inset_0_1px_2px_rgb(var(--ambient)/0.06)] ' +
-  'outline-none transition-all duration-400 ease-fluid ' +
-  'focus:bg-[rgb(var(--hairline)/0.06)] focus:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.55),0_0_0_3px_rgb(var(--primary-strong)/0.18)] ' +
+  'w-full rounded-2xl bg-fill px-4 text-[15px] tracking-[-0.01em] text-text placeholder:text-faint ' +
+  'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.04)] ' +
+  'outline-none transition-all duration-300 ease-fluid ' +
+  'focus:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.6),0_0_0_3px_rgb(var(--primary-strong)/0.2)] ' +
   'disabled:opacity-50';
 
 const INVALID =
@@ -46,18 +47,18 @@ export const Field = ({ label, hint, error, children, className, hideLabel }: Fi
     <div className={cn('flex flex-col gap-2', className)}>
       <label
         htmlFor={id}
-        className={cn('text-[10px] font-medium uppercase tracking-[0.18em] text-faint', hideLabel && 'sr-only')}
+        className={cn('pl-1 text-[13px] font-medium tracking-[-0.005em] text-muted', hideLabel && 'sr-only')}
       >
         {label}
       </label>
       {children({ id, describedBy, invalid: Boolean(error) })}
       {error ? (
-        <p id={errorId} role="alert" className="flex items-center gap-1.5 text-[12.5px] text-danger">
+        <p id={errorId} role="alert" className="flex items-center gap-1.5 pl-1 text-[12.5px] text-danger">
           <Icon name="alert" size={13} />
           {error}
         </p>
       ) : hint ? (
-        <p id={hintId} className="text-[12.5px] leading-snug text-faint">
+        <p id={hintId} className="pl-1 text-[12.5px] leading-snug text-faint">
           {hint}
         </p>
       ) : null}
@@ -182,9 +183,8 @@ export const AmountField = forwardRef<
       {({ id, describedBy, invalid }) => (
         <div
           className={cn(
-            'flex items-baseline justify-center gap-1 rounded-[1.625rem] bg-[rgb(var(--hairline)/0.04)] px-5 py-8',
-            'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha)),inset_0_1px_2px_rgb(var(--ambient)/0.06)]',
-            'transition-all duration-400 ease-fluid',
+            'flex items-baseline justify-center gap-1 rounded-[1.5rem] bg-fill px-5 py-7',
+            'transition-all duration-300 ease-fluid',
             'focus-within:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.5),0_0_0_4px_rgb(var(--primary-strong)/0.16)]',
             invalid && INVALID,
           )}
@@ -210,7 +210,10 @@ export const AmountField = forwardRef<
             className={cn(
               'tnum w-auto min-w-[3ch] max-w-full border-0 bg-transparent p-0 text-center font-display [field-sizing:content]',
               'text-[clamp(2.75rem,10vw,3.25rem)] font-bold leading-none tracking-[-0.045em]',
-              'placeholder:text-faint/40 focus:outline-none focus:ring-0',
+              // The focus ring is the box around the figure, so the input
+              // draws none of its own — including the offset the global ring
+              // would paint, which showed as a pale rectangle behind "0.00".
+              'placeholder:text-faint/40 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
               color,
               className,
             )}
@@ -223,7 +226,13 @@ export const AmountField = forwardRef<
 });
 AmountField.displayName = 'AmountField';
 
-/** A radio group rendered as a pill track with a filled selection. */
+/**
+ * A radio group drawn as iOS draws one: a grey track with the chosen option
+ * on a raised white thumb. Selection is shown by lift, not by a slab of blue,
+ * so a screen with three of these does not have three competing calls to
+ * action. One row that scrolls sideways when it is long, never two rows — a
+ * wrapped control reads as two controls.
+ */
 export const SegmentedControl = <T extends string>({
   value,
   onChange,
@@ -250,40 +259,39 @@ export const SegmentedControl = <T extends string>({
   className?: string;
   size?: 'sm' | 'md';
 }) => (
-  <div className="flex flex-col gap-2">
-  <div
-    role="radiogroup"
-    aria-label={label}
-    className={cn(
-      'inline-flex flex-wrap gap-1 rounded-full bg-[rgb(var(--hairline)/0.04)] p-1',
-      'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]',
-      className,
-    )}
-  >
-    {options.map((o) => {
-      const active = o.value === value;
-      return (
-        <button
-          key={o.value}
-          type="button"
-          role="radio"
-          aria-checked={active}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            'inline-flex items-center justify-center rounded-full font-medium tracking-[-0.005em]',
-            'transition-all duration-500 ease-fluid active:scale-[0.97]',
-            size === 'sm' ? 'min-h-[32px] px-3.5 text-[12px]' : 'min-h-[40px] px-4 text-[13px]',
-            active
-              ? 'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.22),0_6px_16px_-8px_rgb(var(--primary-strong)/0.8)]'
-              : 'text-muted hover:text-text',
-          )}
-        >
-          {o.label}
-        </button>
-      );
-    })}
-  </div>
-    {hint && <p className="text-[12.5px] leading-snug text-faint">{hint}</p>}
+  <div className="flex min-w-0 max-w-full flex-col gap-2">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={cn(
+        'hide-scrollbar inline-flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-fill p-[3px]',
+        className,
+      )}
+    >
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              'inline-flex shrink-0 grow items-center justify-center whitespace-nowrap rounded-full tracking-[-0.005em]',
+              'transition-all duration-300 ease-fluid active:scale-[0.97]',
+              size === 'sm' ? 'min-h-[32px] px-3.5 text-[12.5px]' : 'min-h-[38px] px-4 text-[13.5px]',
+              active
+                ? 'bg-surface-base font-semibold text-text shadow-thumb dark:bg-surface-bright'
+                : 'font-medium text-muted hover:text-text',
+            )}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+    {hint && <p className="pl-1 text-[12.5px] leading-snug text-faint">{hint}</p>}
   </div>
 );
 
@@ -303,24 +311,24 @@ export const Toggle = ({
     role="switch"
     aria-checked={checked}
     onClick={() => onChange(!checked)}
-    className="flex w-full items-center justify-between gap-5 rounded-2xl px-2 py-2.5 text-left transition-colors duration-400 ease-fluid hover:bg-[rgb(var(--hairline)/0.04)]"
+    className="flex w-full items-center justify-between gap-5 rounded-2xl px-2 py-2.5 text-left transition-colors duration-300 ease-fluid hover:bg-fill"
   >
     <span className="min-w-0">
-      <span className="block text-[14px] tracking-[-0.01em] text-text">{label}</span>
+      <span className="block text-[15px] tracking-[-0.01em] text-text">{label}</span>
       {description && <span className="mt-0.5 block text-[12.5px] leading-snug text-muted">{description}</span>}
     </span>
     <span
+      // iOS's switch: 51 by 31, green when on, a white knob that carries
+      // the state by where it sits as well as by the colour behind it.
       className={cn(
-        'relative h-7 w-[50px] shrink-0 rounded-full transition-all duration-500 ease-fluid',
-        checked
-          ? 'bg-primary-strong shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2),0_4px_12px_-4px_rgb(var(--primary-strong)/0.7)]'
-          : 'bg-[rgb(var(--hairline)/0.09)] shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]',
+        'relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-300 ease-fluid',
+        checked ? 'bg-success' : 'bg-[rgb(var(--fill)/calc(var(--fill-alpha)*2.2))]',
       )}
     >
       <span
         className={cn(
-          'absolute top-1 h-5 w-5 rounded-full bg-white shadow-[0_2px_6px_rgb(0_0_0/0.25)] transition-transform duration-500 ease-spring',
-          checked ? 'translate-x-[26px]' : 'translate-x-1',
+          'absolute left-0.5 top-0.5 h-[27px] w-[27px] rounded-full bg-white shadow-thumb transition-transform duration-400 ease-spring',
+          checked ? 'translate-x-5' : 'translate-x-0',
         )}
       />
     </span>
@@ -434,8 +442,8 @@ export const CheckboxField = ({
     onClick={() => onChange(!checked)}
     className={cn(
       'well flex w-full items-start gap-3 p-3.5 text-left',
-      'outline-none transition-colors duration-400 ease-fluid',
-      'hover:bg-[rgb(var(--hairline)/0.06)]',
+      'outline-none transition-colors duration-300 ease-fluid',
+      'hover:bg-[rgb(var(--fill)/calc(var(--fill-alpha)*1.6))]',
       'focus-visible:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.55),0_0_0_3px_rgb(var(--primary-strong)/0.18)]',
       'disabled:opacity-50',
     )}
@@ -443,7 +451,7 @@ export const CheckboxField = ({
     <span
       aria-hidden="true"
       className={cn(
-        'mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px]',
+        'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full',
         'transition-all duration-300 ease-fluid',
         checked
           ? 'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.25)]'
@@ -453,7 +461,7 @@ export const CheckboxField = ({
       {checked && <Icon name="check" size={12} />}
     </span>
     <span className="min-w-0">
-      <span className="block text-[14px] tracking-[-0.01em] text-text">{label}</span>
+      <span className="block text-[15px] tracking-[-0.01em] text-text">{label}</span>
       {description && (
         <span className="mt-0.5 block text-[12.5px] leading-snug text-muted">{description}</span>
       )}

@@ -56,7 +56,7 @@ export const SignIn = () => {
       )}
 
       <form onSubmit={submit} className="mt-9 space-y-5">
-        {justConfirmed && <FormNotice tone="success">Email confirmed — you can sign in now.</FormNotice>}
+        {justConfirmed && <FormNotice tone="success">Email confirmed. You can sign in now.</FormNotice>}
         {error && (
           <FormNotice tone="error" detail={error.detail}>
             {error.message}

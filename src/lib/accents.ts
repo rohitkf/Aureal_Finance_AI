@@ -37,7 +37,7 @@ export const KIND_LABELS: Record<LedgerKind, string> = {
 };
 
 export const KIND_HINTS: Record<LedgerKind, string> = {
-  income: 'Anything arriving in an account — salary, a refund, a payment from somebody.',
+  income: 'Anything arriving in an account: salary, a refund, a payment from somebody.',
   expense: 'Anything leaving one.',
   transfer: 'Money moving between two of your own accounts. Your total doesn’t change.',
   opening: 'What an account was already holding when you added it. Not money you earned.',

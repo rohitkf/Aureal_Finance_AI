@@ -3,11 +3,13 @@
 @tailwind utilities;
 
 /* ------------------------------------------------------------------ *
- * Typefaces — self-hosted.
+ * Typeface — self-hosted.
  *
  * A finance app should not hand a third party a request on every page
  * load, and self-hosting removes the cross-origin round trip entirely.
- * Both families are variable, so the full weight range is one file.
+ * Geist is variable, so the full weight range is one file. It carries
+ * display type too: one family, like the system font on an iPhone, where
+ * hierarchy comes from weight and size rather than a second face.
  * ------------------------------------------------------------------ */
 @font-face {
   font-family: 'Geist';
@@ -28,47 +30,30 @@
     U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
     U+2C60-2C7F, U+A720-A7FF;
 }
-@font-face {
-  font-family: 'Jakarta';
-  font-style: normal;
-  font-weight: 500 800;
-  font-display: swap;
-  src: url('/fonts/plus-jakarta-sans-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
-    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Jakarta';
-  font-style: normal;
-  font-weight: 500 800;
-  font-display: swap;
-  src: url('/fonts/plus-jakarta-sans-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
-    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
-    U+2C60-2C7F, U+A720-A7FF;
-}
 
 /* ------------------------------------------------------------------ *
  * Design tokens.
  *
- * Two designed palettes, not an inversion:
- *   dark  — "Ethereal Glass": near-OLED black, vantablack surfaces lifted
- *           only by hairlines and a faint mesh of colour in the backdrop.
- *   light — "Soft Structuralism": neutral silver ground, pure white
- *           surfaces floating on wide, highly diffused ambient shadow.
+ * "Glass": an iPhone-style material over a living colour wallpaper. A web
+ * approximation of Apple's Liquid Glass, not Apple's own — Apple ships that
+ * for its platforms only. Two designed palettes, not an inversion:
+ *   light — pale frosted panes over a soft sky, lilac and mint wallpaper.
+ *   dark  — smoked panes over a deep blue, violet and green wallpaper.
  *
- * Every colour is an RGB triplet so opacity modifiers keep working.
+ * Every colour is an RGB triplet so opacity modifiers keep working. Every
+ * text colour has been checked at AA against a card *and* against the
+ * wallpaper at its most saturated point, since titles sit straight on it.
  * ------------------------------------------------------------------ */
 @layer base {
   :root {
     /* — Light ————————————————————————————————— */
-    --background: 242 243 245;
-    --surface: 242 243 245;
+    --background: 236 239 245;
+    --surface: 236 239 245;
     --surface-lowest: 255 255 255;
-    --surface-low: 250 250 251;
+    --surface-low: 248 249 251;
     --surface-base: 255 255 255;
-    --surface-high: 244 244 246;
-    --surface-highest: 233 234 238;
+    --surface-high: 242 243 247;
+    --surface-highest: 229 231 237;
     --surface-bright: 255 255 255;
 
     /* Hairlines, expressed as an ink to be laid over a surface at low alpha. */
@@ -78,12 +63,23 @@
     --border: 226 227 232;
     --border-strong: 205 207 214;
 
-    --text: 9 9 11;
-    --muted: 82 82 91;
-    --faint: 95 109 133;
+    /* The glass itself: a tint, how much of it, and the light along its rim. */
+    --glass: 255 255 255;
+    --glass-alpha: 0.74;
+    --glass-strong-alpha: 0.82;
+    --glass-rim: 255 255 255;
+    --glass-rim-alpha: 0.7;
+    --specular: 0.9;
+    /* iOS's tertiary fill: a grey that reads on any tint beneath it. */
+    --fill: 118 118 128;
+    --fill-alpha: 0.1;
 
-    --primary: 29 78 216;
-    --primary-strong: 37 99 235;
+    --text: 17 17 21;
+    --muted: 72 72 82;
+    --faint: 84 86 100;
+
+    --primary: 0 88 204;
+    --primary-strong: 0 113 227;
     --on-primary: 255 255 255;
     --primary-soft: 219 231 255;
 
@@ -99,30 +95,31 @@
     --info: 2 132 199;
 
     /* Diffused ambient shadow — never a harsh drop shadow. */
-    --ambient: 24 24 27;
+    --ambient: 30 41 82;
     --ambient-a: 0.05;
-    --ambient-b: 0.07;
+    --ambient-b: 0.12;
 
-    /* Mesh orbs behind the page. */
-    --mesh-1: 37 99 235;
-    --mesh-2: 79 70 229;
-    --mesh-3: 4 120 87;
-    --mesh-opacity: 0.07;
-    --grain-opacity: 0.025;
+    /* The wallpaper behind the glass. */
+    --mesh-1: 120 165 255;
+    --mesh-2: 170 140 255;
+    --mesh-3: 90 210 170;
+    --mesh-4: 255 186 150;
+    --mesh-opacity: 0.3;
+    --grain-opacity: 0.02;
 
     color-scheme: light;
   }
 
   .dark {
     /* — Dark ————————————————————————————————— */
-    --background: 6 7 9;
-    --surface: 6 7 9;
-    --surface-lowest: 3 4 5;
-    --surface-low: 13 15 19;
-    --surface-base: 16 18 23;
-    --surface-high: 24 27 33;
-    --surface-highest: 35 39 47;
-    --surface-bright: 48 53 63;
+    --background: 7 8 12;
+    --surface: 7 8 12;
+    --surface-lowest: 10 11 15;
+    --surface-low: 18 19 24;
+    --surface-base: 26 27 33;
+    --surface-high: 36 37 44;
+    --surface-highest: 48 50 58;
+    --surface-bright: 64 66 76;
 
     --hairline: 255 255 255;
     --hairline-alpha: 0.08;
@@ -130,13 +127,22 @@
     --border: 32 36 44;
     --border-strong: 58 64 76;
 
-    --text: 237 240 246;
-    --muted: 172 178 191;
-    --faint: 128 135 149;
+    --glass: 30 30 36;
+    --glass-alpha: 0.7;
+    --glass-strong-alpha: 0.8;
+    --glass-rim: 255 255 255;
+    --glass-rim-alpha: 0.09;
+    --specular: 0.12;
+    --fill: 118 118 128;
+    --fill-alpha: 0.2;
 
-    --primary: 173 198 255;
-    --primary-strong: 77 142 255;
-    --on-primary: 0 26 66;
+    --text: 245 245 247;
+    --muted: 174 174 182;
+    --faint: 152 152 162;
+
+    --primary: 100 170 255;
+    --primary-strong: 0 113 227;
+    --on-primary: 255 255 255;
     --primary-soft: 18 34 62;
 
     --secondary: 192 193 255;
@@ -146,19 +152,20 @@
     --on-success: 0 46 30;
     --warning: 251 191 36;
     --on-warning: 56 36 0;
-    --danger: 255 168 158;
+    --danger: 255 140 130;
     --on-danger: 82 0 4;
     --info: 125 211 252;
 
     --ambient: 0 0 0;
-    --ambient-a: 0.4;
-    --ambient-b: 0.55;
+    --ambient-a: 0.35;
+    --ambient-b: 0.5;
 
-    --mesh-1: 77 142 255;
-    --mesh-2: 139 92 246;
-    --mesh-3: 16 185 129;
-    --mesh-opacity: 0.16;
-    --grain-opacity: 0.035;
+    --mesh-1: 40 90 255;
+    --mesh-2: 130 60 230;
+    --mesh-3: 16 160 120;
+    --mesh-4: 200 70 120;
+    --mesh-opacity: 0.3;
+    --grain-opacity: 0.03;
 
     color-scheme: dark;
   }
@@ -187,6 +194,15 @@
     @apply outline-none ring-2 ring-primary-strong ring-offset-[3px] ring-offset-background;
   }
 
+  /* Some people turn transparency off; give them solid panes. */
+  @media (prefers-reduced-transparency: reduce) {
+    :root {
+      --glass-alpha: 0.97;
+      --glass-strong-alpha: 0.98;
+      --bar-alpha: 0.97;
+    }
+  }
+
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -205,44 +221,74 @@
 
 @layer components {
   /* ---------------------------------------------------------------- *
-   * Double-bezel (Doppelrand)
+   * Glass
    *
-   * Premium surfaces are never laid flat on the page. An outer tray
-   * holds an inner plate, with concentric radii and an inner highlight,
-   * so a card reads as machined hardware rather than a coloured div.
+   * Every surface is a pane of frosted glass over the wallpaper: a tint, a
+   * bright rim of light along its edge, a specular line across the top, and
+   * a wide soft shadow beneath. There is deliberately no `backdrop-filter`
+   * on these: they scroll, and a blur under a scrolling element is
+   * re-rasterised on every frame. The wallpaper behind them is a set of
+   * smooth radial fields, so a blur would change nothing you could see — the
+   * tint alone gives the frosted read for free. Real blur is kept for the
+   * fixed chrome (`.glass-bar`), where it is composited once.
    * ---------------------------------------------------------------- */
+
+  /*
+   * The hero pane. `.bezel` was a tray holding a plate; the tray is gone, so
+   * it is now only the frame the hero sits in, and `.bezel-core` is the glass.
+   * The class names stay so nothing that composes them has to change.
+   */
   .bezel {
-    @apply rounded-[2rem] p-1.5;
-    background: rgb(var(--hairline) / 0.035);
-    box-shadow: inset 0 0 0 1px rgb(var(--hairline) / var(--hairline-alpha));
+    @apply rounded-[1.75rem];
   }
 
   .bezel-core {
-    @apply rounded-[1.625rem];
-    background: rgb(var(--surface-base));
+    @apply relative rounded-[1.75rem];
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / calc(var(--specular) * 0.22)) 0%, transparent 38%),
+      rgb(var(--glass) / var(--glass-strong-alpha));
     box-shadow:
-      inset 0 0 0 1px rgb(var(--hairline) / var(--hairline-alpha)),
-      inset 0 1px 0 0 rgb(255 255 255 / 0.06),
+      inset 0 0 0 1px rgb(var(--glass-rim) / var(--glass-rim-alpha)),
+      inset 0 1px 0 0 rgb(255 255 255 / var(--specular)),
       0 1px 2px rgb(var(--ambient) / var(--ambient-a)),
-      0 24px 48px -24px rgb(var(--ambient) / var(--ambient-b));
+      0 30px 60px -30px rgb(var(--ambient) / var(--ambient-b));
   }
 
-  /* A single-shell surface, for places where a full tray would be noise. */
+  /* An ordinary card: one pane of glass. */
   .plate {
-    @apply rounded-[1.375rem];
-    background: rgb(var(--surface-base));
+    @apply rounded-[1.5rem];
+    background: rgb(var(--glass) / var(--glass-alpha));
     box-shadow:
-      inset 0 0 0 1px rgb(var(--hairline) / var(--hairline-alpha)),
-      inset 0 1px 0 0 rgb(255 255 255 / 0.05),
+      inset 0 0 0 1px rgb(var(--glass-rim) / var(--glass-rim-alpha)),
+      inset 0 1px 0 0 rgb(255 255 255 / var(--specular)),
       0 1px 2px rgb(var(--ambient) / var(--ambient-a)),
-      0 18px 40px -22px rgb(var(--ambient) / var(--ambient-b));
+      0 20px 44px -28px rgb(var(--ambient) / var(--ambient-b));
   }
 
-  /* An inset well: pressed into a plate rather than floating on it. */
+  /* An inset well: a grey fill pressed into the glass, as iOS fills are. */
   .well {
     @apply rounded-2xl;
-    background: rgb(var(--hairline) / 0.035);
-    box-shadow: inset 0 0 0 1px rgb(var(--hairline) / 0.06);
+    background: rgb(var(--fill) / var(--fill-alpha));
+  }
+
+  /*
+   * Fixed chrome — the top bar, tab bar, sidebar and sheets. These are the
+   * only surfaces that blur what is behind them, because they are the only
+   * ones that do not move.
+   */
+  .glass-bar {
+    background: rgb(var(--glass) / var(--bar-alpha, 0.62));
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    backdrop-filter: blur(28px) saturate(180%);
+    box-shadow:
+      inset 0 0 0 1px rgb(var(--glass-rim) / var(--glass-rim-alpha)),
+      inset 0 1px 0 0 rgb(255 255 255 / var(--specular)),
+      0 12px 40px -12px rgb(var(--ambient) / var(--ambient-b));
+  }
+
+  /* A sentence-case heading over a group of rows, as in iOS Settings. */
+  .caption {
+    @apply text-[13px] font-semibold tracking-[-0.005em] text-muted;
   }
 
   .hairline {

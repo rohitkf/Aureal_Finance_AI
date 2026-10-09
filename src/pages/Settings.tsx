@@ -30,7 +30,7 @@ import {
 } from '@/lib/backup';
 import { useDevMode } from '@/lib/devMode';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '@/lib/cn';
+import { cn, pillClass } from '@/lib/cn';
 import { money } from '@/lib/format';
 import { useAppState, useCategories, useLabels, useStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
@@ -44,7 +44,8 @@ import { LabelChip } from '@/components/LabelPicker';
 import { CURRENCIES, LOCALES } from '@/lib/intl';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
+import { Card, CardHeader, Label, PageHeader } from '@/components/ui/Card';
+import { IconTile } from '@/components/ui/List';
 import { MoneyDial } from '@/components/ui/MoneyDial';
 import { SelectField, TextField, Toggle } from '@/components/ui/Field';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -52,6 +53,20 @@ import { ConfirmDialog } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
 import type { Category, Label as LabelType } from '@/lib/types';
+
+/** Where the jump links at the top of the page go, in page order. */
+const SECTIONS = [
+  { id: 'account', label: 'Account' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'safe-to-spend', label: 'Safe to Spend' },
+  { id: 'region', label: 'Currency' },
+  { id: 'categories', label: 'Categories' },
+  { id: 'labels', label: 'Labels' },
+  { id: 'colours', label: 'Colours' },
+  { id: 'reminders', label: 'Reminders' },
+  { id: 'backup', label: 'Backup' },
+  { id: 'security', label: 'Security' },
+];
 
 const THEMES: Array<{ value: 'light' | 'dark' | 'system'; label: string; icon: IconName }> = [
   { value: 'light', label: 'Light', icon: 'sun' },
@@ -87,6 +102,12 @@ export const Settings = () => {
   }, [state.settings.minimumBalance]);
   const [minimumError, setMinimumError] = useState<string | undefined>();
   const [name, setName] = useState(state.settings.userName);
+  // The same trap as the minimum above: opened directly, Settings draws with
+  // the empty state's "You", and leaving the field saved "You" over the name
+  // that arrived a moment later. Follow the stored name as it changes.
+  useEffect(() => {
+    setName(state.settings.userName);
+  }, [state.settings.userName]);
   const [confirmClear, setConfirmClear] = useState(false);
   const [categoryDialog, setCategoryDialog] = useState<{ open: boolean; editing: Category | null }>({
     open: false,
@@ -149,16 +170,20 @@ export const Settings = () => {
   };
 
   return (
-    <div className="max-w-4xl space-y-8">
-      <header>
-        <Eyebrow>Settings</Eyebrow>
-        <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">
-          Preferences & security
-        </h1>
-      </header>
+    <div className="max-w-4xl space-y-6 sm:space-y-8">
+      <PageHeader title="Settings" subtitle="Your profile, how Aureal works for you, and your data.">
+        {/* A long page, so a way straight to each part of it. */}
+        <nav aria-label="Settings sections" className="hide-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+          {SECTIONS.map((section) => (
+            <a key={section.id} href={`#${section.id}`} className={pillClass(false)}>
+              {section.label}
+            </a>
+          ))}
+        </nav>
+      </PageHeader>
 
       {/* ---------------- Account ---------------- */}
-      <Card className="space-y-6">
+      <Card className="scroll-mt-24 space-y-6" id="account">
         <CardHeader title="Your account" description="How Aureal addresses you, and who is signed in." />
         <div className="grid gap-5 sm:grid-cols-2">
           <TextField
@@ -169,7 +194,7 @@ export const Settings = () => {
           />
           <TextField label="Email" value={user?.email ?? ''} readOnly hint="Contact support to change this." />
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[rgb(var(--hairline)/0.08)] pt-5">
+        <div className="well flex flex-wrap items-center justify-between gap-4 p-3.5 pl-4">
           <p className="text-[13px] text-muted">Signed in as {user?.email}</p>
           <Button
             icon="logout"
@@ -183,8 +208,51 @@ export const Settings = () => {
         </div>
       </Card>
 
+      {/* ---------------- Appearance ---------------- */}
+      <Card className="scroll-mt-24 space-y-6" id="appearance">
+        <CardHeader
+          title="Appearance"
+          description="Light and dark are designed separately. Pick whichever reads better."
+        />
+        <div className="grid gap-3 sm:grid-cols-3">
+          {THEMES.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setTheme(t.value)}
+              aria-pressed={preference === t.value}
+              className={cn(
+                'flex items-center gap-3.5 rounded-2xl p-4 text-left transition-all duration-300 ease-fluid active:scale-[0.98]',
+                preference === t.value
+                  ? 'bg-primary/15 shadow-[inset_0_0_0_1.5px_rgb(var(--primary)/0.55)]'
+                  : 'bg-fill text-muted hover:text-text',
+              )}
+            >
+              <span
+                className={cn(
+                  'flex h-9 w-9 items-center justify-center rounded-full',
+                  preference === t.value
+                    ? 'bg-primary/15 text-primary'
+                    : 'bg-[rgb(var(--hairline)/0.08)] text-muted',
+                )}
+              >
+                <Icon name={t.icon} size={17} />
+              </span>
+              <span className="text-[14px] font-medium text-text">{t.label}</span>
+              {preference === t.value && <Icon name="check" size={16} className="ml-auto text-primary" />}
+            </button>
+          ))}
+        </div>
+        <Toggle
+          checked={state.settings.maskBalances}
+          onChange={(maskBalances) => dispatch({ type: 'update-settings', settings: { maskBalances } })}
+          label="Hide balances by default"
+          description="Masks every figure until you choose to reveal it. Useful on a shared screen."
+        />
+      </Card>
+
       {/* ---------------- Safe to spend ---------------- */}
-      <Card className="space-y-6">
+      <Card className="scroll-mt-24 space-y-6" id="safe-to-spend">
         <CardHeader
           title="Safe to Spend"
           description="The balance you never want to dip below. Everything above it is treated as spendable."
@@ -229,10 +297,10 @@ export const Settings = () => {
       </Card>
 
       {/* ---------------- Currency & region ---------------- */}
-      <Card className="space-y-6" id="region">
+      <Card className="scroll-mt-24 space-y-6" id="region">
         <CardHeader
           title="Currency & region"
-          description="How every figure and every date is written. Both were stored in your profile from the beginning and neither was ever read — the app wrote pounds and British dates whatever the columns said."
+          description="How every figure and every date is written."
         />
         <div className="grid gap-5 sm:grid-cols-2">
           <SelectField
@@ -279,12 +347,12 @@ export const Settings = () => {
             believing their balances were converted. */}
         <p className="text-[12.5px] leading-relaxed text-faint">
           Changing the currency changes the symbol every figure is written with. It does not convert
-          anything — £100 already recorded becomes €100, not its value in euros.
+          anything: £100 already recorded becomes €100, not its value in euros.
         </p>
       </Card>
 
       {/* ---------------- Categories ---------------- */}
-      <Card className="space-y-6" id="categories">
+      <Card className="scroll-mt-24 space-y-6" id="categories">
         <CardHeader
           title="Categories"
           description="Your own headings for filing transactions. Add, rename or retire them at any time."
@@ -349,10 +417,10 @@ export const Settings = () => {
       </Card>
 
       {/* ---------------- Labels ---------------- */}
-      <Card className="space-y-6" id="labels">
+      <Card className="scroll-mt-24 space-y-6" id="labels">
         <CardHeader
           title="Labels"
-          description="The tags you put across categories — a holiday, a project, a person. Made while recording a transaction; renamed and recoloured here."
+          description="Tags that cut across categories: a holiday, a project, a person. Made while recording a transaction, renamed and recoloured here."
         />
 
         {labels.length === 0 ? (
@@ -391,159 +459,8 @@ export const Settings = () => {
         )}
       </Card>
 
-      {/* ---------------- Appearance ---------------- */}
-      <Card className="space-y-6">
-        <CardHeader
-          title="Appearance"
-          description="Light and dark are designed separately — pick whichever reads better."
-        />
-        <div className="grid gap-3 sm:grid-cols-3">
-          {THEMES.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setTheme(t.value)}
-              aria-pressed={preference === t.value}
-              className={cn(
-                'flex items-center gap-3.5 rounded-2xl p-4 text-left transition-all duration-500 ease-fluid',
-                preference === t.value
-                  ? 'bg-primary/10 shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.35)]'
-                  : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)]',
-              )}
-            >
-              <span
-                className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-full',
-                  preference === t.value
-                    ? 'bg-primary/15 text-primary'
-                    : 'bg-[rgb(var(--hairline)/0.06)] text-muted',
-                )}
-              >
-                <Icon name={t.icon} size={17} />
-              </span>
-              <span className="text-[14px] font-medium text-text">{t.label}</span>
-              {preference === t.value && <Icon name="check" size={16} className="ml-auto text-primary" />}
-            </button>
-          ))}
-        </div>
-        <Toggle
-          checked={state.settings.maskBalances}
-          onChange={(maskBalances) => dispatch({ type: 'update-settings', settings: { maskBalances } })}
-          label="Hide balances by default"
-          description="Masks every figure until you choose to reveal it — useful on a shared screen."
-        />
-      </Card>
-
-      {/* ---------------- Development mode ---------------- */}
-      <Card className="space-y-6" id="developer">
-        <CardHeader
-          title="Developer"
-          description="For diagnosing a problem on this device."
-        />
-        <Toggle
-          checked={devMode}
-          onChange={setDevMode}
-          label="Development mode"
-          description="Shows the underlying error whenever something fails, instead of the plain-English message. Applies to this device only, and stays on until you turn it off."
-        />
-      </Card>
-
-      {/* ---------------- Bank connections ---------------- */}
-      <Card className="space-y-6" id="connections">
-        <CardHeader title="Bank connections" description="Where automatic transaction syncing will live." />
-        <BankConnectionsUpcoming />
-      </Card>
-
-      {/* ---------------- Security ---------------- */}
-      <Card className="space-y-6" id="security">
-        <CardHeader title="Security & privacy" description="What Aureal stores, and how you stay in control." />
-        <div className="space-y-2">
-          <SecurityRow
-            icon="lock"
-            title="Row-level security"
-            description="Every table is filtered by your user id in the database itself, not just in the app."
-            action={<Badge tone="success">Enforced</Badge>}
-          />
-          <SecurityRow
-            icon="shield"
-            title="Password sign-in"
-            description="Passwords are hashed by Supabase Auth and never stored by this app."
-            action={<Badge tone="success">On</Badge>}
-          />
-          <SecurityRow
-            icon="sync"
-            title="Change your password"
-            description="We’ll email you a link to set a new one."
-            action={
-              <Button size="sm" onClick={() => navigate('/forgot-password')}>
-                Send link
-              </Button>
-            }
-          />
-          {/* There used to be a second download here, of `AppState` as JSON.
-              It was not a smaller version of the backup below — it was a
-              different file, and the wrong one: the state the screens are
-              written against hides archived categories and drops sort
-              orders, and nothing in the app can read it back. Somebody who
-              took it as their safety copy had a file that could not be
-              restored. One download, and it is the one that works. */}
-          <SecurityRow
-            icon="download"
-            title="Export your data"
-            description="Everything Aureal holds, as one file you can keep — and put back."
-            action={
-              <Button size="sm" onClick={() => document.getElementById('backup')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
-                Take a backup
-              </Button>
-            }
-          />
-        </div>
-      </Card>
-
-      {/* ---------------- Data ---------------- */}
-      <Card className="space-y-6">
-        <CardHeader
-          title="Your data"
-          description="Your account starts empty. Load a sample set if you'd like to see the app with numbers in it."
-        />
-        <div className="flex flex-wrap gap-2.5">
-          <Button
-            icon="sparkles"
-            disabled={busy !== null}
-            onClick={async () => {
-              setBusy('sample');
-              try {
-                await loadSampleData();
-                toast({
-                  tone: 'success',
-                  title: 'Sample data loaded',
-                  description: 'Clearly marked as samples — clear it whenever you like.',
-                });
-              } catch (e) {
-                toast({
-                  tone: 'danger',
-                  title: 'Couldn’t load the sample data',
-                  description: errorMessageWithDetail(e),
-                });
-              } finally {
-                setBusy(null);
-              }
-            }}
-          >
-            {busy === 'sample' ? 'Loading…' : 'Load sample data'}
-          </Button>
-          <Button icon="trash" disabled={!hasData || busy !== null} onClick={() => setConfirmClear(true)}>
-            Clear everything
-          </Button>
-        </div>
-        <p className="text-[12.5px] leading-relaxed text-faint">
-          Sample data is written to your account like anything else, so you can edit or delete it. It is never added
-          on its own.
-        </p>
-      </Card>
-
       {/* ---------------- Colours ---------------- */}
-      <Card className="space-y-6" id="colours">
+      <Card className="scroll-mt-24 space-y-6" id="colours">
         <CardHeader
           title="Colours"
           description="Which colour each kind of line is drawn in, on the register and everywhere else. Red for spending reads as an alarm to some people and as ordinary to others, so it is yours to set."
@@ -581,11 +498,11 @@ export const Settings = () => {
                         })
                       }
                       className={cn(
-                        'flex items-center gap-2 rounded-full px-3 py-1.5 text-[12.5px]',
-                        'transition-all duration-400 ease-fluid active:scale-[0.97]',
+                        'flex min-h-[34px] items-center gap-2 rounded-full px-3.5 py-1.5 text-[13px]',
+                        'transition-all duration-300 ease-fluid active:scale-[0.96]',
                         chosen
-                          ? 'text-text shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))]'
-                          : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)]',
+                          ? 'bg-surface-base font-semibold text-text shadow-thumb dark:bg-surface-bright'
+                          : 'bg-fill font-medium text-muted hover:text-text',
                       )}
                     >
                       <span className={cn('h-2.5 w-2.5 rounded-full', ACCENT_SWATCH[accent])} />
@@ -608,7 +525,7 @@ export const Settings = () => {
       </Card>
 
       {/* ---------------- Reminders ---------------- */}
-      <Card className="space-y-6" id="reminders">
+      <Card className="scroll-mt-24 space-y-6" id="reminders">
         <CardHeader
           title="Reminders"
           description="How far ahead a reminder is described as a distance rather than a date."
@@ -627,12 +544,7 @@ export const Settings = () => {
                   onClick={() =>
                     dispatch({ type: 'update-settings', settings: { dueHorizonDays: option.days } })
                   }
-                  className={cn(
-                    'rounded-full px-3.5 py-1.5 text-[12.5px] transition-all duration-400 ease-fluid active:scale-[0.97]',
-                    chosen
-                      ? 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.3)]'
-                      : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] hover:bg-[rgb(var(--hairline)/0.05)] hover:text-text',
-                  )}
+                  className={pillClass(chosen)}
                 >
                   {option.label}
                 </button>
@@ -643,16 +555,16 @@ export const Settings = () => {
           <p className="text-[12.5px] leading-relaxed text-faint">
             {state.settings.dueHorizonDays === 0
               ? 'Every reminder shows its date and nothing else.'
-              : `Anything due within ${state.settings.dueHorizonDays === 1 ? 'a day' : `${state.settings.dueHorizonDays} days`} says so — “Due today”, “Due tomorrow”, “Due in 4 days”. Further out, only the date, because “due in 143 days” is a number nobody converts back into March.`}
+              : `Anything due within ${state.settings.dueHorizonDays === 1 ? 'a day' : `${state.settings.dueHorizonDays} days`} says so: “Due today”, “Due tomorrow”, “Due in 4 days”. Further out, only the date, because “due in 143 days” is a number nobody converts back into March.`}
           </p>
         </div>
       </Card>
 
       {/* ---------------- Backup ---------------- */}
-      <Card className="space-y-6" id="backup">
+      <Card className="scroll-mt-24 space-y-6" id="backup">
         <CardHeader
           title="Backup & restore"
-          description="One file holding everything — accounts, transactions, schedules, budgets, goals, labels. Yours to keep somewhere else."
+          description="One file holding everything: accounts, transactions, schedules, budgets, goals, labels. Yours to keep somewhere else."
         />
 
         <div className="flex flex-wrap gap-2.5">
@@ -676,14 +588,122 @@ export const Settings = () => {
         </div>
 
         <p className="text-[12.5px] leading-relaxed text-faint">
-          A backup is a copy of your rows, not of the app — so it restores into whichever account you are signed into,
+          A backup is a copy of your rows, not of the app, so it restores into whichever account you are signed into,
           and it carries no password, no email and no session. Account balances are rebuilt from the transactions in
           the file rather than copied, which is the same way they are maintained normally.
         </p>
       </Card>
 
+      {/* ---------------- Data ---------------- */}
+      <Card className="scroll-mt-24 space-y-6" id="data">
+        <CardHeader
+          title="Your data"
+          description="Your account starts empty. Load a sample set if you'd like to see the app with numbers in it."
+        />
+        <div className="flex flex-wrap gap-2.5">
+          <Button
+            icon="sparkles"
+            disabled={busy !== null}
+            onClick={async () => {
+              setBusy('sample');
+              try {
+                await loadSampleData();
+                toast({
+                  tone: 'success',
+                  title: 'Sample data loaded',
+                  description: 'Clearly marked as samples. Clear it whenever you like.',
+                });
+              } catch (e) {
+                toast({
+                  tone: 'danger',
+                  title: 'Couldn’t load the sample data',
+                  description: errorMessageWithDetail(e),
+                });
+              } finally {
+                setBusy(null);
+              }
+            }}
+          >
+            {busy === 'sample' ? 'Loading…' : 'Load sample data'}
+          </Button>
+          <Button icon="trash" disabled={!hasData || busy !== null} onClick={() => setConfirmClear(true)}>
+            Clear everything
+          </Button>
+        </div>
+        <p className="text-[12.5px] leading-relaxed text-faint">
+          Sample data is written to your account like anything else, so you can edit or delete it. It is never added
+          on its own.
+        </p>
+      </Card>
+
+      {/* ---------------- Security ---------------- */}
+      <Card className="scroll-mt-24 space-y-6" id="security">
+        <CardHeader title="Security & privacy" description="What Aureal stores, and how you stay in control." />
+        <div className="space-y-2">
+          <SecurityRow
+            icon="lock"
+            title="Row-level security"
+            description="Every table is filtered by your user id in the database itself, not just in the app."
+            action={<Badge tone="success">Enforced</Badge>}
+          />
+          <SecurityRow
+            icon="shield"
+            title="Password sign-in"
+            description="Passwords are hashed by Supabase Auth and never stored by this app."
+            action={<Badge tone="success">On</Badge>}
+          />
+          <SecurityRow
+            icon="sync"
+            title="Change your password"
+            description="We’ll email you a link to set a new one."
+            action={
+              <Button size="sm" onClick={() => navigate('/forgot-password')}>
+                Send link
+              </Button>
+            }
+          />
+          {/* There used to be a second download here, of `AppState` as JSON.
+              It was not a smaller version of the backup below — it was a
+              different file, and the wrong one: the state the screens are
+              written against hides archived categories and drops sort
+              orders, and nothing in the app can read it back. Somebody who
+              took it as their safety copy had a file that could not be
+              restored. One download, and it is the one that works. */}
+          <SecurityRow
+            icon="download"
+            title="Export your data"
+            description="Everything Aureal holds, as one file you can keep and put back."
+            action={
+              <Button size="sm" onClick={() => document.getElementById('backup')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+                Take a backup
+              </Button>
+            }
+          />
+        </div>
+      </Card>
+
+      {/* ---------------- Bank connections ---------------- */}
+      <Card className="scroll-mt-24 space-y-6" id="connections">
+        <CardHeader title="Bank connections" description="Where automatic transaction syncing will live." />
+        <BankConnectionsUpcoming />
+      </Card>
+
+      {/* ---------------- Development mode ---------------- */}
+      <Card className="scroll-mt-24 space-y-6" id="developer">
+        <CardHeader
+          title="Developer"
+          description="For diagnosing a problem on this device."
+        />
+        <Toggle
+          checked={devMode}
+          onChange={setDevMode}
+          label="Development mode"
+          description="Shows the underlying error whenever something fails, instead of the plain-English message. Applies to this device only, and stays on until you turn it off."
+        />
+      </Card>
+
       {/* ---------------- Danger zone ---------------- */}
-      <Card className="space-y-5 shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.3)]">
+      <Card className="scroll-mt-24 space-y-5" id="delete">
         <CardHeader
           title="Delete your account"
           description="Removes the account itself, not just what is in it. Everything goes at once and none of it can be recovered."
@@ -840,9 +860,7 @@ const BankConnectionsUpcoming = () => (
   <div className="well flex flex-col gap-5 p-6">
     <div className="flex items-start justify-between gap-4">
       <div className="flex items-center gap-3.5">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--hairline)/0.06)] text-faint shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]">
-          <Icon name="bank" size={19} />
-        </span>
+        <IconTile icon="bank" size="lg" />
         <div>
           <p className="text-[14.5px] font-medium tracking-[-0.01em] text-text">Open Banking sync</p>
           <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">
@@ -855,7 +873,7 @@ const BankConnectionsUpcoming = () => (
 
     <p className="text-[13px] leading-relaxed text-muted">
       This isn’t built yet, so Aureal doesn’t pretend otherwise: every account and transaction is entered by you, and
-      every figure on screen comes from something you recorded. When bank connections arrive they’ll be read-only —
+      every figure on screen comes from something you recorded. When bank connections arrive they’ll be read-only:
       Aureal will be able to see your transactions and never to move your money.
     </p>
 
@@ -877,9 +895,7 @@ const SecurityRow = ({
   action: React.ReactNode;
 }) => (
   <div className="well flex items-center gap-3.5 p-4">
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success/10 text-success shadow-[inset_0_0_0_1px_rgb(var(--success)/0.2)]">
-      <Icon name={icon} size={17} />
-    </span>
+    <IconTile icon={icon} tint="success" />
     <div className="min-w-0 flex-1">
       <p className="text-[14px] font-medium tracking-[-0.01em] text-text">{title}</p>
       <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{description}</p>

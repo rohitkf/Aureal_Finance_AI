@@ -79,15 +79,15 @@ describe('the totals', () => {
   ];
 
   it('counts a house as an asset, which the old rule did not have a word for', () => {
-    expect(totalAssets(accounts)).toBe(252000);
+    expect(totalAssets(accounts, [])).toBe(252000);
   });
 
   it('counts a loan as owed, not as money held', () => {
-    expect(totalDebt(accounts)).toBe(12800);
+    expect(totalDebt(accounts, [])).toBe(12800);
   });
 
   it('nets one off against the other', () => {
-    expect(netWorth(accounts)).toBe(239200);
+    expect(netWorth(accounts, [])).toBe(239200);
   });
 
   it('moves an account to the other side when its group says so', () => {
@@ -103,8 +103,8 @@ describe('the totals', () => {
   });
 
   it('behaves exactly as before when nobody has made a group', () => {
-    expect(totalAssets(accounts, [])).toBe(totalAssets(accounts));
-    expect(netWorth(accounts, [])).toBe(netWorth(accounts));
+    expect(totalAssets(accounts, [])).toBe(252000);
+    expect(netWorth(accounts, [])).toBe(239200);
   });
 });
 

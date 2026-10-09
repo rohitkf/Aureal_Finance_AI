@@ -273,3 +273,56 @@ describe('the window', () => {
     expect(ledgerRows(s, TODAY, '2026-08-01', '2027-09-18').some((r) => r.id === 'old')).toBe(false);
   });
 });
+
+describe('the column of an account money arrives in', () => {
+  it('counts a transfer in when walking back, though the line is drawn against the sender', () => {
+    // Savings holds 5,000 today, 1,000 of which arrived on the 10th. A
+    // purchase from savings on the 5th left it at 4,000, not 5,000.
+    const s = state({
+      transactions: [
+        txn({ id: 'spend', date: '2026-09-05', accountId: 'savings', amount: 50 }),
+        txn({ id: 'move', date: '2026-09-10', type: 'transfer', accountId: 'current', toAccountId: 'savings', amount: 1000 }),
+      ],
+    });
+    expect(rows(s).find((r) => r.id === 'spend')!.balanceAfter).toBe(4000);
+  });
+
+  it('counts a standing order in when walking forward', () => {
+    const s = state({
+      recurring: [
+        {
+          id: 'save', name: 'Save', amount: 200, direction: 'transfer', categoryId: 'c',
+          accountId: 'current', toAccountId: 'savings', frequency: 'monthly', anchorDay: 20,
+          startDate: '2026-01-20', status: 'active',
+        } as RecurringPayment,
+        {
+          id: 'gym', name: 'Gym', amount: 30, direction: 'out', categoryId: 'c',
+          accountId: 'savings', frequency: 'monthly', anchorDay: 25,
+          startDate: '2026-01-25', status: 'active',
+        } as RecurringPayment,
+      ],
+    });
+    expect(rows(s).find((r) => r.id === 'gym@2026-09-25')!.balanceAfter).toBe(5000 + 200 - 30);
+  });
+});
+
+describe('a loan', () => {
+  it('reads a payment as reducing what is owed, as a card does', () => {
+    const loan: Account = { ...current, id: 'loan', name: 'Loan', type: 'liability', balance: 3000 };
+    const s = state({
+      accounts: [current, loan],
+      transactions: [txn({ id: 'interest', date: '2026-09-01', accountId: 'loan', amount: 20 })],
+    });
+    // Interest added on the 1st is the last thing on the loan: 3,000 after it.
+    expect(rows(s).find((r) => r.id === 'interest')!.balanceAfter).toBe(3000);
+    const earlier = state({
+      accounts: [current, loan],
+      transactions: [
+        txn({ id: 'first', date: '2026-08-01', accountId: 'loan', amount: 10 }),
+        txn({ id: 'interest', date: '2026-09-01', accountId: 'loan', amount: 20 }),
+      ],
+    });
+    // Before the 20 of interest, 20 less was owed.
+    expect(rows(earlier).find((r) => r.id === 'first')!.balanceAfter).toBe(2980);
+  });
+});

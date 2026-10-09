@@ -5,13 +5,14 @@ import type {
   AppState,
   Budget,
   Forecast,
+  Goal,
   ForecastDay,
   ForecastEvent,
   NetWorthPoint,
   Transaction,
   VirtualAccount,
 } from './types';
-import { addDays, addMonths, endOfMonth, monthKey } from './date';
+import { addDays, addMonths, daysBetween, endOfMonth, monthKey } from './date';
 import { expandRecurrence, monthlyEquivalent } from './recurrence';
 import { round2 } from './format';
 
@@ -119,10 +120,12 @@ export const availableNow = (accounts: Account[]): number =>
  * Everything held, spendable or not — investments and a house included.
  *
  * Takes the groups so a group marked `liability` moves its accounts to the
- * other side. Called without them it behaves exactly as it always did, which
- * is what every caller that has no groups to hand wants.
+ * other side. They are required, not defaulted: a default of none let three
+ * screens quietly compute net worth by type alone, so an account filed under
+ * a liability group counted as an asset on Accounts and Reports while the
+ * balance sheet beneath said otherwise.
  */
-export const totalAssets = (accounts: Account[], groups: AccountGroup[] = []): number =>
+export const totalAssets = (accounts: Account[], groups: AccountGroup[]): number =>
   round2(
     accounts
       .filter((a) => isCounted(a) && sideOf(a, groups) === 'asset')
@@ -130,7 +133,7 @@ export const totalAssets = (accounts: Account[], groups: AccountGroup[] = []): n
   );
 
 /** Everything owed — cards, loans, and anything in a group marked liability. */
-export const totalDebt = (accounts: Account[], groups: AccountGroup[] = []): number =>
+export const totalDebt = (accounts: Account[], groups: AccountGroup[]): number =>
   round2(
     accounts
       .filter((a) => isCounted(a) && sideOf(a, groups) === 'liability')
@@ -163,7 +166,7 @@ export const accountUtilisation = (account: Account): number =>
 export const availableCredit = (account: Account): number =>
   round2((account.creditLimit ?? 0) - account.balance);
 
-export const netWorth = (accounts: Account[], groups: AccountGroup[] = []): number =>
+export const netWorth = (accounts: Account[], groups: AccountGroup[]): number =>
   round2(totalAssets(accounts, groups) - totalDebt(accounts, groups));
 
 /* ------------------------------------------------------------------ */
@@ -192,6 +195,30 @@ export const signedAmount = (t: Transaction): number => {
 export const counts = (t: Pick<Transaction, 'status'>): boolean =>
   t.status !== 'scheduled' && t.status !== 'void';
 
+/**
+ * Whether a transaction is money that actually came in or went out.
+ *
+ * It has to count, and it must not be an opening balance. An opening balance
+ * is what an account already held when it was added — written as an income
+ * because balances are derived from transactions, but adding a savings
+ * account with £5,000 in it is not £5,000 of income, and adding a card with
+ * £800 owed is not £800 of spending. Every "what happened this month" figure
+ * goes through this, or adding an account inflates the month it was added in.
+ */
+export const isMovement = (t: Pick<Transaction, 'status' | 'isOpening'>): boolean => counts(t) && !t.isOpening;
+
+/** What came in and went out across some transactions, opening balances and transfers aside. */
+export const inAndOut = (transactions: Transaction[]): { income: number; spent: number } => {
+  let income = 0;
+  let spent = 0;
+  for (const t of transactions) {
+    if (!isMovement(t)) continue;
+    if (t.type === 'income') income += t.amount;
+    else if (t.type === 'expense') spent += t.amount;
+  }
+  return { income: round2(income), spent: round2(spent) };
+};
+
 export const confirmedTransactions = (state: AppState, today: string): Transaction[] => {
   // Excluded accounts are not part of any figure; see `reported`.
   state = reported(state);
@@ -203,7 +230,7 @@ export const monthSpend = (state: AppState, month: string): number => {
   state = reported(state);
   return round2(
     state.transactions
-      .filter((t) => t.type === 'expense' && counts(t) && monthKey(t.date) === month)
+      .filter((t) => t.type === 'expense' && isMovement(t) && monthKey(t.date) === month)
       .reduce((sum, t) => sum + t.amount, 0),
   );
 }
@@ -213,7 +240,7 @@ export const monthIncome = (state: AppState, month: string): number => {
   state = reported(state);
   return round2(
     state.transactions
-      .filter((t) => t.type === 'income' && counts(t) && monthKey(t.date) === month)
+      .filter((t) => t.type === 'income' && isMovement(t) && monthKey(t.date) === month)
       .reduce((sum, t) => sum + t.amount, 0),
   );
 }
@@ -228,7 +255,7 @@ export const spendByCategory = (state: AppState, month: string): Map<string, num
 
   const out = new Map<string, number>();
   for (const t of state.transactions) {
-    if (t.type !== 'expense' || !counts(t) || monthKey(t.date) !== month) continue;
+    if (t.type !== 'expense' || !isMovement(t) || monthKey(t.date) !== month) continue;
     if (t.splits?.length) {
       for (const s of t.splits) out.set(s.categoryId, round2((out.get(s.categoryId) ?? 0) + s.amount));
     } else {
@@ -299,6 +326,20 @@ const transferEffect = (
   return leaves ? 'out' : 'in';
 };
 
+/**
+ * Whether a payment in or out of this account moves spendable cash.
+ *
+ * Netflix charged to a card is not money leaving your current account — the
+ * card bill is, and that is a transfer already counted when it is paid.
+ * Counting the charge as well took it off Safe to Spend twice. A dividend
+ * landing in an ISA is not spendable either. An account that cannot be found
+ * is assumed to be cash: for a forecast, the cautious answer.
+ */
+const touchesCash = (accounts: Account[], accountId: string): boolean => {
+  const account = accounts.find((a) => a.id === accountId);
+  return account ? isSpendable(account) : true;
+};
+
 export const forecastEvents = (state: AppState, today: string, to: string): ForecastEvent[] => {
   // Excluded accounts are not part of any figure; see `reported`.
   state = reported(state);
@@ -307,16 +348,19 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
   const claimed = new Set<string>();
 
   for (const t of state.transactions) {
-    // Cancelled. It is still a record, but it is not money coming.
-    if (t.status === 'void') continue;
-    const overdue = isOverdue(t, today);
-    // Anything on or before today has already moved the balance, unless it is
-    // still only scheduled — in which case it has not, and still counts.
-    if (!overdue && (t.date <= today || t.date > to)) continue;
     // Claimed by the occurrence it stands in for, which is not always the day
     // it landed on: a salary moved from the 30th to the 28th still accounts
-    // for the 30th, and without this the rule would project it again.
+    // for the 30th, and without this the rule would project it again. Every
+    // row claims, whatever its status or date — a salary paid early and
+    // already cleared still stands in for its occurrence.
     if (t.recurringId) claimed.add(`${t.recurringId}|${t.recurringDate ?? t.date}`);
+    // Only what has not happened yet is an event. Anything that counts is
+    // already in the balance the forecast starts from — even when it is dated
+    // ahead, because the trigger never looks at the date — so adding it again
+    // counted it twice. Cancelled is not money coming either.
+    if (t.status !== 'scheduled') continue;
+    const overdue = isOverdue(t, today);
+    if (!overdue && t.date > to) continue;
 
     const effect =
       t.type === 'transfer' ? transferEffect(state.accounts, t.accountId, t.toAccountId) : null;
@@ -330,9 +374,9 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
       kind: t.recurringId ? 'recurring' : 'scheduled',
       accountId: t.accountId,
       categoryId: t.categoryId,
-      projected: t.status === 'scheduled',
+      projected: true,
       overdue,
-      affectsAvailable: t.type !== 'transfer' || effect !== null,
+      affectsAvailable: t.type === 'transfer' ? effect !== null : touchesCash(state.accounts, t.accountId),
     });
   }
 
@@ -358,7 +402,7 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
         categoryId: rule.categoryId,
         projected: true,
         overdue: false,
-        affectsAvailable: rule.direction !== 'transfer' || effect !== null,
+        affectsAvailable: rule.direction === 'transfer' ? effect !== null : touchesCash(state.accounts, rule.accountId),
       });
     }
   }
@@ -427,7 +471,9 @@ export const balanceHistory = (state: AppState, today: string, days = 30): numbe
   // Excluded accounts are not part of any figure; see `reported`.
   state = reported(state);
 
-  const cleared = state.transactions.filter((t) => counts(t) && t.date <= today);
+  // An opening balance is not undone: the money was there before the account
+  // was added here, and undoing it drew a cliff in the trend on the day it was.
+  const cleared = state.transactions.filter((t) => isMovement(t) && t.date <= today);
   const deltaOn = (date: string) =>
     cleared
       .filter((t) => t.date === date)
@@ -465,7 +511,9 @@ export const balanceHistory = (state: AppState, today: string, days = 30): numbe
  */
 const balanceDelta = (t: Transaction, account: Account): number => {
   if (!counts(t)) return 0;
-  const credit = account.type === 'credit';
+  // A loan inverts exactly as a card does — the trigger's test is
+  // `type in ('credit', 'liability')`, and so is this one.
+  const credit = owesMoney(account);
   if (account.id === t.accountId) {
     if (t.type === 'income') return credit ? -t.amount : t.amount;
     // An expense, and the outgoing leg of a transfer, both leave the account.
@@ -494,6 +542,8 @@ export const positionAsOf = (
   state: AppState,
   date: string,
 ): { assets: number; liabilities: number } => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
   const after = state.transactions.filter((t) => t.date > date);
   let assets = 0;
   let liabilities = 0;
@@ -501,7 +551,10 @@ export const positionAsOf = (
   for (const account of state.accounts) {
     const undone = after.reduce((sum, t) => sum + balanceDelta(t, account), 0);
     const balance = account.balance - undone;
-    if (account.type === 'credit') liabilities += balance;
+    // The same side `netWorth` puts it on today, so the last point of the
+    // chart is the figure in the headline. By type alone, a loan counted as
+    // an asset and the chart climbed by everything owed on it.
+    if (sideOf(account, state.accountGroups) === 'liability') liabilities += balance;
     else assets += balance;
   }
 
@@ -525,13 +578,19 @@ export const netWorthSeries = (
   if (state.netWorthHistory.length > 0) return state.netWorthHistory.slice(-months);
   if (state.accounts.length === 0) return [];
 
-  return Array.from({ length: months }, (_, i) => {
+  const series = Array.from({ length: months }, (_, i) => {
     const month = monthKey(addMonths(`${monthKey(today)}-01`, i - (months - 1)));
-    // The current month is measured as it stands today, not at a month end
-    // that has not arrived.
-    const asOf = month === monthKey(today) ? today : endOfMonth(`${month}-01`);
+    // The current month is measured as it stands now — every balance as it
+    // is, including a payment already counted that is dated later this month.
+    // Measured at today's date instead, the last point disagreed with the net
+    // worth printed beside it by exactly that payment.
+    const asOf = month === monthKey(today) ? '9999-12-31' : endOfMonth(`${month}-01`);
     return { month, ...positionAsOf(state, asOf) };
   });
+  // Months before anything was recorded are not a history of zero. Drawn, they
+  // made "+£10,000 over 6 months" out of the day the accounts were added.
+  const first = series.findIndex((p) => p.assets !== 0 || p.liabilities !== 0);
+  return first <= 0 ? series : series.slice(first);
 };
 
 /* ------------------------------------------------------------------ */
@@ -549,6 +608,22 @@ export interface SafeToSpend {
   /** Locked virtual-account allocations: in the balance, but spoken for. */
   allocated: number;
   through: string;
+  /** Days from today to `through`, both counted: today is still a day to spend in. */
+  daysLeft: number;
+  /** `amount` spread over `daysLeft`, never below nothing. */
+  perDay: number;
+  /** The payments behind `expectedIncome`, in date order. */
+  incoming: ForecastEvent[];
+  /** The payments behind `committed`, in date order. Overdue ones first, since they land today. */
+  outgoing: ForecastEvent[];
+  /**
+   * What is free if none of the expected income has arrived yet.
+   *
+   * The headline counts a salary due on the 28th as money you have, which is
+   * right for the month and wrong for this afternoon. This is the honest
+   * figure for today.
+   */
+  beforeIncome: number;
 }
 
 /**
@@ -564,8 +639,17 @@ export interface SafeToSpend {
  * Unlocked allocations are deliberately not counted: they are a plan for the
  * money rather than a commitment, and the screen says so.
  */
-export const lockedAllocations = (virtualAccounts: VirtualAccount[]): number =>
-  round2(virtualAccounts.filter((v) => v.locked).reduce((sum, v) => sum + v.allocated, 0));
+export const lockedAllocations = (virtualAccounts: VirtualAccount[], accounts: Account[]): number => {
+  // Only money that was in "available" to begin with can be held back from it.
+  // An allocation inside an investment account was never counted as
+  // spendable, so subtracting it as well took it off twice.
+  const spendable = new Set(accounts.filter((a) => isCounted(a) && isSpendable(a)).map((a) => a.id));
+  return round2(
+    virtualAccounts
+      .filter((v) => v.locked && spendable.has(v.parentAccountId))
+      .reduce((sum, v) => sum + v.allocated, 0),
+  );
+};
 
 /**
  * What the user can spend between now and the end of the month while still
@@ -587,10 +671,12 @@ export const safeToSpend = (state: AppState, today: string): SafeToSpend => {
   const overdue = round2(outgoing.filter((e) => e.overdue).reduce((s, e) => s + e.amount, 0));
   const available = availableNow(state.accounts);
   const reserve = state.settings.minimumBalance;
-  const allocated = lockedAllocations(state.virtualAccounts);
+  const allocated = lockedAllocations(state.virtualAccounts, state.accounts);
+  const amount = round2(available + expectedIncome - committed - reserve - allocated);
+  const daysLeft = daysBetween(today, through) + 1;
 
   return {
-    amount: round2(available + expectedIncome - committed - reserve - allocated),
+    amount,
     available,
     expectedIncome,
     committed,
@@ -598,6 +684,11 @@ export const safeToSpend = (state: AppState, today: string): SafeToSpend => {
     reserve,
     allocated,
     through,
+    daysLeft,
+    perDay: round2(Math.max(0, amount) / daysLeft),
+    incoming: counted.filter((e) => e.direction === 'in'),
+    outgoing,
+    beforeIncome: round2(amount - expectedIncome),
   };
 };
 
@@ -615,13 +706,31 @@ export interface BudgetProgress {
   state: 'on-track' | 'close' | 'over';
 }
 
+/**
+ * The budgets in force for a month: each category's most recent limit, set in
+ * this month or carried forward from an earlier one.
+ *
+ * A budget is stored against the month it was set in. Read literally, every
+ * limit vanished on the 1st and had to be set again — nobody budgets that
+ * way. A limit stands until it is changed, and changing it writes a row for
+ * the month it was changed in, so earlier months keep what they had.
+ */
+export const effectiveBudgets = (budgets: Budget[], month: string): Budget[] => {
+  const latest = new Map<string, Budget>();
+  for (const b of budgets) {
+    if (b.month > month) continue;
+    const seen = latest.get(b.categoryId);
+    if (!seen || b.month > seen.month) latest.set(b.categoryId, b);
+  }
+  return [...latest.values()].map((b) => ({ ...b, month }));
+};
+
 export const budgetProgress = (state: AppState, month: string): BudgetProgress[] => {
   // Excluded accounts are not part of any figure; see `reported`.
   state = reported(state);
 
   const spend = spendByCategory(state, month);
-  return state.budgets
-    .filter((b) => b.month === month)
+  return effectiveBudgets(state.budgets, month)
     .map((b: Budget): BudgetProgress => {
       const spent = spend.get(b.categoryId) ?? 0;
       const ratio = b.limit === 0 ? 0 : spent / b.limit;
@@ -685,3 +794,271 @@ export const savingsRate = (state: AppState, month: string): number => {
   if (income === 0) return 0;
   return ((income - monthSpend(state, month)) / income) * 100;
 };
+
+/** What arrives every month on a schedule, as a monthly figure. */
+export const monthlyRecurringIncome = (state: AppState): number => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+  return round2(
+    state.recurring
+      .filter((r) => r.status === 'active' && r.direction === 'in')
+      .reduce((sum, r) => sum + monthlyEquivalent(r), 0),
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/* Debt                                                                */
+/* ------------------------------------------------------------------ */
+
+export interface DebtSummary {
+  /** Every counted account that is owed: cards, loans, and anything in a liability group. */
+  facilities: Account[];
+  /** All of it. */
+  total: number;
+  /** Owed on cards alone — the only figure utilisation is about. */
+  cardDebt: number;
+  cardLimit: number;
+  /** Percent of the card limit used. */
+  utilisation: number;
+  /** What would bring utilisation under 30%, or 0 when it already is. */
+  toThirtyPercent: number;
+  /**
+   * Scheduled payments towards what is owed, as a monthly figure: transfers
+   * into an owed account, which is what paying a card or a loan is.
+   */
+  monthlyPayments: number;
+  /** Interest added each month at today's balances and rates. */
+  monthlyInterest: number;
+  /** Months to clear everything at that rate of payment, or null if it never clears. */
+  payoffMonths: number | null;
+}
+
+/**
+ * The debt screen's figures.
+ *
+ * Its payments figure used to sum rules filed under a category whose id was
+ * literally `debt` — true of the sample data and of nobody else, so for every
+ * real account it was £0 and the payoff estimate was always "never".
+ */
+export const debtSummary = (state: AppState): DebtSummary => {
+  // Excluded accounts are not part of any figure; see `reported`.
+  state = reported(state);
+
+  const facilities = state.accounts.filter((a) => sideOf(a, state.accountGroups) === 'liability');
+  const owed = new Set(facilities.map((a) => a.id));
+  const total = totalDebt(state.accounts, state.accountGroups);
+  const cardDebt = totalCardDebt(state.accounts);
+  const cardLimit = totalCreditLimit(state.accounts);
+  const utilisation = creditUtilisation(state.accounts);
+
+  const monthlyPayments = round2(
+    state.recurring
+      .filter((r) => r.status === 'active' && r.direction === 'transfer' && !!r.toAccountId && owed.has(r.toAccountId))
+      .reduce((sum, r) => sum + monthlyEquivalent(r), 0),
+  );
+
+  // Interest by each balance's own rate. An average of the rates, unweighted,
+  // let a £50 card at 30% decide the interest on a £5,000 loan at 6%.
+  const interestOn = (balance: number) =>
+    facilities.reduce((sum, a) => sum + (total > 0 ? (a.balance / total) * balance : 0) * ((a.apr ?? 0) / 100 / 12), 0);
+  const monthlyInterest = round2(interestOn(total));
+
+  let payoffMonths: number | null = null;
+  if (total <= 0) payoffMonths = 0;
+  else if (monthlyPayments > 0) {
+    let balance = total;
+    for (let month = 1; month <= 600; month += 1) {
+      balance = balance + interestOn(balance) - monthlyPayments;
+      if (balance <= 0) {
+        payoffMonths = month;
+        break;
+      }
+    }
+  }
+
+  return {
+    facilities,
+    total,
+    cardDebt,
+    cardLimit,
+    utilisation,
+    toThirtyPercent: round2(Math.max(0, cardDebt - cardLimit * 0.3)),
+    monthlyPayments,
+    monthlyInterest,
+    payoffMonths,
+  };
+};
+
+/* ------------------------------------------------------------------ */
+/* One account over time                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One account's balance, a few weeks back and a month ahead.
+ *
+ * The account screen used to do this itself, and got it wrong in ways that
+ * only showed on the accounts that matter most: a card payment walked the
+ * card's history the wrong way, a cancelled payment counted, a loan was read
+ * as money held, and a standing order *into* the account was never projected.
+ * The arithmetic here is the trigger's (`balanceDelta`) backwards and the
+ * forecast's forwards.
+ */
+export const accountTrace = (
+  state: AppState,
+  accountId: string,
+  today: string,
+  back = 21,
+  ahead = 30,
+): ForecastDay[] => {
+  const account = state.accounts.find((a) => a.id === accountId);
+  if (!account) return [];
+  const owed = owesMoney(account);
+
+  // Settled: undone walking back. An opening balance is the money that was
+  // there before the account was added here, so it is never undone.
+  const settled = state.transactions.filter(
+    (t) => counts(t) && !t.isOpening && (t.accountId === accountId || t.toAccountId === accountId),
+  );
+  // A counted row dated ahead is in the balance already, so it has happened
+  // by today whatever its date says; walked on its own date, today's point
+  // disagreed with the balance printed above the chart.
+  const on = (t: Transaction) => (t.date > today ? today : t.date);
+  const endOf = (date: string) =>
+    round2(account.balance - settled.filter((t) => on(t) > date).reduce((s, t) => s + balanceDelta(t, account), 0));
+
+  // Still to come: what it does to this balance, signed the way the stored
+  // balance moves.
+  const pending: Array<{ date: string; delta: number; event: ForecastEvent }> = [];
+  const effect = (accountIdOf: string, toId: string | undefined, type: 'in' | 'out' | 'transfer', amount: number) => {
+    let up = 0;
+    if (accountIdOf === accountId) up += type === 'in' ? amount : -amount;
+    if (type === 'transfer' && toId === accountId) up += amount;
+    // On an account that is owed, money arriving pays it down.
+    return owed ? -up : up;
+  };
+
+  const claimed = new Set<string>();
+  for (const t of state.transactions) {
+    if (t.recurringId) claimed.add(`${t.recurringId}|${t.recurringDate ?? t.date}`);
+    if (t.status !== 'scheduled') continue;
+    if (t.accountId !== accountId && t.toAccountId !== accountId) continue;
+    const date = t.date < today ? today : t.date;
+    const delta = effect(t.accountId, t.toAccountId, t.type === 'income' ? 'in' : t.type === 'expense' ? 'out' : 'transfer', t.amount);
+    pending.push({
+      date,
+      delta,
+      event: {
+        id: t.id,
+        date: t.date,
+        label: t.merchant,
+        amount: t.amount,
+        direction: delta >= 0 !== owed ? 'in' : 'out',
+        kind: t.recurringId ? 'recurring' : 'scheduled',
+        accountId: t.accountId,
+        categoryId: t.categoryId,
+        projected: true,
+        overdue: t.date <= today,
+        affectsAvailable: true,
+      },
+    });
+  }
+
+  const skipped = skippedOccurrences(state);
+  const horizon = addDays(today, ahead);
+  for (const rule of state.recurring) {
+    if (rule.accountId !== accountId && rule.toAccountId !== accountId) continue;
+    for (const date of expandRecurrence(rule, addDays(today, 1), horizon)) {
+      if (claimed.has(`${rule.id}|${date}`) || skipped.has(`${rule.id}|${date}`)) continue;
+      const delta = effect(rule.accountId, rule.toAccountId, rule.direction, rule.amount);
+      pending.push({
+        date,
+        delta,
+        event: {
+          id: `${rule.id}-${date}`,
+          date,
+          label: rule.name,
+          amount: rule.amount,
+          direction: delta >= 0 !== owed ? 'in' : 'out',
+          kind: rule.isSubscription ? 'subscription' : 'recurring',
+          accountId: rule.accountId,
+          categoryId: rule.categoryId,
+          projected: true,
+          overdue: false,
+          affectsAvailable: true,
+        },
+      });
+    }
+  }
+
+  const days: ForecastDay[] = [];
+  for (let i = -back; i <= ahead; i += 1) {
+    const date = addDays(today, i);
+    const prior = addDays(date, -1);
+    const onDay = i >= 0 ? pending.filter((p) => p.date === date) : [];
+    const projectedBefore = (d: string) =>
+      i >= 0 ? pending.filter((p) => p.date <= d).reduce((s, p) => s + p.delta, 0) : 0;
+    const opening = round2(endOf(prior) + (i > 0 ? projectedBefore(prior) : 0));
+    const closing = round2(endOf(date) + projectedBefore(date));
+    // What moved that day, settled and still to come, signed as the stored
+    // balance moves. On an owed account a rise is spending and a fall is a payment.
+    const moves = [
+      ...settled.filter((t) => on(t) === date).map((t) => balanceDelta(t, account)),
+      ...onDay.map((p) => p.delta),
+    ];
+    const rising = moves.filter((d) => d > 0).reduce((s, d) => s + d, 0);
+    const falling = moves.filter((d) => d < 0).reduce((s, d) => s - d, 0);
+    days.push({
+      date,
+      opening,
+      income: round2(owed ? falling : rising),
+      expenses: round2(owed ? rising : falling),
+      closing,
+      events: onDay.map((p) => p.event),
+      projected: i > 0,
+    });
+  }
+  return days;
+};
+
+/* ------------------------------------------------------------------ */
+/* Goals                                                               */
+/* ------------------------------------------------------------------ */
+
+export interface GoalOutlook {
+  remaining: number;
+  complete: boolean;
+  /** Whole months until the target date, never below zero. */
+  monthsLeft: number;
+  /** Months the current contribution needs, or null with no contribution. */
+  monthsNeeded: number | null;
+  onTrack: boolean;
+  /** What a month would have to be to arrive on the date, while there is still time. */
+  neededPerMonth: number | null;
+  /** The date has gone by and the goal is not met. */
+  late: boolean;
+}
+
+/** Whether a goal's contribution gets it there by its date. */
+export const goalOutlook = (goal: Goal, today: string): GoalOutlook => {
+  const remaining = round2(Math.max(0, goal.target - goal.saved));
+  const complete = remaining === 0;
+  const monthsLeft = Math.max(0, Math.round(daysBetween(today, goal.targetDate) / 30.44));
+  const late = !complete && goal.targetDate < today;
+  const monthsNeeded = complete ? 0 : goal.monthlyContribution > 0 ? Math.ceil(remaining / goal.monthlyContribution) : null;
+  return {
+    remaining,
+    complete,
+    monthsLeft,
+    monthsNeeded,
+    onTrack: complete || (!late && monthsNeeded !== null && monthsNeeded <= monthsLeft),
+    neededPerMonth: complete || late ? null : round2(remaining / Math.max(monthsLeft, 1)),
+    late,
+  };
+};
+
+/** Across every goal. Only unfinished ones are still being paid into. */
+export const goalTotals = (goals: Goal[]): { target: number; saved: number; monthly: number } => ({
+  target: round2(goals.reduce((s, g) => s + g.target, 0)),
+  saved: round2(goals.reduce((s, g) => s + Math.min(g.saved, g.target), 0)),
+  monthly: round2(goals.filter((g) => g.saved < g.target).reduce((s, g) => s + g.monthlyContribution, 0)),
+});

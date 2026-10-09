@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
 import { formatFullDate, formatMediumDate, formatTime, monthKey, relativeDayLabel } from '@/lib/date';
 import { downloadCsv } from '@/lib/csv';
+import { inAndOut, isMovement } from '@/lib/finance';
 import { Register } from '@/components/Register';
 import { Reminders } from '@/components/Reminders';
 import { isReminder, ledgerRows, ledgerWindow, type LedgerRow } from '@/lib/ledger';
@@ -14,7 +15,7 @@ import { LabelChip } from '@/components/LabelPicker';
 import { TransactionRow } from '@/components/TransactionRow';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow } from '@/components/ui/Card';
+import { Card, CardHeader, Eyebrow, PageHeader } from '@/components/ui/Card';
 import { SegmentedControl, SelectField, TextField } from '@/components/ui/Field';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
@@ -88,6 +89,7 @@ export const Transactions = () => {
    * Three questions, not three pages — one destination, and a toggle.
    */
   const [view, setView] = useState<'register' | 'reminders' | 'list'>('register');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   /** A line drawn from a rule, opened for editing before any row exists. */
   const [occurrence, setOccurrence] = useState<Transaction | null>(null);
   const [skipping, setSkipping] = useState<LedgerRow | null>(null);
@@ -169,13 +171,12 @@ export const Transactions = () => {
     return [...map.entries()];
   }, [filtered]);
 
-  const totals = useMemo(
-    () => ({
-      spent: filtered.filter((t) => t.type === 'expense' && t.status !== 'scheduled').reduce((s, t) => s + t.amount, 0),
-      received: filtered.filter((t) => t.type === 'income' && t.status !== 'scheduled').reduce((s, t) => s + t.amount, 0),
-    }),
-    [filtered],
-  );
+  // Cancelled payments and opening balances are on the list and in neither
+  // total: one never happened, the other was never money arriving.
+  const totals = useMemo(() => {
+    const { income, spent } = inAndOut(filtered);
+    return { spent, received: income };
+  }, [filtered]);
 
   /**
    * How many reminders have a date that has already gone by — the count worth
@@ -192,6 +193,12 @@ export const Transactions = () => {
     (accountFilter !== 'all' ? 1 : 0) +
     (categoryFilter !== 'all' ? 1 : 0) +
     (query ? 1 : 0);
+  /** The filters behind the Filters button, and whether they are showing. */
+  const extraFilters =
+    (accountFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (monthFilter !== monthKey(today) ? 1 : 0);
+  // One in use keeps them open: hiding a filter that is narrowing the list is
+  // how a person ends up sure a transaction is missing.
+  const filtersShown = filtersOpen || accountFilter !== 'all' || categoryFilter !== 'all';
 
   /**
    * The rows on screen, as a file. Exactly what the filters are showing — an
@@ -293,42 +300,52 @@ export const Transactions = () => {
   };
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Eyebrow>Transactions</Eyebrow>
-          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">Your ledger</h1>
-          {/* Separators only where the line has room; they would otherwise
-              dangle at the end of a wrapped line on a phone. */}
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-body-sm text-muted">
+    <div className="space-y-5 sm:space-y-6">
+      <PageHeader
+        title="Transactions"
+        // Separators only where the line has room; they would otherwise
+        // dangle at the end of a wrapped line on a phone.
+        subtitle={
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span>{filtered.length} transactions</span>
             <span aria-hidden="true" className="hidden sm:inline">·</span>
             <span className="tnum text-danger">{money(totals.spent, { masked: maskBalances })} spent</span>
             <span aria-hidden="true" className="hidden sm:inline">·</span>
             <span className="tnum text-success">{money(totals.received, { masked: maskBalances })} received</span>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <SegmentedControl
-            label="How to read this page"
-            size="sm"
-            value={view}
-            onChange={setView}
-            options={[
-              { value: 'register', label: 'Register' },
-              { value: 'reminders', label: dueCount > 0 ? `Reminders · ${dueCount}` : 'Reminders' },
-              { value: 'list', label: 'List' },
-            ]}
-          />
-          <Button icon="download" className="hidden sm:inline-flex" onClick={exportCsv}>
-            Export CSV
-          </Button>
-          <Button variant="primary" icon="plus" onClick={() => setAddOpen(true)}>
-            Add transaction
-          </Button>
-        </div>
-      </header>
+          </span>
+        }
+        actions={
+          <>
+            <Button size="sm" icon="download" className="hidden sm:inline-flex" onClick={exportCsv}>
+              Export CSV
+            </Button>
+            <Button size="sm" variant="primary" icon="plus" onClick={() => setAddOpen(true)}>
+              Add transaction
+            </Button>
+          </>
+        }
+      >
+        <SegmentedControl
+          label="How to read this page"
+          value={view}
+          onChange={setView}
+          className="w-full sm:w-auto"
+          options={[
+            { value: 'register', label: 'Register' },
+            { value: 'reminders', label: dueCount > 0 ? `Reminders · ${dueCount}` : 'Reminders' },
+            { value: 'list', label: 'List' },
+          ]}
+          // Three words that each mean something only once you know: say
+          // what the chosen one shows, so nobody has to press all three.
+          hint={
+            view === 'register'
+              ? 'Every payment with what the account held after it: what happened, then what’s scheduled.'
+              : view === 'reminders'
+                ? 'What’s due or overdue, so you can tick it off or skip it.'
+                : 'Everything you’ve recorded, to search and filter.'
+          }
+        />
+      </PageHeader>
 
       {view === 'register' ? (
         <Card className="p-2 sm:p-3">
@@ -340,65 +357,80 @@ export const Transactions = () => {
         </Card>
       ) : (
         <>
-      {/* ---------------- Filters ---------------- */}
-      <Card tone="well" className="space-y-3 p-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+      {/* ---------------- Filters ----------------
+          Search and the kind of transaction are what people reach for; the
+          month, account and category pickers fold away behind Filters until
+          wanted, and open by themselves when one of them is in use. */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
           <TextField
             label="Search transactions"
             hideLabel
-            placeholder="Search — or #label…"
+            placeholder="Search, or #label…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             containerClassName="flex-1"
+            className="h-11 bg-[rgb(var(--glass)/var(--glass-alpha))]"
             type="search"
           />
-          <div className="hide-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 md:mx-0 md:px-0">
-            {TYPE_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => setTypeFilter(f.value)}
-                aria-pressed={typeFilter === f.value}
-                className={pillClass(typeFilter === f.value)}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+          <Button
+            icon="filter"
+            aria-expanded={filtersShown}
+            aria-controls="transaction-filters"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className={cn(filtersShown && 'text-primary')}
+          >
+            Filters{extraFilters > 0 ? ` · ${extraFilters}` : ''}
+          </Button>
+        </div>
+        <div className="hide-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          {TYPE_FILTERS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => setTypeFilter(f.value)}
+              aria-pressed={typeFilter === f.value}
+              className={pillClass(typeFilter === f.value)}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <SelectField label="Month" value={monthFilter} onChange={(value) => setMonthFilter(value)}>
-            <option value="all">All time</option>
-            {months.map((m) => (
-              <option key={m} value={m}>
-                {new Date(`${m}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
-              </option>
-            ))}
-          </SelectField>
-          <SelectField label="Account" value={accountFilter} onChange={(value) => setAccountFilter(value)}>
-            <option value="all">All accounts</option>
-            {state.accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </SelectField>
-          <SelectField label="Category" value={categoryFilter} onChange={(value) => setCategoryFilter(value)}>
-            <option value="all">All categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </SelectField>
-          <div className="flex items-end">
-            <Button icon="close" onClick={resetFilters} disabled={activeFilters === 0} fullWidth>
-              Clear {activeFilters > 0 ? `(${activeFilters})` : 'filters'}
-            </Button>
-          </div>
-        </div>
-      </Card>
+        {filtersShown && (
+          <Card id="transaction-filters" className="grid animate-fade-in gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <SelectField label="Month" value={monthFilter} onChange={(value) => setMonthFilter(value)}>
+              <option value="all">All time</option>
+              {months.map((m) => (
+                <option key={m} value={m}>
+                  {new Date(`${m}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField label="Account" value={accountFilter} onChange={(value) => setAccountFilter(value)}>
+              <option value="all">All accounts</option>
+              {state.accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField label="Category" value={categoryFilter} onChange={(value) => setCategoryFilter(value)}>
+              <option value="all">All categories</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </SelectField>
+            <div className="flex items-end">
+              <Button icon="close" onClick={resetFilters} disabled={activeFilters === 0} fullWidth>
+                Clear {activeFilters > 0 ? `(${activeFilters})` : 'filters'}
+              </Button>
+            </div>
+          </Card>
+        )}
+      </div>
 
       {/* ---------------- Ledger ---------------- */}
       <div className="grid gap-4 xl:grid-cols-12">
@@ -418,17 +450,15 @@ export const Transactions = () => {
                 <EmptyState
                   icon="search"
                   title="No transactions match those filters"
-                  description="Try a different month, account or category — or clear the filters to see everything."
+                  description="Try a different month, account or category, or clear the filters to see everything."
                   secondary={<Button onClick={resetFilters}>Clear filters</Button>}
                 />
               )}
             </Card>
           ) : (
             groups.map(([date, items]) => {
-              const net = items.reduce(
-                (s, t) => s + (t.type === 'income' ? t.amount : t.type === 'expense' ? -t.amount : 0),
-                0,
-              );
+              const day = inAndOut(items);
+              const net = day.income - day.spent;
               return (
                 <section key={date} className="space-y-1.5">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1">
@@ -616,9 +646,7 @@ const TransactionDetail = ({
   const category = lookupCategory(transaction.categoryId);
   const account = state.accounts.find((a) => a.id === transaction.accountId);
 
-  const merchantHistory = state.transactions.filter(
-    (t) => t.merchant === transaction.merchant && t.status !== 'scheduled',
-  );
+  const merchantHistory = state.transactions.filter((t) => t.merchant === transaction.merchant && isMovement(t));
   const merchantTotal = merchantHistory.reduce((s, t) => s + t.amount, 0);
 
   const body = (

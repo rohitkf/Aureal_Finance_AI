@@ -28,6 +28,7 @@ export const LedgerLine = ({
   today,
   masked,
   accountName,
+  toAccountName,
   categoryName,
   labels,
   accents,
@@ -38,6 +39,8 @@ export const LedgerLine = ({
   today: string;
   masked: boolean;
   accountName: string;
+  /** The account a transfer arrives in, when the line is one. */
+  toAccountName?: string;
   categoryName: string;
   labels: Label[];
   /** Which colour each kind of line is drawn in — the person's choice. */
@@ -62,8 +65,9 @@ export const LedgerLine = ({
    */
   const context = [
     categoryName,
-    accountName,
-    row.toAccountId ? 'transfer' : null,
+    // A transfer says where it went. "Everyday · transfer" left the one thing
+    // worth knowing about it out.
+    row.toAccountId && toAccountName ? `${accountName} → ${toAccountName}` : accountName,
     row.projected ? 'not yet recorded' : null,
   ]
     .filter(Boolean)
@@ -72,8 +76,8 @@ export const LedgerLine = ({
   return (
     <div
       className={cn(
-        'group flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors duration-300 ease-fluid',
-        'hover:bg-[rgb(var(--hairline)/0.05)]',
+        'group flex items-start gap-3 rounded-r-xl rounded-l-[4px] px-3 py-3 transition-colors duration-300 ease-fluid',
+        'hover:bg-fill',
         // A bar down the left saying what kind of movement this is, before the
         // number is read at all.
         ACCENT_BAR[accent],
@@ -148,7 +152,7 @@ export const LedgerLine = ({
           aria-label={`Skip ${row.name} on ${formatMediumDate(row.date)}`}
           className={cn(
             'mt-1 shrink-0 rounded-lg p-1.5 text-faint outline-none transition-colors duration-300',
-            'hover:bg-[rgb(var(--hairline)/0.08)] hover:text-danger',
+            'hover:bg-fill hover:text-danger',
             'focus-visible:shadow-[0_0_0_2px_rgb(var(--primary-strong)/0.5)]',
             'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 sm:opacity-0',
             'max-sm:opacity-100',
@@ -197,9 +201,9 @@ export const DayHeading = ({
   const due = dueWithin !== undefined && ahead >= 0 && ahead < dueWithin;
 
   return (
-    <div className="sticky top-[72px] z-10 -mx-1 space-y-1 rounded-lg bg-[rgb(var(--surface-base))]/90 px-3 py-2 backdrop-blur-xl">
+    <div className="sticky top-[72px] z-10 -mx-1 space-y-1 rounded-xl bg-[rgb(var(--glass)/0.92)] px-3 py-2 backdrop-blur-xl">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="truncate text-label-md text-muted">{formatDayHeader(date)}</span>
+        <span className="truncate text-[13px] font-semibold text-text">{formatDayHeader(date)}</span>
         <span className={cn('shrink-0 tnum text-label-md', total < 0 ? 'text-muted' : 'text-success')}>
           {total > 0 && '+'}
           {money(total, { masked })}

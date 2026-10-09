@@ -3,12 +3,12 @@ import { useCategoryLookup } from '@/lib/store';
 import { Icon, type IconName } from './ui/Icon';
 
 const ACCENTS: Record<string, string> = {
-  primary: 'bg-primary/12 text-primary',
-  success: 'bg-success/12 text-success',
-  secondary: 'bg-secondary/12 text-secondary',
-  warning: 'bg-warning/14 text-warning',
-  danger: 'bg-danger/12 text-danger',
-  neutral: 'bg-[rgb(var(--hairline)/0.08)] text-muted',
+  primary: 'bg-primary/15 text-primary',
+  success: 'bg-success/15 text-success',
+  secondary: 'bg-secondary/15 text-secondary',
+  warning: 'bg-warning/15 text-warning',
+  danger: 'bg-danger/15 text-danger',
+  neutral: 'bg-fill text-muted',
 };
 
 /**
@@ -27,7 +27,8 @@ export const CategoryIcon = ({
 }) => {
   const lookupCategory = useCategoryLookup();
   const category = lookupCategory(categoryId);
-  const box = { sm: 'h-8 w-8 rounded-lg', md: 'h-10 w-10 rounded-xl', lg: 'h-12 w-12 rounded-xl' }[size];
+  // iOS's rounded squares, at the radii Settings draws them.
+  const box = { sm: 'h-8 w-8 rounded-[9px]', md: 'h-10 w-10 rounded-[11px]', lg: 'h-12 w-12 rounded-[14px]' }[size];
   const icon = { sm: 15, md: 18, lg: 22 }[size];
 
   return (

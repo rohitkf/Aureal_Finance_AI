@@ -84,7 +84,7 @@ describe('what an excluded account stops doing', () => {
   it('stops counting towards net worth', () => {
     // 1000 held, 400 owed. The 5000 in the business account is real and is
     // deliberately not here.
-    expect(netWorth(state().accounts)).toBe(600);
+    expect(netWorth(state().accounts, [])).toBe(600);
   });
 
   it('stops its spending colouring the month', () => {
@@ -107,7 +107,7 @@ describe('what an excluded account stops doing', () => {
 
 describe('what it leaves alone', () => {
   it('leaves debt on the accounts that are still counted', () => {
-    expect(totalDebt(state().accounts)).toBe(400);
+    expect(totalDebt(state().accounts, [])).toBe(400);
   });
 
   it('keeps the account itself, so it can be brought back', () => {

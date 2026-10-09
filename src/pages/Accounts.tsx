@@ -18,7 +18,8 @@ import { money, percent, round2 } from '@/lib/format';
 import { useAppState, useLoading, useSettings } from '@/lib/store';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
-import { Card, Eyebrow, Label } from '@/components/ui/Card';
+import { Card, Label, PageHeader, StatGroup } from '@/components/ui/Card';
+import { IconTile } from '@/components/ui/List';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Progress, SegmentedBar } from '@/components/ui/Progress';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
@@ -114,13 +115,14 @@ export const Accounts = () => {
 
   // The headline is spendable cash, so its count must be of the same accounts.
   // An investment sits in the list below but is not money you can spend today.
-  const spendable = state.accounts.filter(isSpendable);
-  const credit = state.accounts.filter((a) => a.type === 'credit' && isCounted(a));
+  const spendable = state.accounts.filter((a) => isCounted(a) && isSpendable(a));
+  // Everything the "Total owed" figure adds up, so the count and the sum agree.
+  const owing = state.accounts.filter((a) => isCounted(a) && sideOf(a, state.accountGroups) === 'liability');
   const liquid = availableNow(state.accounts);
   const debt = totalDebt(state.accounts, state.accountGroups);
 
   const allocated = useMemo(
-    () => state.virtualAccounts.reduce((s, v) => s + v.allocated, 0),
+    () => round2(state.virtualAccounts.reduce((s, v) => s + v.allocated, 0)),
     [state.virtualAccounts],
   );
 
@@ -156,66 +158,48 @@ export const Accounts = () => {
   }
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Eyebrow>Accounts</Eyebrow>
-          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">Balances & allocation</h1>
-          <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-muted">
-            Everything you hold and everything you owe, plus how your money is earmarked.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2.5">
-          <Button icon="bank" onClick={() => setCashFlowOpen(true)}>
-            Cash flow setup
-          </Button>
-          {/* The page's own +, as in Bluecoins: a new account, or the group
-              setup. In the header rather than floating, because a phone's
-              island nav already has a + — for a transaction — and two
-              identical buttons a thumb apart that do different things is a
-              mistake waiting to be made. */}
-          <Button variant="primary" icon="plus" aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
-            Add
-          </Button>
-        </div>
-      </header>
+    <div className="space-y-6 sm:space-y-8">
+      <PageHeader
+        title="Accounts"
+        subtitle="Everything you hold and everything you owe, and how your money is earmarked."
+        actions={
+          <>
+            <Button size="sm" icon="sliders" onClick={() => setCashFlowOpen(true)}>
+              Cash flow setup
+            </Button>
+            {/* The page's own +, as in Bluecoins: a new account, or the group
+                setup. In the header rather than floating, because a phone's
+                tab bar already has a + — for a transaction — and two
+                identical buttons a thumb apart that do different things is a
+                mistake waiting to be made. */}
+            <Button size="sm" variant="primary" icon="plus" aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
+              Add
+            </Button>
+          </>
+        }
+      />
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <div className="flex items-center justify-between">
-            <Eyebrow>Available now</Eyebrow>
-            <Badge tone="success">{spendable.length} accounts</Badge>
-          </div>
-          <p className="tnum mt-3 font-display text-metric-lg text-text">
-            {money(liquid, { masked: maskBalances })}
-          </p>
-          <p className="mt-1 text-body-sm text-muted">Cash you can spend or move today</p>
-        </Card>
-
-        <Card>
-          <div className="flex items-center justify-between">
-            <Eyebrow>Total owed</Eyebrow>
-            <Badge tone="danger">{credit.length === 1 ? '1 facility' : `${credit.length} facilities`}</Badge>
-          </div>
-          <p className="tnum mt-3 font-display text-metric-lg text-danger">
-            {money(debt, { masked: maskBalances })}
-          </p>
-          <p className="mt-1 text-body-sm text-muted">
-            {percent(creditUtilisation(state.accounts), 1)} of {money(totalCreditLimit(state.accounts), { compact: true })} limit
-          </p>
-        </Card>
-
-        <Card>
-          <div className="flex items-center justify-between">
-            <Eyebrow>Net position</Eyebrow>
-            <Icon name="wallet" size={18} className="text-primary" />
-          </div>
-          <p className="tnum mt-3 font-display text-metric-lg text-primary">
-            {money(netWorth(state.accounts), { signed: true, masked: maskBalances })}
-          </p>
-          <p className="mt-1 text-body-sm text-muted">What’s left after clearing every balance owed</p>
-        </Card>
-      </section>
+      <StatGroup
+        stats={[
+          {
+            label: 'Available now',
+            value: money(liquid, { masked: maskBalances }),
+            note: `Cash you can spend today, in ${spendable.length === 1 ? '1 account' : `${spendable.length} accounts`}`,
+          },
+          {
+            label: 'Total owed',
+            value: money(debt, { masked: maskBalances }),
+            tone: 'danger',
+            note: `${owing.length === 1 ? '1 account' : `${owing.length} accounts`} · ${percent(creditUtilisation(state.accounts), 1)} of ${money(totalCreditLimit(state.accounts), { compact: true })} card limit`,
+          },
+          {
+            label: 'Net position',
+            value: money(netWorth(state.accounts, state.accountGroups), { signed: true, masked: maskBalances }),
+            tone: 'primary',
+            note: 'What’s left after clearing everything owed',
+          },
+        ]}
+      />
 
       {/* ---------------- Every account, in two halves ---------------- */}
       <section className="space-y-3">
@@ -223,7 +207,7 @@ export const Accounts = () => {
             where accounts go, and seeing them is the quickest way to learn
             that. The prompt sits above them rather than in their place. */}
         {state.accounts.length === 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-primary/8 p-4 shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.2)]">
+          <div className="plate flex flex-wrap items-center justify-between gap-3 p-4">
             <p className="text-body-sm text-muted">
               <strong className="text-text">No accounts yet.</strong> Add your bank account, a card or cash, and the
               rest of Aureal comes to life.
@@ -245,21 +229,21 @@ export const Accounts = () => {
             />
           </Card>
         ) : (
-          <div className="space-y-10">
+          <div className="space-y-8">
             {halves.map((half) => (
               <section key={half.side} aria-labelledby={`half-${half.side}`}>
                 {/* What you own, then what you owe — the organising fact, as
                     a heading rather than a badge on every group. */}
-                <div className="flex items-baseline justify-between gap-3 border-b border-[rgb(var(--hairline)/0.14)] pb-2.5">
+                <div className="flex items-baseline justify-between gap-3 px-4 pb-2">
                   <h2
                     id={`half-${half.side}`}
-                    className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted"
+                    className="font-display text-[20px] font-bold tracking-[-0.02em] text-text"
                   >
                     {half.side === 'asset' ? 'Assets' : 'Liabilities'}
                   </h2>
                   <span
                     className={cn(
-                      'tnum text-label-md font-medium',
+                      'tnum text-[15px] font-semibold',
                       half.side === 'asset' ? 'text-text' : 'text-danger',
                     )}
                   >
@@ -268,24 +252,32 @@ export const Accounts = () => {
                   </span>
                 </div>
 
-                <ul className="divide-y divide-[rgb(var(--hairline)/0.06)]">
+                <ul className="plate divide-y divide-[rgb(var(--hairline)/0.07)] overflow-hidden p-0">
                   {half.groups.map(({ group, accounts, subtotal }) => (
-                    <li key={group.id} className="py-1">
+                    <li key={group.id} className="px-2 py-1">
                       {/* Right padding matches the account rows' (room for their
                           edit button), so group totals and balances read as
                           one column of figures. */}
-                      <div className="flex items-baseline justify-between gap-3 py-2.5 pl-1 pr-12 sm:pr-14">
+                      <div
+                        className={cn(
+                          'flex items-baseline justify-between gap-3 pl-2 pr-12 sm:pr-14',
+                          // An empty group is still a place an account can go,
+                          // so it stays listed, but quietly: a line, not a section.
+                          accounts.length > 0 ? 'py-2.5' : 'py-1.5',
+                        )}
+                      >
                         <h3
                           className={cn(
-                            'truncate text-[15px] font-medium tracking-[-0.01em]',
-                            accounts.length > 0 ? 'text-primary' : 'text-primary/55',
+                            'truncate tracking-[-0.01em]',
+                            accounts.length > 0 ? 'text-[15px] font-semibold text-primary' : 'text-[14px] font-medium text-faint',
                           )}
                         >
                           {group.name}
                         </h3>
                         <span
                           className={cn(
-                            'tnum shrink-0 text-[15px]',
+                            'tnum shrink-0',
+                            accounts.length === 0 ? 'text-[14px]' : 'text-[15px]',
                             accounts.length === 0
                               ? 'text-faint'
                               : half.side === 'liability' && subtotal > 0
@@ -303,10 +295,10 @@ export const Accounts = () => {
                             <li key={account.id} className="group/row relative flex items-center">
                               <Link
                                 to={`/accounts/${account.id}`}
-                                className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl py-2 pl-5 pr-12 transition-colors duration-300 ease-fluid hover:bg-[rgb(var(--hairline)/0.04)] sm:pr-14"
+                                className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl py-2.5 pl-2 pr-12 transition-colors duration-300 ease-fluid hover:bg-fill sm:pr-14"
                               >
                                 <span className="min-w-0">
-                                  <span className="block truncate text-[14.5px] text-text">{account.name}</span>
+                                  <span className="block truncate text-[15px] text-text">{account.name}</span>
                                   {/* One string, so it reads, finds and tests
                                       as one line (AGENTS.md §8). */}
                                   <span className="block truncate text-[12.5px] text-faint">
@@ -326,7 +318,7 @@ export const Accounts = () => {
                                 </span>
                                 <span
                                   className={cn(
-                                    'tnum shrink-0 text-[14.5px]',
+                                    'tnum shrink-0 text-[15px] font-medium',
                                     owesMoney(account) && account.balance > 0 ? 'text-danger' : 'text-text',
                                   )}
                                 >
@@ -355,11 +347,8 @@ export const Accounts = () => {
 
             {archived.length > 0 && (
               <div className="space-y-3">
-                <div className="flex items-baseline justify-between gap-3 border-b border-[rgb(var(--hairline)/0.12)] pb-2.5">
-                  <h2 className="flex items-center gap-2.5 font-display text-headline-sm text-muted">
-                    <span className="h-4 w-1.5 rounded-full bg-[rgb(var(--hairline)/0.3)]" aria-hidden="true" />
-                    Closed
-                  </h2>
+                <div className="flex items-baseline justify-between gap-3 px-4">
+                  <h2 className="font-display text-[20px] font-bold tracking-[-0.02em] text-muted">Closed</h2>
                   {/* Its own figure, because the two halves above cover what
                       is in use — so without this the headline net worth would
                       not visibly add up. */}
@@ -378,12 +367,10 @@ export const Accounts = () => {
                     )}
                   </span>
                 </div>
-                <ul className="space-y-1.5">
+                <ul className="plate divide-y divide-[rgb(var(--hairline)/0.07)] overflow-hidden p-0">
                   {archived.map((account) => (
-                    <li key={account.id} className="well flex items-center gap-3 p-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[rgb(var(--hairline)/0.06)] text-faint">
-                        <Icon name={TYPE_ICON[account.type]} size={15} />
-                      </span>
+                    <li key={account.id} className="flex items-center gap-3 px-4 py-2.5">
+                      <IconTile icon={TYPE_ICON[account.type]} size="sm" />
                       <Link to={`/accounts/${account.id}`} className="min-w-0 flex-1 truncate text-body-md text-muted">
                         {account.name}
                       </Link>
@@ -414,10 +401,9 @@ export const Accounts = () => {
 
       {/* ---------------- Virtual accounts ---------------- */}
       <section className="space-y-3">
-        <div className="flex items-center gap-3">
-          <span className="h-4 w-1.5 rounded-full bg-primary-strong" aria-hidden="true" />
-          <h2 className="font-display text-headline-sm text-text">Virtual accounts</h2>
-          <span className="tnum text-label-md text-muted">{money(allocated, { compact: true })} allocated</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4">
+          <h2 className="font-display text-[20px] font-bold tracking-[-0.02em] text-text">Virtual accounts</h2>
+          <span className="tnum text-[13px] text-muted">{money(allocated, { compact: true })} allocated</span>
           <Button
             size="sm"
             icon="plus"
@@ -432,9 +418,9 @@ export const Accounts = () => {
           The single most important thing to communicate on this screen: these
           are labels on money you already have, not extra money.
         */}
-        <div className="flex items-start gap-3 rounded-xl border border-primary/25 bg-primary/8 p-4">
-          <Icon name="info" size={18} className="mt-0.5 shrink-0 text-primary" />
-          <p className="text-body-sm text-muted">
+        <div className="well flex items-start gap-3 p-4">
+          <Icon name="info" size={17} className="mt-0.5 shrink-0 text-primary" />
+          <p className="text-[13.5px] leading-relaxed text-muted">
             <strong className="text-text">Virtual accounts are allocations, not additional funds.</strong> They
             divide the {money(allocated, { compact: true })} already sitting in {parentNames} so you can see
             what each pound is meant for. Your total balance doesn’t change.
@@ -446,7 +432,7 @@ export const Accounts = () => {
             <EmptyState
               icon="layers"
               title="No allocations yet"
-              description="Split an account into envelopes — bills, emergency fund, spending — to see what’s truly free."
+              description="Split an account into envelopes (bills, emergency fund, spending) to see what’s truly free."
               action={{
                 label: 'Add an allocation',
                 onClick: () => setAllocationDialog({ open: true, editing: null }),
@@ -455,7 +441,7 @@ export const Accounts = () => {
           </Card>
         ) : (
           <>
-            <Card tone="well" className="space-y-3">
+            <Card className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Label>Allocation of {parentNames}</Label>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -485,12 +471,10 @@ export const Accounts = () => {
               {state.virtualAccounts.map((v) => {
                 const pct = v.target ? (v.allocated / v.target) * 100 : 100;
                 return (
-                  <Card key={v.id} tone="well" className="flex flex-col justify-between gap-5">
+                  <Card key={v.id} className="flex flex-col justify-between gap-5">
                     <div>
                       <div className="flex items-start justify-between">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-high text-primary">
-                          <Icon name={(v.icon as IconName) ?? 'box'} size={18} />
-                        </span>
+                        <IconTile icon={(v.icon as IconName) ?? 'box'} tint="primary" />
                         <div className="flex items-center gap-1">
                           {v.locked && <Badge tone="primary" icon="lock">Held back</Badge>}
                           {v.target ? (
@@ -554,11 +538,9 @@ export const Accounts = () => {
         )}
       </section>
 
-      <Card tone="well" className="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
+      <Card tone="well" className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3.5">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--hairline)/0.06)] text-faint shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]">
-            <Icon name="bank" size={18} />
-          </span>
+          <IconTile icon="bank" />
           <div>
             <h3 className="font-display text-[16px] font-semibold tracking-[-0.015em] text-text">
               Automatic bank sync is coming
@@ -661,7 +643,7 @@ export const Accounts = () => {
       <Modal open={menuOpen} onClose={() => setMenuOpen(false)} title="Add" size="sm">
         <div className="-mx-2 space-y-1">
           {[
-            { icon: 'bank' as const, label: 'Add new account', hint: 'A bank account, a card, a loan — anything with a balance.', go: () => setDialogOpen(true) },
+            { icon: 'bank' as const, label: 'Add new account', hint: 'A bank account, a card, a loan: anything with a balance.', go: () => setDialogOpen(true) },
             { icon: 'layers' as const, label: 'Account group setup', hint: 'The headings accounts sit under, in Assets and Liabilities.', go: () => setGroupsOpen(true) },
           ].map((item) => (
             <button
@@ -671,11 +653,9 @@ export const Accounts = () => {
                 setMenuOpen(false);
                 item.go();
               }}
-              className="flex w-full items-center gap-4 rounded-2xl px-3 py-3.5 text-left transition-colors duration-300 ease-fluid hover:bg-[rgb(var(--hairline)/0.05)]"
+              className="flex w-full items-center gap-4 rounded-2xl px-3 py-3.5 text-left transition-colors duration-300 ease-fluid hover:bg-fill"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Icon name={item.icon} size={19} />
-              </span>
+              <IconTile icon={item.icon} tint="primary" />
               <span className="min-w-0">
                 <span className="block text-[15px] text-text">{item.label}</span>
                 <span className="block text-[12.5px] leading-snug text-faint">{item.hint}</span>

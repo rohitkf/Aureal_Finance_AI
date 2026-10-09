@@ -88,7 +88,7 @@ report.check(structural, 'names, labels, heading order and target sizes');
 
 // ---- Colour contrast, in both themes -----------------------------------
 const contrastRoutes = signedIn
-  ? ['/login', '/signup', '/', '/accounts', '/transactions', '/budget', '/forecast', '/reports', '/settings']
+  ? ['/login', '/signup', '/', '/accounts', '/transactions', '/budget', '/time-machine', '/reports', '/settings']
   : PUBLIC_ROUTES;
 for (const theme of ['dark', 'light']) {
   let ok = true;

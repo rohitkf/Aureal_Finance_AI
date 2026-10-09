@@ -38,7 +38,7 @@ const EMPTY = [
   ['/subscriptions', /No subscriptions yet|Nothing active/i],
   ['/goals', /No goals yet/i],
   ['/reports', /No data to report on yet/i],
-  ['/forecast', /Nothing scheduled yet/i],
+  ['/time-machine', /No spendable accounts yet/i],
 ];
 
 for (const [route, expected] of EMPTY) {

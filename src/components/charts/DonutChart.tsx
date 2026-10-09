@@ -85,7 +85,7 @@ export const DonutChart = ({
           </g>
         </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="text-label-sm uppercase tracking-wider text-faint">
+          <span className="text-[12.5px] font-medium text-faint">
             {highlighted ? highlighted.label : centerLabel}
           </span>
           <span className="tnum font-display text-metric-md text-text">
@@ -106,14 +106,17 @@ export const DonutChart = ({
               onMouseLeave={() => setActive(null)}
               onFocus={() => setActive(a.id)}
               onBlur={() => setActive(null)}
-              className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors duration-400 ease-fluid hover:bg-surface-high"
+              className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors duration-300 ease-fluid hover:bg-fill"
             >
-              <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: a.color }} />
-              <span className="min-w-0 flex-1 truncate text-body-sm text-text">{a.label}</span>
-              <span className="tnum shrink-0 text-body-sm font-semibold text-text">{money(a.value)}</span>
-              <span className="tnum w-12 shrink-0 text-right text-label-sm text-faint">
-                {percent(a.fraction * 100)}
+              <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: a.color }} />
+              {/* The share sits under the name rather than in a column of its
+                  own: beside a donut in a half-width card, a fourth column
+                  left the name so little room it broke mid-word. */}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-body-sm leading-snug text-text">{a.label}</span>
+                <span className="tnum block text-label-sm text-faint">{percent(a.fraction * 100)}</span>
               </span>
+              <span className="tnum shrink-0 text-body-sm font-semibold text-text">{money(a.value)}</span>
             </button>
           </li>
         ))}

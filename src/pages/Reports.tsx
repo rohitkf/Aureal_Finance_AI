@@ -5,6 +5,7 @@ import {
   monthIncome,
   monthSpend,
   monthlyCommitments,
+  monthlyRecurringIncome,
   netWorth,
   netWorthSeries,
   savingsRate,
@@ -14,8 +15,7 @@ import {
 } from '@/lib/finance';
 import { addMonths, formatMonthYear, formatShortMonth, monthKey } from '@/lib/date';
 import { downloadCsv } from '@/lib/csv';
-import { money, percent } from '@/lib/format';
-import { monthlyEquivalent } from '@/lib/recurrence';
+import { money, percent, round2 } from '@/lib/format';
 import { useAppState, useCategoryLookup, useLoading, useSettings, useToday } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { DonutChart } from '@/components/charts/DonutChart';
@@ -23,7 +23,7 @@ import { IncomeExpenseChart } from '@/components/charts/BarChart';
 import { NetWorthChart } from '@/components/charts/NetWorthChart';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow, Label } from '@/components/ui/Card';
+import { Card, CardHeader, PageHeader, StatGroup } from '@/components/ui/Card';
 import { SegmentedControl } from '@/components/ui/Field';
 import { Progress } from '@/components/ui/Progress';
 import { EmptyState, SkeletonChart } from '@/components/ui/States';
@@ -54,13 +54,7 @@ export const Reports = () => {
 
   // Likewise, commitments are compared against recurring income rather than
   // whatever has happened to land so far this month.
-  const recurringIncome = useMemo(
-    () =>
-      state.recurring
-        .filter((r) => r.status === 'active' && r.direction === 'in')
-        .reduce((sum, r) => sum + monthlyEquivalent(r), 0),
-    [state.recurring],
-  );
+  const recurringIncome = useMemo(() => monthlyRecurringIncome(state), [state]);
 
   /**
    * The last N calendar months, counted back from this one.
@@ -121,35 +115,40 @@ export const Reports = () => {
     [state, today, range],
   );
 
+  const netWorthChange = useMemo(() => {
+    const first = netWorthPoints[0];
+    const last = netWorthPoints[netWorthPoints.length - 1];
+    return first && last ? round2(last.assets - last.liabilities - (first.assets - first.liabilities)) : 0;
+  }, [netWorthPoints]);
+
   const hasData = state.transactions.length > 0;
 
   if (loading) return <SkeletonChart />;
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <Eyebrow>Reports</Eyebrow>
-          <h1 className="mt-5 font-display text-[clamp(2rem,4.5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.035em] text-text">How your money behaves</h1>
-          <p className="mt-3 text-[14px] leading-relaxed text-muted">Trends, categories and net worth over time.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <SegmentedControl
-            label="Reporting range"
-            value={range}
-            onChange={setRange}
-            size="sm"
-            options={[
-              { value: '3', label: '3M' },
-              { value: '6', label: '6M' },
-              { value: '12', label: '12M' },
-            ]}
-          />
-          <Button icon="download" size="sm" onClick={exportCsv} disabled={!hasData}>
-            Export
-          </Button>
-        </div>
-      </header>
+    <div className="space-y-6 sm:space-y-8">
+      <PageHeader
+        title="Reports"
+        subtitle="How your money behaves: trends, categories and net worth over time."
+        actions={
+          <>
+            <SegmentedControl
+              label="Reporting range"
+              value={range}
+              onChange={setRange}
+              size="sm"
+              options={[
+                { value: '3', label: '3M' },
+                { value: '6', label: '6M' },
+                { value: '12', label: '12M' },
+              ]}
+            />
+            <Button icon="download" size="sm" onClick={exportCsv} disabled={!hasData}>
+              Export
+            </Button>
+          </>
+        }
+      />
 
       {!hasData ? (
         <Card className="p-0">
@@ -161,27 +160,29 @@ export const Reports = () => {
         </Card>
       ) : (
         <>
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Kpi label="Spent this month" value={money(spent, { compact: true, masked: maskBalances })} note="Cleared transactions" />
-            <Kpi
-              label="Income this month"
-              value={money(income, { compact: true, masked: maskBalances })}
-              tone="success"
-              note="Received so far"
-            />
-            <Kpi
-              label="Savings rate"
-              value={percent(rate)}
-              tone={rate >= 20 ? 'success' : rate >= 0 ? 'warning' : 'danger'}
-              note={`${formatMonthYear(`${lastMonth}-01`)} · ${rate >= 20 ? 'healthy' : rate >= 0 ? 'room to improve' : 'spending exceeded income'}`}
-            />
-            <Kpi
-              label="Net worth"
-              value={money(netWorth(state.accounts), { compact: true, masked: maskBalances })}
-              tone="primary"
-              note="Assets minus what you owe"
-            />
-          </section>
+          <StatGroup
+            stats={[
+              { label: 'Spent this month', value: money(spent, { compact: true, masked: maskBalances }), note: 'Cleared transactions' },
+              {
+                label: 'Income this month',
+                value: money(income, { compact: true, masked: maskBalances }),
+                tone: 'success',
+                note: 'Received so far',
+              },
+              {
+                label: 'Savings rate',
+                value: percent(rate),
+                tone: rate >= 20 ? 'success' : rate >= 0 ? 'warning' : 'danger',
+                note: `${formatMonthYear(`${lastMonth}-01`)} · ${rate >= 20 ? 'healthy' : rate >= 0 ? 'room to improve' : 'spending exceeded income'}`,
+              },
+              {
+                label: 'Net worth',
+                value: money(netWorth(state.accounts, state.accountGroups), { compact: true, masked: maskBalances }),
+                tone: 'primary',
+                note: 'Assets minus what you owe',
+              },
+            ]}
+          />
 
           <div className="grid gap-4 xl:grid-cols-2">
             <Card className="space-y-5">
@@ -204,14 +205,11 @@ export const Reports = () => {
               title="Net worth"
               description="Assets minus liabilities. The dashed lines show each side separately."
               action={
-                <Badge tone="success" icon="trending-up">
-                  {money(
-                    (netWorthPoints[netWorthPoints.length - 1]?.assets ?? 0) -
-                      (netWorthPoints[netWorthPoints.length - 1]?.liabilities ?? 0) -
-                      ((netWorthPoints[0]?.assets ?? 0) - (netWorthPoints[0]?.liabilities ?? 0)),
-                    { compact: true, signed: true },
-                  )}{' '}
-                  over {range} months
+                <Badge tone={netWorthChange >= 0 ? 'success' : 'danger'} icon={netWorthChange >= 0 ? 'arrow-up' : 'arrow-down'}>
+                  {money(netWorthChange, { compact: true, signed: true })}{' '}
+                  {/* The series starts when something was first recorded, so
+                      "over 6 months" claimed a history that was not there. */}
+                  since {formatShortMonth(`${netWorthPoints[0]?.month ?? month}-01`)}
                 </Badge>
               }
             />
@@ -252,7 +250,7 @@ export const Reports = () => {
               <dl className="space-y-3">
                 <Line label="Recurring commitments" value={money(monthlyCommitments(state), { compact: true })} note="Per month" />
                 <Line label="Subscriptions" value={money(subs.monthly, { compact: true })} note={`${subs.count} active · ${money(subs.annual, { compact: true })} a year`} />
-                <Line label="Total debt" value={money(totalDebt(state.accounts), { compact: true })} note="Across credit facilities" tone="danger" />
+                <Line label="Total debt" value={money(totalDebt(state.accounts, state.accountGroups), { compact: true })} note="Cards, loans and anything else owed" tone="danger" />
                 <Line
                   label="Committed share of income"
                   value={percent(recurringIncome > 0 ? (monthlyCommitments(state) / recurringIncome) * 100 : 0)}
@@ -267,31 +265,6 @@ export const Reports = () => {
     </div>
   );
 };
-
-const Kpi = ({
-  label,
-  value,
-  tone = 'text',
-  note,
-}: {
-  label: string;
-  value: string;
-  tone?: 'text' | 'success' | 'warning' | 'danger' | 'primary';
-  note?: string;
-}) => (
-  <Card>
-    <Label>{label}</Label>
-    <p
-      className={cn(
-        'tnum mt-2 font-display text-metric-lg',
-        { text: 'text-text', success: 'text-success', warning: 'text-warning', danger: 'text-danger', primary: 'text-primary' }[tone],
-      )}
-    >
-      {value}
-    </p>
-    {note && <p className="mt-0.5 text-body-sm text-muted">{note}</p>}
-  </Card>
-);
 
 const Line = ({
   label,

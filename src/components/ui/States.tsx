@@ -65,7 +65,7 @@ interface EmptyStateProps {
 
 export const EmptyState = ({ icon = 'box', title, description, action, secondary, className }: EmptyStateProps) => (
   <div className={cn('flex flex-col items-center justify-center px-6 py-14 text-center', className)}>
-    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[rgb(var(--hairline)/0.06)] shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))] text-muted">
+    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-fill text-muted">
       <Icon name={icon} size={24} />
     </div>
     <h3 className="font-display text-headline-sm text-text">{title}</h3>
@@ -91,7 +91,7 @@ export const ErrorState = ({
   className?: string;
 }) => (
   <div className={cn('flex flex-col items-center justify-center px-6 py-14 text-center', className)} role="alert">
-    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-danger/30 bg-danger/10 text-danger">
+    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-danger/15 text-danger">
       <Icon name="alert" size={24} />
     </div>
     <h3 className="font-display text-headline-sm text-text">{title}</h3>

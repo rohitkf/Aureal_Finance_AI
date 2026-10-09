@@ -90,7 +90,7 @@ export const LabelPicker = ({ value, onChange }: LabelPickerProps) => {
           if (matches.length === 1) toggle(matches[0]!.id);
           else if (isNew) create();
         }}
-        hint="A label cuts across categories — which holiday, which flat, which client. A transaction can carry several."
+        hint="A label cuts across categories: which holiday, which flat, which client. A transaction can carry several."
       />
 
       {(matches.length > 0 || isNew) && (
