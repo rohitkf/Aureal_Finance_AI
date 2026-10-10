@@ -79,7 +79,11 @@ export const TimeMachine = () => {
 
   const [preset, setPreset] = useState<TimeMachinePreset>('month');
   const [custom, setCustom] = useState(() => presetRange('month', today));
-  /** `null` is every account, including one added after the page was opened. */
+  /**
+   * `null` is every account, including one added after the page was opened.
+   * Otherwise the accounts tapped, which is never empty: taking off the last
+   * one goes back to all of them.
+   */
   const [picked, setPicked] = useState<string[] | null>(null);
   const [limit, setLimit] = useState(LINES_PER_PAGE);
 
@@ -95,15 +99,19 @@ export const TimeMachine = () => {
         : custom.to < custom.from
           ? 'The end comes before the start.'
           : undefined;
-  const chosen = picked ?? options.map((a) => a.id);
-  const noAccounts = chosen.length === 0;
+  const { chosen, showingAll } = useMemo(() => {
+    // An account picked and since closed or taken out of cash flow drops out;
+    // if that leaves nothing, the screen shows every account again.
+    const still = picked?.filter((id) => options.some((a) => a.id === id)) ?? [];
+    return still.length ? { chosen: still, showingAll: false } : { chosen: options.map((a) => a.id), showingAll: true };
+  }, [picked, options]);
 
   const tm = useMemo(
     () =>
-      rangeError || noAccounts
+      rangeError || options.length === 0
         ? null
-        : timeMachine(state, today, { from: range.from, to: range.to, accountIds: picked ?? undefined }),
-    [state, today, range.from, range.to, picked, rangeError, noAccounts],
+        : timeMachine(state, today, { from: range.from, to: range.to, accountIds: showingAll ? undefined : chosen }),
+    [state, today, range.from, range.to, showingAll, chosen, rangeError, options.length],
   );
 
   /** Whole days, stopping at the first one past the limit. */
@@ -121,10 +129,16 @@ export const TimeMachine = () => {
 
   if (loading) return <SkeletonChart />;
 
+  /**
+   * Filter chips, as they behave everywhere else: with every account showing,
+   * tapping one shows that one alone. After that each tap adds or removes
+   * one. It used to take the tapped account *out* of "all", so tapping
+   * Everyday showed everything except Everyday — the opposite of what it said.
+   */
   const toggle = (id: string) => {
-    const next = chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id];
-    // Everything chosen is "all", so an account added later joins in.
-    setPicked(next.length === options.length ? null : next);
+    const next = showingAll ? [id] : chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id];
+    // Nothing, or everything, is "all": an account added later joins in.
+    setPicked(next.length === 0 || next.length === options.length ? null : next);
     setLimit(LINES_PER_PAGE);
   };
 
@@ -140,7 +154,7 @@ export const TimeMachine = () => {
   const change = tm?.change ?? 0;
   const belowMinimum = !!tm && tm.lowest.value < minimumBalance;
   const scope =
-    picked === null
+    showingAll
       ? options.length === 1
         ? 'your account'
         : options.length === 2
@@ -201,18 +215,18 @@ export const TimeMachine = () => {
             <div role="group" aria-label="Accounts" className="flex flex-wrap gap-1.5">
               <button
                 type="button"
-                aria-pressed={picked === null}
+                aria-pressed={showingAll}
                 onClick={() => {
                   setPicked(null);
                   setLimit(LINES_PER_PAGE);
                 }}
-                className={chipClass(picked === null)}
+                className={chipClass(showingAll)}
               >
-                {picked === null && <Icon name="check" size={12} className="shrink-0" />}
+                {showingAll && <Icon name="check" size={12} className="shrink-0" />}
                 All accounts
               </button>
               {options.map((a) => {
-                const on = chosen.includes(a.id);
+                const on = !showingAll && chosen.includes(a.id);
                 return (
                   <button
                     key={a.id}
@@ -245,14 +259,9 @@ export const TimeMachine = () => {
       ) : !tm ? (
         <Card>
           <EmptyState
-            icon={rangeError ? 'calendar' : 'filter'}
-            title={rangeError ? 'Choose a window' : 'Pick at least one account'}
-            description={
-              rangeError
-                ? 'Set a start and an end date, with the end on or after the start.'
-                : 'The timeline follows the accounts you choose above.'
-            }
-            secondary={!rangeError ? <Button onClick={() => setPicked(null)}>Choose all accounts</Button> : undefined}
+            icon="calendar"
+            title="Choose a window"
+            description="Set a start and an end date, with the end on or after the start."
           />
         </Card>
       ) : (

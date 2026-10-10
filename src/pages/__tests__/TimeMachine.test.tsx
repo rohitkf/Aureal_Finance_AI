@@ -123,13 +123,25 @@ describe('Time Machine', () => {
     expect(screen.getByText('Money out').nextSibling).toHaveTextContent('−£950.00');
   });
 
-  it('offers every spendable account, all chosen, and never the card', () => {
+  it('offers every spendable account, showing all of them, and never the card', () => {
     open();
     const group = screen.getByRole('group', { name: 'Accounts' });
     expect(within(group).getByRole('button', { name: /All accounts/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(group).getByRole('button', { name: /Everyday/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(group).getByRole('button', { name: /Rainy Day Pot/ })).toHaveAttribute('aria-pressed', 'true');
+    // "All" is the chip that is on; no single account is picked out yet.
+    expect(within(group).getByRole('button', { name: /Everyday/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(within(group).getByRole('button', { name: /Rainy Day Pot/ })).toHaveAttribute('aria-pressed', 'false');
     expect(within(group).queryByRole('button', { name: /Amex/ })).not.toBeInTheDocument();
+  });
+
+  it('shows only the account tapped while all are showing, not every other one', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(screen.getByRole('button', { name: /Everyday/ }));
+
+    expect(screen.getByRole('button', { name: /All accounts/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /Everyday/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Rainy Day Pot/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText(/^In Everyday$/)).toBeInTheDocument();
   });
 
   it('shows each payment with the balance its account holds afterwards', () => {
@@ -149,21 +161,32 @@ describe('Time Machine', () => {
   it('turns a transfer into money leaving when its destination is left out', async () => {
     const user = userEvent.setup();
     open();
-    await user.click(screen.getByRole('button', { name: /Rainy Day Pot/ }));
+    await user.click(screen.getByRole('button', { name: /Everyday/ }));
 
     expect(screen.getByRole('button', { name: /All accounts/ })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByText('Money out').nextSibling).toHaveTextContent('−£1,050.00');
     expect(screen.getByText('Everyday → Rainy Day Pot', { exact: false })).toBeInTheDocument();
   });
 
-  it('asks for an account rather than drawing an empty timeline', async () => {
+  it('adds a second account with a second tap, and is back to all when every one is on', async () => {
     const user = userEvent.setup();
     open();
     await user.click(screen.getByRole('button', { name: /Rainy Day Pot/ }));
-    await user.click(screen.getByRole('button', { name: /Everyday/ }));
+    expect(screen.getByText(/^In Rainy Day Pot$/)).toBeInTheDocument();
 
-    expect(screen.getByText('Pick at least one account')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Choose all accounts' }));
+    await user.click(screen.getByRole('button', { name: /Everyday/ }));
+    expect(screen.getByRole('button', { name: /All accounts/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByText('£600.00')[0]).toBeInTheDocument();
+  });
+
+  it('never draws an empty timeline: taking off the last account shows them all again', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(screen.getByRole('button', { name: /Rainy Day Pot/ }));
+    await user.click(screen.getByRole('button', { name: /Rainy Day Pot/ }));
+
+    expect(screen.getByRole('button', { name: /All accounts/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByText('Pick at least one account')).not.toBeInTheDocument();
     expect(screen.getAllByText('£600.00')[0]).toBeInTheDocument();
   });
 

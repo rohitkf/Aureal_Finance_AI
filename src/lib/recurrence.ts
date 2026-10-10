@@ -1,4 +1,4 @@
-import type { Frequency, RecurringPayment, WeekendMode } from './types';
+import type { Frequency, RecurringPayment, Transaction, TransactionType, WeekendMode } from './types';
 import {
   ISO,
   addDays,
@@ -256,4 +256,69 @@ export const monthlyEquivalent = (
     }
   };
   return perPeriod() / every;
+};
+
+/** How a rule's direction is written on the transactions it stands for. */
+export const typeOfDirection = (direction: RecurringPayment['direction']): TransactionType =>
+  direction === 'in' ? 'income' : direction === 'out' ? 'expense' : 'transfer';
+
+/** The fields of a scheduled payment that come from its rule. */
+export type FollowPatch = Partial<
+  Pick<Transaction, 'accountId' | 'toAccountId' | 'type' | 'amount' | 'categoryId' | 'merchant'>
+>;
+
+/**
+ * What each of a rule's still-scheduled payments has to change when the rule
+ * is edited.
+ *
+ * A scheduled payment is the rule's next occurrence written down ahead of
+ * time. Editing the rule used to change the rule alone, so the payments it had
+ * already written kept the old account, amount and name. Move a salary rule to
+ * a new current account and its pending payday stayed on the old one — and,
+ * because that payment still claims its date, the rule did not predict it on
+ * the new account either. The salary vanished from Safe to Spend and the Time
+ * Machine both.
+ *
+ * Each field follows the rule only where the payment still has the rule's old
+ * value. One the person changed on that payment by hand — a bigger bill this
+ * month, a payday into another account — is theirs, and stays. Only
+ * `scheduled` rows move: anything that has happened is history, and changing
+ * a rule does not rewrite what was paid. The amount is left alone on a payment
+ * split across categories, whose parts must still total it.
+ */
+export const followRule = (
+  previous: RecurringPayment,
+  next: RecurringPayment,
+  transactions: Transaction[],
+): Array<{ id: string; patch: FollowPatch }> => {
+  const out: Array<{ id: string; patch: FollowPatch }> = [];
+  const oldType = typeOfDirection(previous.direction);
+  const newType = typeOfDirection(next.direction);
+  const oldTo = previous.direction === 'transfer' ? (previous.toAccountId ?? null) : null;
+  const newTo = next.direction === 'transfer' ? (next.toAccountId ?? null) : null;
+
+  for (const t of transactions) {
+    if (t.recurringId !== next.id || t.status !== 'scheduled') continue;
+    const patch: FollowPatch = {};
+
+    if (next.accountId !== previous.accountId && t.accountId === previous.accountId) patch.accountId = next.accountId;
+
+    const tTo = t.type === 'transfer' ? (t.toAccountId ?? null) : null;
+    if ((newType !== oldType || newTo !== oldTo) && t.type === oldType && tTo === oldTo) {
+      const account = patch.accountId ?? t.accountId;
+      // A transfer has to go somewhere other than where it starts. A payment
+      // moved by hand onto the rule's new destination cannot become one.
+      if (newType !== 'transfer' || (newTo !== null && newTo !== account)) {
+        patch.type = newType;
+        patch.toAccountId = newTo ?? undefined;
+      }
+    }
+
+    if (next.amount !== previous.amount && t.amount === previous.amount && !t.splits?.length) patch.amount = next.amount;
+    if (next.categoryId !== previous.categoryId && t.categoryId === previous.categoryId) patch.categoryId = next.categoryId;
+    if (next.name !== previous.name && t.merchant === previous.name) patch.merchant = next.name;
+
+    if (Object.keys(patch).length) out.push({ id: t.id, patch });
+  }
+  return out;
 };

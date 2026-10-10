@@ -50,7 +50,9 @@ import {
   toTransaction,
   toVirtualAccount,
   transactionToRow,
+  followPatchToRow,
 } from './mappers';
+import { followRule } from './recurrence';
 import { missingStandardGroups } from './accountGroups';
 import { owesMoney } from './finance';
 
@@ -754,13 +756,26 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           });
           break;
 
-        case 'update-recurring':
+        case 'update-recurring': {
+          // Worked out now, against the rule as it stood before this edit:
+          // by the time the write runs, the state may already be newer.
+          const r = action.recurring;
+          const previous = stateRef.current.recurring.find((x) => x.id === r.id);
+          const follow = previous ? followRule(previous, r, stateRef.current.transactions) : [];
           run('update that recurring payment', async () => {
-            const r = action.recurring;
             check(await supabase.from('recurring_payments').update(recurringToRow(r)).eq('id', r.id));
-            return ['recurring'];
+            // The payments it has already written down follow it; see
+            // `followRule`. Still scheduled is re-checked at the door, so a
+            // payment cleared in the meantime is left as it was.
+            for (const { id, patch } of follow) {
+              check(
+                await supabase.from('transactions').update(followPatchToRow(patch)).eq('id', id).eq('status', 'scheduled'),
+              );
+            }
+            return follow.length ? ['recurring', 'transactions'] : ['recurring'];
           });
           break;
+        }
 
         case 'delete-recurring':
           run('delete that recurring payment', async () => {
