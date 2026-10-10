@@ -162,7 +162,7 @@ export const DatePicker = ({
           'text-[14px] tracking-[-0.01em] text-text',
           'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.04)]',
           'outline-none transition-all duration-400 ease-fluid',
-          'focus-visible:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.55),0_0_0_3px_rgb(var(--primary-strong)/0.18)]',
+          'focus-visible:shadow-[inset_0_0_0_1.5px_rgb(var(--primary)),0_0_0_4px_rgb(var(--primary-strong)/0.35)]',
           'disabled:opacity-50',
           invalid && 'shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.55)]',
         )}
@@ -238,11 +238,11 @@ export const DatePicker = ({
                   className={cn(
                     'flex h-9 items-center justify-center rounded-xl text-[13px] tabular-nums',
                     'outline-none transition-colors duration-200 ease-fluid',
-                    'focus-visible:shadow-[inset_0_0_0_2px_rgb(var(--primary-strong)/0.6)]',
+                    'focus-visible:shadow-[inset_0_0_0_2px_rgb(var(--text))]',
                     !inMonth && 'text-faint/50',
                     inMonth && !isSelected && 'text-muted hover:bg-[rgb(var(--hairline)/0.07)] hover:text-text',
                     isSelected &&
-                      'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2)]',
+                      'bg-primary-strong font-medium text-[rgb(var(--on-primary))]',
                   )}
                 >
                   {Number(iso.slice(8))}

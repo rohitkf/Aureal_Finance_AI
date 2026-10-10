@@ -72,7 +72,7 @@ export const TimePicker = ({ value, onChange, id, describedBy, invalid, disabled
           'text-[14px] tracking-[-0.01em] text-text',
           'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.04)]',
           'outline-none transition-all duration-400 ease-fluid',
-          'focus-visible:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.55),0_0_0_3px_rgb(var(--primary-strong)/0.18)]',
+          'focus-visible:shadow-[inset_0_0_0_1.5px_rgb(var(--primary)),0_0_0_4px_rgb(var(--primary-strong)/0.35)]',
           'disabled:opacity-50',
           invalid && 'shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.55)]',
         )}
@@ -166,7 +166,7 @@ const Column = ({
             )}
           >
             {render(v)}
-            {suffix && <span className="text-[10.5px] opacity-70">{suffix(v)}</span>}
+            {suffix && <span className="text-[10.5px]">{suffix(v)}</span>}
           </button>
         </li>
       );

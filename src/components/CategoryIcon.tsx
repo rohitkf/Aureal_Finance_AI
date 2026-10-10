@@ -27,8 +27,8 @@ export const CategoryIcon = ({
 }) => {
   const lookupCategory = useCategoryLookup();
   const category = lookupCategory(categoryId);
-  // iOS's rounded squares, at the radii Settings draws them.
-  const box = { sm: 'h-8 w-8 rounded-[9px]', md: 'h-10 w-10 rounded-[11px]', lg: 'h-12 w-12 rounded-[14px]' }[size];
+  // Circles, as the reference draws every icon.
+  const box = { sm: 'h-8 w-8 rounded-full', md: 'h-10 w-10 rounded-full', lg: 'h-12 w-12 rounded-full' }[size];
   const icon = { sm: 15, md: 18, lg: 22 }[size];
 
   return (

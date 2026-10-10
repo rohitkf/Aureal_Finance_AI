@@ -12,11 +12,11 @@ interface BezelProps {
 }
 
 /**
- * The hero pane: the one or two surfaces that lead a screen, in a stronger
- * tint of glass with a specular sheen across the top. It was once a plate
- * seated in a tray; the tray is gone and the name stayed, so nothing that
- * composes it had to change. Using it on every card would flatten the
- * hierarchy it exists to create.
+ * The hero card: the one or two surfaces that lead a screen, with the
+ * largest radius and a soft shadow. It was once a plate seated in a tray;
+ * the tray is gone and the name stayed, so nothing that composes it had to
+ * change. Using it on every card would flatten the hierarchy it exists to
+ * create.
  */
 export const Bezel = ({ children, className, coreClassName, as: Tag = 'div', ...rest }: BezelProps) => (
   <Tag className={cn('bezel', className)} {...rest}>

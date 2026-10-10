@@ -86,7 +86,7 @@ export const LedgerLine = ({
       <button
         type="button"
         onClick={onOpen}
-        className="flex min-w-0 flex-1 items-start gap-3 text-left outline-none focus-visible:rounded-lg focus-visible:shadow-[0_0_0_2px_rgb(var(--primary-strong)/0.5)]"
+        className="flex min-w-0 flex-1 items-start gap-3 text-left outline-none focus-visible:rounded-lg focus-visible:shadow-[0_0_0_2px_rgb(var(--primary))]"
       >
         <CategoryIcon categoryId={row.categoryId} size="sm" className="mt-0.5" />
 
@@ -114,7 +114,7 @@ export const LedgerLine = ({
               className={cn(
                 'shrink-0 text-right tnum text-body-md font-medium',
                 ACCENT_TEXT[accent],
-                !row.settled && 'opacity-70',
+                !row.settled && '!font-normal',
                 voided && 'line-through opacity-50',
               )}
             >
@@ -153,7 +153,7 @@ export const LedgerLine = ({
           className={cn(
             'mt-1 shrink-0 rounded-lg p-1.5 text-faint outline-none transition-colors duration-300',
             'hover:bg-fill hover:text-danger',
-            'focus-visible:shadow-[0_0_0_2px_rgb(var(--primary-strong)/0.5)]',
+            'focus-visible:shadow-[0_0_0_2px_rgb(var(--primary))]',
             'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 sm:opacity-0',
             'max-sm:opacity-100',
           )}
@@ -201,7 +201,7 @@ export const DayHeading = ({
   const due = dueWithin !== undefined && ahead >= 0 && ahead < dueWithin;
 
   return (
-    <div className="sticky top-[72px] z-10 -mx-1 space-y-1 rounded-xl bg-[rgb(var(--glass)/0.92)] px-3 py-2 backdrop-blur-xl">
+    <div className="sticky top-[72px] z-10 -mx-1 space-y-1 rounded-xl bg-[rgb(var(--card)/0.95)] px-3 py-2 backdrop-blur-xl">
       <div className="flex items-baseline justify-between gap-3">
         <span className="truncate text-[13px] font-semibold text-text">{formatDayHeader(date)}</span>
         <span className={cn('shrink-0 tnum text-label-md', total < 0 ? 'text-muted' : 'text-success')}>

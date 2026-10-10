@@ -51,8 +51,8 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
         'flex w-full items-center gap-3.5 rounded-r-2xl rounded-l-[4px] p-3.5 text-left sm:gap-4 sm:p-4',
         'transition-all duration-300 ease-fluid',
         selected
-          ? 'bg-[rgb(var(--glass)/var(--glass-strong-alpha))] shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.35)]'
-          : 'bg-[rgb(var(--glass)/var(--glass-alpha))] hover:bg-[rgb(var(--glass)/var(--glass-strong-alpha))]',
+          ? 'bg-[rgb(var(--card-raised))] shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.35)]'
+          : 'bg-[rgb(var(--card))] hover:bg-[rgb(var(--card-raised))]',
         // Scheduled money is drawn as an outline, never as a solid surface —
         // it has not happened yet.
         scheduled && 'bg-transparent shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.12)] hover:bg-fill',
@@ -116,7 +116,7 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
             className={cn(
               'tnum text-metric-sm font-semibold',
               amountTone,
-              scheduled && 'opacity-70',
+              scheduled && '!font-normal',
               voided && 'line-through opacity-50',
             )}
           >

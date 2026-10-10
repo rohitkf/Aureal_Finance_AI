@@ -9,6 +9,7 @@ import { TransactionRow } from '@/components/TransactionRow';
 import { Badge } from '@/components/ui/Badge';
 import { ButtonLink } from '@/components/ui/Button';
 import { Card, CardHeader, Eyebrow, StatGroup } from '@/components/ui/Card';
+import { FigureText } from '@/components/ui/Figure';
 import { IconTile } from '@/components/ui/List';
 import { Icon } from '@/components/ui/Icon';
 import { Progress } from '@/components/ui/Progress';
@@ -66,7 +67,7 @@ export const AccountDetail = () => {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      {/* iOS's back link: where you came from, with a chevron, in blue. */}
+      {/* The back link: where you came from, with a chevron. */}
       <nav className="-ml-1 flex items-center gap-0.5 text-[15px]" aria-label="Breadcrumb">
         <Link to="/accounts" className="inline-flex min-h-[32px] items-center gap-0.5 rounded-full pr-2 font-medium text-primary hover:opacity-80">
           <Icon name="chevron-left" size={18} />
@@ -79,7 +80,7 @@ export const AccountDetail = () => {
         <div className="flex items-start gap-4">
           <IconTile icon={isCredit ? 'card' : account.type === 'savings' ? 'savings' : 'bank'} tint="primary" size="lg" />
           <div>
-            <h1 className="font-display text-[clamp(1.75rem,4vw,2.25rem)] font-bold leading-tight tracking-[-0.03em] text-text">{account.name}</h1>
+            <h1 className="font-display text-[clamp(1.75rem,4vw,2.25rem)] font-normal leading-tight tracking-[-0.03em] text-text">{account.name}</h1>
             <p className="tnum text-body-md text-muted">
               {account.institution} · {account.maskedNumber}
             </p>
@@ -97,8 +98,8 @@ export const AccountDetail = () => {
 
         <div className="text-left lg:text-right">
           <Eyebrow>{owesMoney(account) ? 'Balance owed' : 'Current balance'}</Eyebrow>
-          <p className={`tnum mt-1 font-display text-hero-mobile ${owesMoney(account) ? 'text-danger' : 'text-text'}`}>
-            {money(account.balance, { masked: maskBalances })}
+          <p className={`figure mt-1 whitespace-nowrap text-[clamp(2.5rem,7vw,3.75rem)] leading-none ${owesMoney(account) ? 'text-danger' : 'text-text'}`}>
+            <FigureText text={money(account.balance, { masked: maskBalances })} />
           </p>
         </div>
       </header>

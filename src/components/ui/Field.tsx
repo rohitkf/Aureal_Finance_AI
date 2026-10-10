@@ -12,15 +12,16 @@ import { DatePicker } from './DatePicker';
 import { TimePicker } from './TimePicker';
 
 /**
- * Controls are iOS fills: a grey pressed into the glass, no outline at rest,
- * that lifts to a blue ring on focus. 15px text, because a field you type
- * into on a phone is read at arm's length.
+ * Controls are fills: a shade darker than the card they sit on, no outline at
+ * rest, that lifts to a ring in the tint on focus — the edge in the tint's ink
+ * (which holds 3:1 on white) and a halo in the fill colour around it. 15px
+ * text, because a field you type into on a phone is read at arm's length.
  */
 const CONTROL =
   'w-full rounded-2xl bg-fill px-4 text-[15px] tracking-[-0.01em] text-text placeholder:text-faint ' +
   'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.04)] ' +
   'outline-none transition-all duration-300 ease-fluid ' +
-  'focus:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.6),0_0_0_3px_rgb(var(--primary-strong)/0.2)] ' +
+  'focus:shadow-[inset_0_0_0_1.5px_rgb(var(--primary)),0_0_0_4px_rgb(var(--primary-strong)/0.35)] ' +
   'disabled:opacity-50';
 
 const INVALID =
@@ -185,13 +186,13 @@ export const AmountField = forwardRef<
           className={cn(
             'flex items-baseline justify-center gap-1 rounded-[1.5rem] bg-fill px-5 py-7',
             'transition-all duration-300 ease-fluid',
-            'focus-within:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.5),0_0_0_4px_rgb(var(--primary-strong)/0.16)]',
+            'focus-within:shadow-[inset_0_0_0_1.5px_rgb(var(--primary)),0_0_0_4px_rgb(var(--primary-strong)/0.35)]',
             invalid && INVALID,
           )}
         >
           <span
             aria-hidden="true"
-            className={cn('font-display text-[32px] font-semibold leading-none tracking-[-0.03em] opacity-40', color)}
+            className={cn('font-display text-[32px] font-light leading-none tracking-[-0.03em]', color)}
           >
             £
           </span>
@@ -209,7 +210,7 @@ export const AmountField = forwardRef<
             // fall back to the default input width, still centred.
             className={cn(
               'tnum w-auto min-w-[3ch] max-w-full border-0 bg-transparent p-0 text-center font-display [field-sizing:content]',
-              'text-[clamp(2.75rem,10vw,3.25rem)] font-bold leading-none tracking-[-0.045em]',
+              'text-[clamp(2.75rem,10vw,3.25rem)] font-light leading-none tracking-[-0.045em]',
               // The focus ring is the box around the figure, so the input
               // draws none of its own — including the offset the global ring
               // would paint, which showed as a pale rectangle behind "0.00".
@@ -281,9 +282,11 @@ export const SegmentedControl = <T extends string>({
               'inline-flex shrink-0 grow items-center justify-center whitespace-nowrap rounded-full tracking-[-0.005em]',
               'transition-all duration-300 ease-fluid active:scale-[0.97]',
               size === 'sm' ? 'min-h-[32px] px-3.5 text-[12.5px]' : 'min-h-[38px] px-4 text-[13.5px]',
+              // The chosen option is a solid pill in the ink colour, as the
+              // reference marks the page it is on in its top bar.
               active
-                ? 'bg-surface-base font-semibold text-text shadow-thumb dark:bg-surface-bright'
-                : 'font-medium text-muted hover:text-text',
+                ? 'bg-text font-medium text-[rgb(var(--card))]'
+                : 'font-normal text-muted hover:text-text',
             )}
           >
             {o.label}
@@ -318,19 +321,24 @@ export const Toggle = ({
       {description && <span className="mt-0.5 block text-[12.5px] leading-snug text-muted">{description}</span>}
     </span>
     <span
-      // iOS's switch: 51 by 31, green when on, a white knob that carries
-      // the state by where it sits as well as by the colour behind it.
-      className={cn(
-        'relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-300 ease-fluid',
-        checked ? 'bg-success' : 'bg-[rgb(var(--fill)/calc(var(--fill-alpha)*2.2))]',
-      )}
+      // The reference's switch: a pill with a cross at one end and a tick at
+      // the other, and a knob that slides over whichever is not true — in
+      // the tint, carrying the tick, when it is on. The state reads three
+      // ways at once: where the knob sits, its colour, and its glyph.
+      className="relative flex h-8 w-[60px] shrink-0 items-center justify-between rounded-full bg-[rgb(var(--fill)/calc(var(--fill-alpha)*1.8))] px-2 text-faint"
     >
+      <Icon name="close" size={12} className={cn('transition-opacity duration-300', checked ? 'opacity-100' : 'opacity-0')} />
+      <Icon name="check" size={12} className={cn('transition-opacity duration-300', checked ? 'opacity-0' : 'opacity-100')} />
       <span
         className={cn(
-          'absolute left-0.5 top-0.5 h-[27px] w-[27px] rounded-full bg-white shadow-thumb transition-transform duration-400 ease-spring',
-          checked ? 'translate-x-5' : 'translate-x-0',
+          'absolute left-[3px] top-[3px] flex h-[26px] w-[26px] items-center justify-center rounded-full shadow-thumb transition-all duration-400 ease-spring',
+          checked
+            ? 'translate-x-[28px] bg-primary-strong text-[rgb(var(--on-primary))]'
+            : 'translate-x-0 bg-surface-base text-faint dark:bg-surface-bright dark:text-text',
         )}
-      />
+      >
+        <Icon name={checked ? 'check' : 'close'} size={13} />
+      </span>
     </span>
   </button>
 );
@@ -444,7 +452,7 @@ export const CheckboxField = ({
       'well flex w-full items-start gap-3 p-3.5 text-left',
       'outline-none transition-colors duration-300 ease-fluid',
       'hover:bg-[rgb(var(--fill)/calc(var(--fill-alpha)*1.6))]',
-      'focus-visible:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.55),0_0_0_3px_rgb(var(--primary-strong)/0.18)]',
+      'focus-visible:shadow-[inset_0_0_0_1.5px_rgb(var(--primary)),0_0_0_4px_rgb(var(--primary-strong)/0.35)]',
       'disabled:opacity-50',
     )}
   >
@@ -454,7 +462,7 @@ export const CheckboxField = ({
         'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full',
         'transition-all duration-300 ease-fluid',
         checked
-          ? 'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.25)]'
+          ? 'bg-primary-strong text-[rgb(var(--on-primary))]'
           : 'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))]',
       )}
     >

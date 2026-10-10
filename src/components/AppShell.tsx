@@ -1,8 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/cn';
-import { availableNow } from '@/lib/finance';
-import { money } from '@/lib/format';
 import { useAppState, useSettings, useStore } from '@/lib/store';
 import { useTheme } from '@/hooks/useTheme';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -13,7 +11,7 @@ import { AddTransactionSheet } from './AddTransactionSheet';
 import { CommandPalette } from './CommandPalette';
 import { Toggle } from './ui/Field';
 import { Icon, type IconName } from './ui/Icon';
-import { GroupedList, IconTile, ListRow, type Tint } from './ui/List';
+import { GroupedList, IconTile, ListRow, type TileTone } from './ui/List';
 import { Modal } from './ui/Modal';
 import type { TransactionType } from '@/lib/types';
 
@@ -21,15 +19,8 @@ import type { TransactionType } from '@/lib/types';
 /* Pieces                                                              */
 /* ------------------------------------------------------------------ */
 
-/**
- * A cluster of round buttons on one capsule of glass — how iOS 26 puts its
- * toolbar buttons over content, instead of a bar spanning the screen.
- */
-const GlassCluster = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <div className={cn('glass-bar flex items-center gap-0.5 rounded-full p-1', className)}>{children}</div>
-);
-
-const ClusterButton = ({
+/** A round control on the top bar, outlined as the reference draws them. */
+const RoundButton = ({
   icon,
   label,
   onClick,
@@ -46,7 +37,7 @@ const ClusterButton = ({
     title={label}
     onClick={onClick}
     className={cn(
-      'flex h-10 w-10 items-center justify-center rounded-full text-text',
+      'chrome flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text',
       'transition-all duration-300 ease-fluid hover:bg-fill active:scale-[0.92]',
       className,
     )}
@@ -56,71 +47,39 @@ const ClusterButton = ({
 );
 
 const Initials = ({ name }: { name: string }) => (
-  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-[12px] font-semibold text-primary">
+  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-text text-[12.5px] font-semibold text-[rgb(var(--card))]">
     {name
       .split(' ')
       .map((w) => w[0])
-      .join('')}
+      .join('')
+      .slice(0, 2)}
   </span>
 );
 
-/* ------------------------------------------------------------------ */
-/* Sidebar                                                             */
-/* ------------------------------------------------------------------ */
-
-const SIDEBAR_ACTIVE: Record<Tint, string> = {
-  primary: 'text-primary',
-  secondary: 'text-secondary',
-  success: 'text-success',
-  warning: 'text-warning',
-  danger: 'text-danger',
-  neutral: 'text-muted',
-};
-
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+/**
+ * A destination on the top bar. The page you are on is a solid pill in the
+ * ink colour — white on charcoal, black on stone — exactly as the reference
+ * marks "Payment" in its bar.
+ */
+const navPill = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'group flex items-center gap-3 rounded-[14px] py-2 pl-2 pr-3 text-[14px] tracking-[-0.01em]',
+    'flex h-10 shrink-0 items-center rounded-full px-4 text-[13.5px] tracking-[-0.01em]',
     'transition-all duration-300 ease-fluid',
-    isActive ? 'bg-fill font-semibold text-text' : 'text-muted hover:bg-fill hover:text-text',
+    isActive ? 'bg-text font-medium text-[rgb(var(--card))]' : 'text-muted hover:text-text',
   );
-
-const SidebarSection = ({ title, items }: { title: string; items: NavItem[] }) => (
-  <div>
-    <p className="caption px-3 pb-1.5 pt-5">{title}</p>
-    <nav className="space-y-0.5">
-      {items.map((item) => (
-        <NavLink key={item.to} to={item.to} end={item.to === '/'} className={navLinkClass}>
-          {({ isActive }) => (
-            <>
-              <Icon
-                name={item.icon}
-                size={18}
-                className={cn(
-                  'shrink-0 transition-colors duration-300 ease-fluid',
-                  isActive ? SIDEBAR_ACTIVE[item.tint ?? 'primary'] : 'text-faint group-hover:text-muted',
-                )}
-              />
-              {item.label}
-            </>
-          )}
-        </NavLink>
-      ))}
-    </nav>
-  </div>
-);
 
 /* ------------------------------------------------------------------ */
 /* Quick add                                                           */
 /* ------------------------------------------------------------------ */
 
 /** The three things people add most, as big targets a thumb cannot miss. */
-const QUICK_TILES: Array<{ label: string; short: string; icon: IconName; type: TransactionType; tint: Tint }> = [
+const QUICK_TILES: Array<{ label: string; short: string; icon: IconName; type: TransactionType; tint: TileTone }> = [
   { label: 'Add expense', short: 'Expense', icon: 'minus', type: 'expense', tint: 'danger' },
   { label: 'Add income', short: 'Income', icon: 'plus', type: 'income', tint: 'success' },
   { label: 'Transfer money', short: 'Transfer', icon: 'swap', type: 'transfer', tint: 'primary' },
 ];
 
-const QUICK_LINKS: Array<{ label: string; hint: string; icon: IconName; to: string; tint: Tint }> = [
+const QUICK_LINKS: Array<{ label: string; hint: string; icon: IconName; to: string; tint: TileTone }> = [
   { label: 'Add recurring payment', hint: 'A bill, salary or subscription', icon: 'repeat', to: '/recurring?new=1', tint: 'secondary' },
   { label: 'Add account', hint: 'A bank account, card, loan or cash', icon: 'bank', to: '/accounts?new=1', tint: 'neutral' },
 ];
@@ -140,6 +99,8 @@ export const AppShell = () => {
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  /** The desktop bar's More, while there is no room for every destination. */
+  const [navMoreOpen, setNavMoreOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [addType, setAddType] = useState<TransactionType>('expense');
@@ -158,12 +119,29 @@ export const AppShell = () => {
   useEffect(() => {
     setMoreOpen(false);
     setQuickOpen(false);
+    setNavMoreOpen(false);
   }, [location.pathname]);
 
-  const total = availableNow(state.accounts);
+  // The bar's More closes the way a menu does: Escape, or a click anywhere
+  // that is not the menu.
+  useEffect(() => {
+    if (!navMoreOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setNavMoreOpen(false);
+    const onPointer = (e: PointerEvent) => {
+      if (!(e.target as Element).closest('[aria-label="More destinations"], [aria-haspopup="menu"]')) setNavMoreOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+    };
+  }, [navMoreOpen]);
+
   const toggleMask = () => dispatch({ type: 'update-settings', settings: { maskBalances: !maskBalances } });
   // Somewhere in More is the screen you are on: say so on the tab.
   const inMore = MORE_NAV.some((item) => location.pathname.startsWith(item.to));
+  const inPlanning = PLANNING_NAV.some((item) => location.pathname.startsWith(item.to));
 
   const openAdd = (type: TransactionType) => {
     setAddType(type);
@@ -182,132 +160,127 @@ export const AppShell = () => {
         Skip to main content
       </a>
 
-      {/* ---------------- Top: floating glass, no bar ----------------
-          Content scrolls up under a soft fade rather than under a slab, and
-          the controls float over it on capsules of glass. Fixed, so their
-          backdrop blur is composited once rather than repainted per frame. */}
-      <header className="pointer-events-none fixed inset-x-0 top-0 z-40 lg:left-[272px]">
+      {/* ---------------- The top bar ----------------
+          The reference's: the mark on the left, the destinations in one
+          capsule, and the person on the right. Fixed, so content scrolls up
+          under a soft fade and the capsules' blur is composited once. */}
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-40">
         <div
           aria-hidden="true"
-          className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[rgb(var(--background)/0.85)] via-[rgb(var(--background)/0.45)] to-transparent"
+          className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[rgb(var(--background)/0.92)] via-[rgb(var(--background)/0.55)] to-transparent"
         />
-        <div className="relative flex items-center gap-3 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 lg:px-8">
+        <div className="relative mx-auto flex max-w-[1480px] items-center gap-2.5 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 lg:gap-4 lg:px-8">
           <NavLink
             to="/"
             aria-label="Aureal home"
-            className="glass-bar pointer-events-auto flex h-12 items-center gap-2.5 rounded-full pl-2 pr-4 transition-transform duration-300 ease-fluid active:scale-[0.96] lg:hidden"
+            className="pointer-events-auto flex shrink-0 items-center gap-2.5 rounded-full pr-2 transition-opacity duration-300 ease-fluid hover:opacity-80"
           >
-            <Logo size={32} />
-            <span className="font-display text-[16px] font-bold tracking-[-0.02em] text-text">Aureal</span>
+            <Logo size={40} />
+            <span className="font-display text-[17px] font-medium tracking-[-0.02em] text-text lg:hidden xl:inline">Aureal</span>
           </NavLink>
 
-          <button
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            className={cn(
-              'glass-bar pointer-events-auto hidden h-12 max-w-xl flex-1 items-center gap-3 rounded-full pl-4 pr-2 text-[14px] text-faint md:flex',
-              'transition-all duration-300 ease-fluid hover:text-muted',
-            )}
-          >
-            <Icon name="search" size={17} />
-            <span className="flex-1 text-left">Search transactions, accounts, subscriptions…</span>
-            <kbd className="rounded-full bg-fill px-2.5 py-1 font-sans text-[11px] text-muted">⌘K</kbd>
-          </button>
+          {/* Every destination, from `lg`. Recurring, Goals, Debts and
+              Reports fold into More until there is room for all nine in one
+              row beside the controls, at `2xl`. */}
+          <nav aria-label="Primary" className="chrome pointer-events-auto mx-auto hidden items-center gap-0.5 rounded-full p-1 lg:flex">
+            {PRIMARY_NAV.map((item) => (
+              <NavLink key={item.to} to={item.to} end={item.to === '/'} className={navPill}>
+                {item.label}
+              </NavLink>
+            ))}
+            {PLANNING_NAV.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={(state) => cn(navPill(state), 'hidden 2xl:flex')}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+            <div className="relative 2xl:hidden">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={navMoreOpen}
+                onClick={() => setNavMoreOpen((v) => !v)}
+                className={cn(navPill({ isActive: inPlanning }), 'gap-1.5')}
+              >
+                More
+                <Icon name="chevron-down" size={14} className={cn('transition-transform duration-300', navMoreOpen && 'rotate-180')} />
+              </button>
+              {navMoreOpen && (
+                <div
+                  role="menu"
+                  aria-label="More destinations"
+                  className="chrome absolute right-0 top-full mt-2 w-60 animate-fade-in rounded-[1.5rem] p-1.5 [--bar-alpha:0.97]"
+                >
+                  {PLANNING_NAV.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      role="menuitem"
+                      className={({ isActive }) =>
+                        cn(
+                          'flex items-center gap-3 rounded-[1.1rem] px-3 py-2.5 text-[14px] transition-colors duration-300',
+                          isActive ? 'bg-text text-[rgb(var(--card))]' : 'text-text hover:bg-fill',
+                        )
+                      }
+                    >
+                      <Icon name={item.icon} size={17} />
+                      {item.label}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          </nav>
 
-          <GlassCluster className="pointer-events-auto ml-auto">
-            <ClusterButton icon="search" label="Search" onClick={() => setSearchOpen(true)} className="md:hidden" />
-            <ClusterButton icon={maskBalances ? 'eye-off' : 'eye'} label={maskBalances ? 'Show balances' : 'Hide balances'} onClick={toggleMask} />
-            <ClusterButton
+          <div className="pointer-events-auto ml-auto flex items-center gap-2 lg:ml-0">
+            <RoundButton icon="search" label="Search" onClick={() => setSearchOpen(true)} />
+            <RoundButton icon={maskBalances ? 'eye-off' : 'eye'} label={maskBalances ? 'Show balances' : 'Hide balances'} onClick={toggleMask} />
+            <RoundButton
               icon={resolved === 'dark' ? 'sun' : 'moon'}
               label={`Switch to ${resolved === 'dark' ? 'light' : 'dark'} mode`}
               onClick={toggle}
               className="hidden sm:flex"
             />
+            <button
+              type="button"
+              onClick={() => openAdd('expense')}
+              className="hidden h-11 shrink-0 items-center gap-2 rounded-full bg-primary-strong pl-4 pr-5 text-[14px] font-medium text-[rgb(var(--on-primary))] transition-all duration-300 ease-fluid hover:brightness-[1.06] active:scale-[0.97] lg:flex"
+            >
+              <Icon name="plus" size={17} />
+              New entry
+            </button>
+            {/* The person, as the reference closes its bar: who is signed in,
+                and the way to their settings. */}
             <NavLink
               to="/settings"
               aria-label="Settings"
-              className="flex h-10 items-center gap-2 rounded-full pl-1 pr-1 transition-all duration-300 ease-fluid hover:bg-fill xl:pr-3.5"
+              className="chrome flex h-11 shrink-0 items-center gap-2.5 rounded-full p-1 transition-all duration-300 ease-fluid hover:bg-fill min-[1720px]:pr-2"
             >
               <Initials name={state.settings.userName} />
-              <span className="hidden text-[13.5px] font-medium tracking-[-0.01em] text-text xl:block">
-                {state.settings.userName}
+              <span className="hidden flex-col pr-1 leading-tight min-[1720px]:flex">
+                <span className="text-[13.5px] font-medium text-text">{state.settings.userName}</span>
+                <span className="text-[11.5px] text-muted">{online ? 'Settings' : 'Offline'}</span>
+              </span>
+              <span className="hidden h-9 w-9 items-center justify-center rounded-full bg-fill text-text min-[1720px]:flex">
+                <Icon name="settings" size={16} />
               </span>
             </NavLink>
-          </GlassCluster>
+          </div>
         </div>
       </header>
 
-      {/* ---------------- Desktop sidebar: a floating pane ---------------- */}
-      <aside className="glass-bar fixed bottom-3 left-3 top-3 z-30 hidden w-[256px] flex-col justify-between overflow-y-auto rounded-[28px] px-3 pb-4 pt-4 lg:flex">
-        <div>
-          <NavLink
-            to="/"
-            aria-label="Aureal home"
-            className="flex items-center gap-2.5 rounded-2xl px-2 py-1.5 transition-opacity duration-300 ease-fluid hover:opacity-80"
-          >
-            <Logo size={34} />
-            <span className="flex flex-col leading-tight">
-              <span className="font-display text-[16px] font-bold tracking-[-0.02em] text-text">Aureal</span>
-              <span className="text-[12px] text-faint">Finance</span>
-            </span>
-          </NavLink>
-          <SidebarSection title="Everyday" items={PRIMARY_NAV} />
-          <SidebarSection title="Planning" items={PLANNING_NAV} />
-        </div>
-
-        <div className="space-y-3 pt-6">
-          <button
-            type="button"
-            onClick={() => openAdd('expense')}
-            className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-full py-3 text-[14px] font-semibold tracking-[-0.01em]',
-              'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2),0_8px_20px_-10px_rgb(var(--primary-strong)/0.7)]',
-              'transition-all duration-300 ease-fluid hover:brightness-[1.08] active:scale-[0.97]',
-            )}
-          >
-            <Icon name="plus" size={17} />
-            New entry
-          </button>
-
-          <div className="well p-4">
-            <p className="text-[12.5px] font-medium text-muted">Available now</p>
-            <p className="tnum mt-1 font-display text-[22px] font-semibold tracking-[-0.025em] text-text">
-              {money(total, { masked: maskBalances })}
-            </p>
-            <p className="mt-1.5 flex items-center gap-1.5 text-[12px] text-muted">
-              {online ? (
-                `${state.accounts.length} account${state.accounts.length === 1 ? '' : 's'}`
-              ) : (
-                <>
-                  <Icon name="cloud-off" size={13} className="text-warning" />
-                  Offline, showing saved data
-                </>
-              )}
-            </p>
-          </div>
-
-          <nav>
-            <NavLink to="/settings" className={navLinkClass}>
-              {({ isActive }) => (
-                <>
-                  <Icon name="settings" size={18} className={cn('shrink-0', isActive ? 'text-text' : 'text-faint')} />
-                  Settings
-                </>
-              )}
-            </NavLink>
-          </nav>
-        </div>
-      </aside>
-
       {/* ---------------- Main ---------------- */}
-      <div className="relative lg:pl-[272px]">
+      <div className="relative">
         {!online && (
-          <div className="glass-bar fixed left-1/2 top-[max(4.5rem,calc(env(safe-area-inset-top)+3.75rem))] z-30 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[12.5px] font-medium text-warning lg:left-[calc(50%+136px)]">
+          <div className="chrome fixed left-1/2 top-[max(4.75rem,calc(env(safe-area-inset-top)+4rem))] z-30 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[12.5px] font-medium text-warning">
             <Icon name="cloud-off" size={14} />
             You’re offline. Changes will sync when you reconnect.
           </div>
         )}
-        <main id="main" className={cn('min-h-[100dvh] pt-[calc(env(safe-area-inset-top)+4.5rem)] lg:pt-20', !online && 'pt-[calc(env(safe-area-inset-top)+7rem)] lg:pt-28')}>
+        <main id="main" className={cn('min-h-[100dvh] pt-[calc(env(safe-area-inset-top)+4.75rem)] lg:pt-24', !online && 'pt-[calc(env(safe-area-inset-top)+7.5rem)] lg:pt-32')}>
           <div className="mx-auto w-full max-w-[1480px] px-4 pb-36 pt-3 sm:px-6 lg:px-8 lg:pb-16 lg:pt-4">
             <Outlet />
           </div>
@@ -318,14 +291,14 @@ export const AppShell = () => {
       {/* Content dissolves into the bar rather than being cut off by it. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[45] h-28 bg-gradient-to-t from-[rgb(var(--background)/0.9)] via-[rgb(var(--background)/0.5)] to-transparent lg:hidden"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[45] h-28 bg-gradient-to-t from-[rgb(var(--background)/0.92)] via-[rgb(var(--background)/0.55)] to-transparent lg:hidden"
       />
 
       <nav
         aria-label="Primary"
         className="fixed inset-x-0 bottom-0 z-[46] flex items-end justify-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
       >
-        <div className="glass-bar flex min-w-0 flex-1 items-center justify-between rounded-full p-1 sm:max-w-md">
+        <div className="chrome flex min-w-0 flex-1 items-center justify-between rounded-full p-1 sm:max-w-md">
           {MOBILE_NAV.map((item) => (
             <TabLink key={item.to} item={item} />
           ))}
@@ -337,23 +310,23 @@ export const AppShell = () => {
             className={cn(
               'relative flex h-[54px] min-w-0 flex-auto flex-col items-center justify-center gap-0.5 rounded-full px-1.5',
               'transition-all duration-300 ease-fluid active:scale-[0.94]',
-              inMore ? 'bg-fill text-primary' : 'text-muted',
+              inMore ? 'bg-text text-[rgb(var(--card))]' : 'text-muted',
             )}
           >
-            <Icon name="more" size={21} />
+            <Icon name="more" size={21} className="rotate-90" />
             <span className="whitespace-nowrap text-[10.5px] font-medium tracking-[-0.01em]">More</span>
           </button>
         </div>
 
-        {/* Add sits apart from the tabs, as iOS sets an action beside its
-            tab bar: it does something rather than going somewhere. */}
+        {/* Add sits apart from the tabs: it does something rather than going
+            somewhere. In the tint, as the reference's round + is in lime. */}
         <button
           type="button"
           onClick={() => setQuickOpen(true)}
           aria-label="Add a transaction"
           className={cn(
             'flex h-[62px] w-[62px] shrink-0 items-center justify-center rounded-full bg-primary-strong text-[rgb(var(--on-primary))]',
-            'shadow-[inset_0_1px_0_0_rgb(255_255_255/0.28),0_10px_24px_-8px_rgb(var(--primary-strong)/0.8)]',
+            'shadow-[0_10px_24px_-10px_rgb(var(--ambient)/0.5)]',
             'transition-all duration-300 ease-fluid active:scale-[0.9]',
           )}
         >
@@ -442,9 +415,9 @@ export const AppShell = () => {
 };
 
 /**
- * A tab. The selected one sits on a lighter lozenge with its icon in colour,
- * as the iOS 26 tab bar marks it. Widths follow the labels — "Time Machine"
- * needs more room than "Home" — so no label ever has to wrap.
+ * A tab. The selected one is a solid pill in the ink colour, as the top bar
+ * marks the page you are on. Widths follow the labels — "Time Machine" needs
+ * more room than "Home" — so no label ever has to wrap.
  */
 const TabLink = ({ item }: { item: NavItem }) => (
   <NavLink
@@ -454,7 +427,7 @@ const TabLink = ({ item }: { item: NavItem }) => (
       cn(
         'relative flex h-[54px] min-w-0 flex-auto flex-col items-center justify-center gap-0.5 rounded-full px-1.5',
         'transition-all duration-300 ease-fluid active:scale-[0.94]',
-        isActive ? 'bg-fill text-primary' : 'text-muted',
+        isActive ? 'bg-text text-[rgb(var(--card))]' : 'text-muted',
       )
     }
   >

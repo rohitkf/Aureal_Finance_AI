@@ -29,7 +29,7 @@ export const Sparkline = ({
   const max = Math.max(...values);
   const span = max - min || 1;
   const stroke = {
-    primary: 'rgb(var(--primary-strong))',
+    primary: 'rgb(var(--primary))',
     success: 'rgb(var(--success))',
     danger: 'rgb(var(--danger))',
   }[tone];

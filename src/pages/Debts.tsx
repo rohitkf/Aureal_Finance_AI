@@ -8,6 +8,7 @@ import { useAppState, useLoading, useSettings, useToday } from '@/lib/store';
 import { Badge } from '@/components/ui/Badge';
 import { ButtonLink } from '@/components/ui/Button';
 import { Card, CardHeader, PageHeader, StatGroup } from '@/components/ui/Card';
+import { FigureText } from '@/components/ui/Figure';
 import { IconTile } from '@/components/ui/List';
 import { Icon } from '@/components/ui/Icon';
 import { Progress } from '@/components/ui/Progress';
@@ -124,7 +125,9 @@ export const Debts = () => {
               const monthlyInterest = (card.balance * (card.apr ?? 0)) / 100 / 12;
 
               return (
-                <Card key={card.id} className="space-y-4">
+                // On paper, like a card in a wallet — and as the reference sets
+                // its light cards among the dark ones.
+                <Card key={card.id} className="paper space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <IconTile icon="card" tint="primary" size="lg" />
@@ -139,8 +142,8 @@ export const Debts = () => {
                   </div>
 
                   <div className="flex items-baseline justify-between">
-                    <span className="tnum font-display text-metric-lg text-text">
-                      {money(card.balance, { masked: maskBalances })}
+                    <span className="figure whitespace-nowrap text-[clamp(2rem,4vw,2.5rem)] leading-none text-text">
+                      <FigureText text={money(card.balance, { masked: maskBalances })} />
                     </span>
                     <span className="tnum text-body-sm text-muted">
                       of {money(card.creditLimit ?? 0, { compact: true })} limit

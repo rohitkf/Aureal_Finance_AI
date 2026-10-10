@@ -89,7 +89,7 @@ export const RangeField = ({
           'flex flex-col gap-3.5 rounded-2xl bg-fill px-4 pb-4 pt-3',
           'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.04)]',
           'transition-all duration-400 ease-fluid',
-          'focus-within:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.5),0_0_0_3px_rgb(var(--primary-strong)/0.16)]',
+          'focus-within:shadow-[inset_0_0_0_1.5px_rgb(var(--primary)),0_0_0_4px_rgb(var(--primary-strong)/0.35)]',
           error && 'shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.55)]',
         )}
       >
@@ -159,6 +159,7 @@ export const RangeField = ({
 };
 
 const NUDGE =
-  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-base text-text shadow-thumb dark:bg-surface-bright ' +
-  'transition-all duration-300 ease-fluid hover:brightness-[1.04] active:scale-[0.92] ' +
+  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text ' +
+  'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))] ' +
+  'transition-all duration-300 ease-fluid hover:bg-fill active:scale-[0.92] ' +
   'disabled:pointer-events-none disabled:opacity-35';

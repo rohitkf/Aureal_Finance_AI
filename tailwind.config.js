@@ -42,8 +42,13 @@ export default {
         danger: token('danger'),
         'on-danger': token('on-danger'),
         info: token('info'),
-        // iOS's grey fill, for wells, tracks and quiet buttons.
+        // A control's fill: tracks, quiet buttons, chips at rest.
         fill: 'rgb(var(--fill) / var(--fill-alpha))',
+        card: token('card'),
+        'card-raised': token('card-raised'),
+        // The person's tint, and the ink that sits on it.
+        tint: token('tint'),
+        'on-tint': token('on-tint'),
       },
       fontFamily: {
         // One family, as on an iPhone: Geist carries the interface, every
@@ -86,8 +91,8 @@ export default {
         float: '0 2px 6px rgb(var(--ambient) / var(--ambient-a)), 0 32px 64px -28px rgb(var(--ambient) / var(--ambient-b))',
         sheet: '0 -12px 60px -18px rgb(var(--ambient) / var(--ambient-b))',
         'inner-top': 'inset 0 1px 0 0 rgb(255 255 255 / 0.08)',
-        // A raised thumb: the selected segment, a switch knob.
-        thumb: '0 1px 2px rgb(0 0 0 / 0.12), 0 3px 8px -2px rgb(0 0 0 / 0.16)',
+        // A raised thumb: a switch knob, a stepper key.
+        thumb: '0 1px 2px rgb(0 0 0 / 0.14), 0 3px 8px -2px rgb(0 0 0 / 0.18)',
       },
       transitionTimingFunction: {
         // The house curve: heavy start, long glide out.

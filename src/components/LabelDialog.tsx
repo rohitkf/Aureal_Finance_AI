@@ -92,7 +92,7 @@ export const LabelDialog = ({
                   ACCENT_CLASS[option],
                   // The chosen one is bigger rather than ticked: a tick drawn
                   // over a colour swatch hides the colour being chosen.
-                  accent === option && 'scale-110 ring-2 ring-[rgb(var(--primary-strong)/0.5)]',
+                  accent === option && 'scale-110 ring-2 ring-[rgb(var(--primary))]',
                 )}
               />
             ))}

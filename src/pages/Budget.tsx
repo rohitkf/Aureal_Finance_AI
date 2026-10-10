@@ -12,7 +12,8 @@ import { Card, CardHeader, Eyebrow, PageHeader } from '@/components/ui/Card';
 import { MoneyDial } from '@/components/ui/MoneyDial';
 import { SelectField } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
-import { Progress } from '@/components/ui/Progress';
+import { Progress, Ring } from '@/components/ui/Progress';
+import { FigureText } from '@/components/ui/Figure';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
@@ -118,35 +119,37 @@ export const Budget = () => {
           they are what this screen is for, and Safe to Spend is on Home. */}
       <section className="grid gap-4 lg:grid-cols-12">
         <Card tone="bezel" className="min-w-0 lg:col-span-7" bodyClassName="space-y-5">
-          <div>
-            <div className="flex items-baseline justify-between gap-3">
+          <div className="flex items-center justify-between gap-5">
+            <div className="min-w-0">
               <Eyebrow>Left to spend</Eyebrow>
-              <span className="tnum text-[12.5px] text-muted">
-                {percent(planned === 0 ? 0 : (spent / planned) * 100)} of plan used
-              </span>
+              <p
+                className={cn(
+                  'figure mt-2 whitespace-nowrap text-[clamp(2.75rem,7.5vw,4rem)] leading-none',
+                  planned - spent < 0 ? 'text-danger' : 'text-text',
+                )}
+              >
+                <FigureText text={money(planned - spent, { compact: true, masked: maskBalances })} />
+              </p>
             </div>
-            <p
-              className={cn(
-                'tnum mt-2 font-display text-[clamp(2.5rem,7vw,3.5rem)] font-bold leading-none tracking-[-0.045em]',
-                planned - spent < 0 ? 'text-danger' : 'text-text',
-              )}
-            >
-              {money(planned - spent, { compact: true, masked: maskBalances })}
-            </p>
-            <Progress
-              className="mt-4"
-              size="lg"
+            {/* The reference's dial: how much of the month's plan is gone. */}
+            <Ring
               value={spent}
               max={planned || 1}
-              tone={spent > planned ? 'danger' : spent / (planned || 1) > 0.85 ? 'warning' : 'success'}
+              tone={spent > planned ? 'danger' : spent / (planned || 1) > 0.85 ? 'warning' : 'primary'}
               label={`Overall budget: ${money(spent)} of ${money(planned)}`}
-            />
-            <p className="mt-2.5 text-[13.5px] text-muted">
-              {spent > planned
-                ? `You're ${money(spent - planned, { compact: true })} over plan with ${daysLeft} days left.`
-                : `That leaves about ${money((planned - spent) / daysLeft, { compact: true })} a day for the ${daysLeft === 1 ? 'rest of today' : `next ${daysLeft} days`}.`}
-            </p>
+              className="h-[112px] w-[112px] sm:h-32 sm:w-32"
+            >
+              <span className="figure text-[26px] leading-none text-text sm:text-[30px]">
+                <FigureText text={percent(planned === 0 ? 0 : (spent / planned) * 100)} />
+              </span>
+              <span className="mt-1 text-[11.5px] text-muted">of plan used</span>
+            </Ring>
           </div>
+          <p className="text-[13.5px] text-muted">
+            {spent > planned
+              ? `You're ${money(spent - planned, { compact: true })} over plan with ${daysLeft} days left.`
+              : `That leaves about ${money((planned - spent) / daysLeft, { compact: true })} a day for the ${daysLeft === 1 ? 'rest of today' : `next ${daysLeft} days`}.`}
+          </p>
 
           <dl className="grid grid-cols-3 gap-2 sm:gap-3">
             <Summary label="Income" value={money(income, { compact: true, masked: maskBalances })} tone="success" note="Received and expected" />
@@ -162,7 +165,7 @@ export const Budget = () => {
 
         <section className="min-w-0 space-y-3 lg:col-span-7">
           <div className="px-1">
-            <h2 className="font-display text-[20px] font-bold tracking-[-0.02em] text-text">Categories</h2>
+            <h2 className="font-display text-[20px] font-medium tracking-[-0.02em] text-text">Categories</h2>
             <p className="text-[13px] text-muted">Closest to its limit first. Tap one to change it.</p>
           </div>
 
@@ -348,11 +351,11 @@ const Summary = ({
     <dt className="truncate text-[12.5px] font-medium text-muted">{label}</dt>
     <dd
       className={cn(
-        'tnum mt-1 whitespace-nowrap font-display text-[clamp(1rem,4.4vw,1.375rem)] font-semibold tracking-[-0.025em]',
+        'figure mt-1 whitespace-nowrap text-[clamp(1.125rem,4.6vw,1.625rem)] leading-tight',
         { success: 'text-success', text: 'text-text', primary: 'text-primary', danger: 'text-danger' }[tone],
       )}
     >
-      {value}
+      <FigureText text={value} />
     </dd>
     <dd className="mt-0.5 text-[12px] leading-snug text-muted">{note}</dd>
   </div>

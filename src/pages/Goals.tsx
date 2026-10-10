@@ -12,7 +12,8 @@ import { goalOutlook, goalTotals, isDepository } from '@/lib/finance';
 import { DateField, SelectField, TextField } from '@/components/ui/Field';
 import type { IconName } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
-import { Progress } from '@/components/ui/Progress';
+import { Progress, Ring } from '@/components/ui/Progress';
+import { FigureText } from '@/components/ui/Figure';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
 import type { Goal } from '@/lib/types';
@@ -161,7 +162,9 @@ export const Goals = () => {
             const { remaining, complete } = p;
 
             return (
-              <Card key={goal.id} className="flex flex-col gap-4">
+              // Goals are set on paper, as the reference sets its light cards
+              // among the dark: they are the plans, apart from the money.
+              <Card key={goal.id} className="paper flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-2">
                   <IconTile icon={(goal.icon as IconName) || 'target'} tint="primary" size="lg" />
                   <Badge tone={complete ? 'success' : p.onTrack ? 'primary' : 'warning'}>
@@ -169,29 +172,28 @@ export const Goals = () => {
                   </Badge>
                 </div>
 
-                <div>
-                  <h2 className="font-display text-headline-sm text-text">{goal.name}</h2>
-                  <p className="tnum mt-1 text-body-md text-muted">
-                    <span className="font-display text-metric-md text-text">
-                      {money(goal.saved, { compact: true, masked: maskBalances })}
-                    </span>{' '}
-                    of {money(goal.target, { compact: true })}
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Progress
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <h2 className="font-display text-headline-sm text-text">{goal.name}</h2>
+                    <p className="figure mt-2 whitespace-nowrap text-[clamp(2rem,4vw,2.5rem)] leading-none text-text">
+                      <FigureText text={money(goal.saved, { compact: true, masked: maskBalances })} />
+                    </p>
+                    <p className="tnum mt-1.5 text-body-sm text-muted">
+                      of {money(goal.target, { compact: true })} ·{' '}
+                      {complete ? 'fully funded' : `${money(remaining, { compact: true })} to go`}
+                    </p>
+                  </div>
+                  <Ring
                     value={goal.saved}
                     max={goal.target}
                     tone={complete ? 'success' : p.onTrack ? 'primary' : 'warning'}
                     label={`${goal.name}: ${money(goal.saved)} of ${money(goal.target)} saved`}
-                  />
-                  <div className="flex justify-between text-body-sm">
-                    <span className="tnum font-semibold text-text">{percent(pct)}</span>
-                    <span className="tnum text-muted">
-                      {complete ? 'Fully funded' : `${money(remaining, { compact: true })} to go`}
+                    className="h-[88px] w-[88px]"
+                  >
+                    <span className="figure text-[20px] leading-none text-text">
+                      <FigureText text={percent(pct)} />
                     </span>
-                  </div>
+                  </Ring>
                 </div>
 
                 <div className="well space-y-1 p-3.5 text-body-sm">

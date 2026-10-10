@@ -73,7 +73,7 @@ export const NetWorthChart = ({
           d={`${path('net')} L ${sx(series.length - 1).toFixed(1)},${chartHeight - pad.bottom} L ${sx(0).toFixed(1)},${chartHeight - pad.bottom} Z`}
           fill={`url(#${gradientId})`}
         />
-        <path d={path('assets')} fill="none" stroke="rgb(var(--primary-strong))" strokeWidth={1.8} strokeDasharray="5 4" />
+        <path d={path('assets')} fill="none" stroke="rgb(var(--primary))" strokeWidth={1.8} strokeDasharray="5 4" />
         <path d={path('liabilities')} fill="none" stroke="rgb(var(--danger))" strokeWidth={1.8} strokeDasharray="5 4" />
         <path d={path('net')} fill="none" stroke="rgb(var(--success))" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
 
@@ -99,7 +99,7 @@ export const NetWorthChart = ({
           <span className="h-0.5 w-4 rounded bg-success" /> Net worth
         </span>
         <span className="flex items-center gap-1.5 text-label-sm text-muted">
-          <span className="h-0.5 w-4 rounded bg-primary-strong" /> Assets
+          <span className="h-0.5 w-4 rounded bg-primary" /> Assets
         </span>
         <span className="flex items-center gap-1.5 text-label-sm text-muted">
           <span className="h-0.5 w-4 rounded bg-danger" /> Liabilities

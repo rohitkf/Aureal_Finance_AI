@@ -279,7 +279,7 @@ export const Recurring = () => {
               aria-pressed={kind === t.value}
               className={pillClass(kind === t.value)}
             >
-              {t.label} <span className="tnum opacity-70">({count})</span>
+              {t.label} <span className="tnum font-normal">({count})</span>
             </button>
           );
         })}
@@ -295,7 +295,7 @@ export const Recurring = () => {
               aria-pressed={tab === t.value}
               className={pillClass(tab === t.value)}
             >
-              {t.label} <span className="tnum opacity-70">({count})</span>
+              {t.label} <span className="tnum font-normal">({count})</span>
             </button>
           );
         })}

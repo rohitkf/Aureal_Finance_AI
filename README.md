@@ -121,8 +121,9 @@ Plus: global search (`⌘K` / `Ctrl+K`) including natural-language questions suc
 - **Simple on the surface, everything still there.** Each screen shows the common case; the
   rest is one tap away behind "How this works" or "More options", and opens by itself whenever
   something in it is set.
-- **Light and dark are two designed palettes**, not an inversion — iPhone-style glass over a
-  colour wallpaper in both. See [DESIGN.md](./DESIGN.md).
+- **Your colour, everywhere.** Charcoal and paper with one bright tint — lime by default, or sky,
+  violet, coral, mint, rose or amber, chosen in Settings and carried to every device you sign in
+  on. Light and dark are two designed palettes, not an inversion. See [DESIGN.md](./DESIGN.md).
 - **Motion never hides content.** Scroll-entry animations are gated behind a flag the app sets at
   runtime, with a timeout backstop, so a failed observer can never leave a balance invisible.
 
@@ -187,9 +188,12 @@ stretched. Every chart also exposes its full data as a screen-reader table (WCAG
 
 ### Surfaces
 
-Every card is a pane of frosted **glass** over a colour wallpaper — a tint, a rim of light and a
-specular line across the top — laid out the way an iPhone lays things out: large titles, grouped
-lists, capsule buttons and a floating tab bar. Real backdrop blur is kept to the fixed chrome, so
+Cards are **solid and flat** — charcoal on near-black in dark, white on warm stone in light —
+lifted by tone rather than shadow, with large round corners. Two more surfaces carry meaning:
+**paper**, a pale card in the tint's family, for plans (goals, budgets, credit cards), and
+**tinted**, a card made of the tint itself, for Safe to Spend alone. Figures are set large and
+light with the currency symbol raised beside them. Navigation is a pill bar across the top on a
+desktop and a floating tab bar on a phone. Backdrop blur is kept to the fixed chrome, so
 scrolling never pays for it. There are no 1px solid grey borders in the product. See
 [DESIGN.md](./DESIGN.md).
 
@@ -202,8 +206,8 @@ behaviour at each — the desktop layout is not simply shrunk:
 
 - Mobile gets bottom navigation, a floating action button, bottom sheets instead of modals, and
   expandable timeline cards where desktop shows a table.
-- Desktop gets a persistent sidebar, multi-column dashboards, a sticky transaction detail panel and
-  hover states.
+- Desktop gets a pill navigation bar across the top, multi-column dashboards, a sticky transaction
+  detail panel and hover states.
 
 The PWA installs, has a splash screen and app shortcuts, works offline from the service-worker
 cache, and shows an offline banner when the network drops.

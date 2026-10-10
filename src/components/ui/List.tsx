@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { Icon, type IconName } from './Icon';
 
-export type Tint = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral';
+export type TileTone = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral';
 
 /**
  * Whole class names, looked up rather than built: Tailwind only emits a class
@@ -11,7 +11,7 @@ export type Tint = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 
  * behind a glyph in full strength, which reads in both themes without a
  * second set of colours for dark.
  */
-const TINTS: Record<Tint, string> = {
+const TONES: Record<TileTone, string> = {
   primary: 'bg-primary/15 text-primary',
   secondary: 'bg-secondary/15 text-secondary',
   success: 'bg-success/15 text-success',
@@ -20,7 +20,7 @@ const TINTS: Record<Tint, string> = {
   neutral: 'bg-fill text-muted',
 };
 
-/** A rounded-square icon, as every row in iOS Settings begins with. */
+/** A round icon, as the reference draws every control: a circle, never a square. */
 export const IconTile = ({
   icon,
   tint = 'neutral',
@@ -28,7 +28,7 @@ export const IconTile = ({
   className,
 }: {
   icon: IconName;
-  tint?: Tint;
+  tint?: TileTone;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }) => (
@@ -36,10 +36,11 @@ export const IconTile = ({
     aria-hidden="true"
     className={cn(
       'flex shrink-0 items-center justify-center',
-      size === 'sm' && 'h-7 w-7 rounded-[8px]',
-      size === 'md' && 'h-9 w-9 rounded-[10px]',
-      size === 'lg' && 'h-12 w-12 rounded-[14px]',
-      TINTS[tint],
+      'rounded-full',
+      size === 'sm' && 'h-7 w-7',
+      size === 'md' && 'h-9 w-9',
+      size === 'lg' && 'h-12 w-12',
+      TONES[tint],
       className,
     )}
   >
@@ -48,7 +49,7 @@ export const IconTile = ({
 );
 
 /**
- * Rows in one pane of glass, divided by hairlines that start after the icon
+ * Rows on one card, divided by hairlines that start after the icon
  * column — the inset grouped list. A heading above it is optional and in
  * sentence case; a footnote below it says anything the rows need explaining.
  */
@@ -76,7 +77,7 @@ interface ListRowProps {
   title: ReactNode;
   subtitle?: ReactNode;
   icon?: IconName;
-  tint?: Tint;
+  tint?: TileTone;
   /** Shown at the trailing edge — a figure, a state, a switch. */
   value?: ReactNode;
   to?: string;

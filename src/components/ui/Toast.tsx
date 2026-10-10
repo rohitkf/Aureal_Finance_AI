@@ -84,7 +84,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                     className={cn(
                       'shrink-0 self-center rounded-full px-3 py-1.5 text-label-md font-medium text-primary',
                       'transition-colors duration-300 hover:bg-[rgb(var(--primary)/0.12)]',
-                      'outline-none focus-visible:shadow-[0_0_0_2px_rgb(var(--primary-strong)/0.5)]',
+                      'outline-none focus-visible:shadow-[0_0_0_2px_rgb(var(--primary))]',
                     )}
                   >
                     {t.action.label}

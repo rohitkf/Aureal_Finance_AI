@@ -20,6 +20,7 @@ const SETTINGS: Settings = {
   theme: 'system',
   accents: DEFAULT_ACCENTS,
   dueHorizonDays: 2,
+  tint: 'lime',
 };
 
 const account = (id: string, name: string, type: Account['type'], balance: number): Account => ({

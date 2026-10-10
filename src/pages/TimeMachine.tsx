@@ -15,6 +15,7 @@ import {
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { FigureText } from '@/components/ui/Figure';
 import { Card, CardHeader, Label, PageHeader } from '@/components/ui/Card';
 import { DateField, SegmentedControl } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
@@ -265,11 +266,11 @@ export const TimeMachine = () => {
                 </Label>
                 <p
                   className={cn(
-                    'tnum mt-2 font-display text-[clamp(2.5rem,7vw,3.75rem)] font-bold leading-none tracking-[-0.045em]',
+                    'figure mt-2 whitespace-nowrap text-[clamp(2.75rem,7.5vw,4.25rem)] leading-none',
                     tm.end < 0 ? 'text-danger' : 'text-text',
                   )}
                 >
-                  {money(tm.end, { masked: maskBalances })}
+                  <FigureText text={money(tm.end, { masked: maskBalances })} />
                 </p>
                 <p className="mt-2 text-body-sm text-muted">{chosen.length === 1 ? 'In' : 'Across'} {scope}</p>
               </div>
@@ -430,7 +431,9 @@ const chipClass = (on: boolean) =>
 const Figure = ({ label, value, tone = 'text-text' }: { label: string; value: string; tone?: string }) => (
   <div className="well min-w-0 p-4">
     <dt className="text-[13px] font-semibold tracking-[-0.005em] text-muted">{label}</dt>
-    <dd className={cn('tnum mt-1.5 font-display text-metric-md', tone)}>{value}</dd>
+    <dd className={cn('figure mt-1.5 whitespace-nowrap text-[clamp(1.375rem,4vw,1.75rem)] leading-tight', tone)}>
+      <FigureText text={value} />
+    </dd>
   </div>
 );
 

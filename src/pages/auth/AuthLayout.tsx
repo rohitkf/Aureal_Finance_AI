@@ -41,7 +41,7 @@ export const AuthLayout = ({
           className="flex items-center gap-3.5 transition-opacity duration-400 ease-fluid hover:opacity-80"
         >
           <Logo size={38} />
-          <span className="font-display text-[17px] font-bold tracking-[-0.02em] text-text">Aureal Finance AI</span>
+          <span className="font-display text-[17px] font-medium tracking-[-0.02em] text-text">Aureal Finance AI</span>
         </Link>
       </Reveal>
 
@@ -50,7 +50,7 @@ export const AuthLayout = ({
           <Eyebrow tone="accent">Personal financial operating system</Eyebrow>
         </Reveal>
         <Reveal delay={160}>
-          <h1 className="mt-8 font-display text-[clamp(2.75rem,4.6vw,4rem)] font-bold leading-[1.02] tracking-[-0.045em] text-text">
+          <h1 className="mt-8 font-display text-[clamp(2.75rem,4.6vw,4rem)] font-normal leading-[1.02] tracking-[-0.045em] text-text">
             Know exactly
             <br />
             what you can spend.
@@ -95,12 +95,12 @@ export const AuthLayout = ({
           <div className="bezel-core p-7 sm:p-10">
             <Link to="/login" className="mb-10 flex items-center gap-3 lg:hidden">
               <Logo size={34} />
-              <span className="font-display text-[16px] font-bold tracking-[-0.02em] text-text">
+              <span className="font-display text-[16px] font-medium tracking-[-0.02em] text-text">
                 Aureal Finance AI
               </span>
             </Link>
 
-            <h2 className="font-display text-[30px] font-bold leading-tight tracking-[-0.035em] text-text">
+            <h2 className="font-display text-[30px] font-normal leading-tight tracking-[-0.035em] text-text">
               {title}
             </h2>
             <p className="mt-2 text-[13.5px] leading-relaxed text-muted">{description}</p>

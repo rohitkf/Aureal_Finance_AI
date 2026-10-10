@@ -43,7 +43,7 @@ export const DigitsField = ({ label, value, onChange, length = 4, hint }: Digits
                 value[i] ? 'text-text' : 'text-faint/40',
                 focused &&
                   i === active &&
-                  'shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.55),0_0_0_3px_rgb(var(--primary-strong)/0.18)]',
+                  'shadow-[inset_0_0_0_1.5px_rgb(var(--primary)),0_0_0_4px_rgb(var(--primary-strong)/0.35)]',
               )}
             >
               {value[i] ?? '•'}
