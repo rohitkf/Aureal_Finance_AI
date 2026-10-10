@@ -4,6 +4,9 @@ import { cn } from '@/lib/cn';
 import { useAppState, useSettings, useStore } from '@/lib/store';
 import { useTheme } from '@/hooks/useTheme';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useMenu } from '@/hooks/useMenu';
+import { useAuth } from '@/lib/auth';
+import { errorMessage } from '@/lib/errors';
 import { MOBILE_NAV, MORE_NAV, PLANNING_NAV, PRIMARY_NAV, type NavItem } from './nav';
 import { Logo } from './Logo';
 import { Atmosphere } from './Atmosphere';
@@ -13,6 +16,8 @@ import { Toggle } from './ui/Field';
 import { Icon, type IconName } from './ui/Icon';
 import { GroupedList, IconTile, ListRow, type TileTone } from './ui/List';
 import { Modal } from './ui/Modal';
+import { useToast } from './ui/Toast';
+import { ProfileMenu } from './ProfileMenu';
 import type { TransactionType } from '@/lib/types';
 
 /* ------------------------------------------------------------------ */
@@ -44,16 +49,6 @@ const RoundButton = ({
   >
     <Icon name={icon} size={18} />
   </button>
-);
-
-const Initials = ({ name }: { name: string }) => (
-  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-text text-[12.5px] font-semibold text-[rgb(var(--card))]">
-    {name
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .slice(0, 2)}
-  </span>
 );
 
 /**
@@ -96,11 +91,13 @@ export const AppShell = () => {
   const online = useOnlineStatus();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  const toast = useToast();
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   /** The desktop bar's More, while there is no room for every destination. */
-  const [navMoreOpen, setNavMoreOpen] = useState(false);
+  const navMore = useMenu();
   const [quickOpen, setQuickOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [addType, setAddType] = useState<TransactionType>('expense');
@@ -119,24 +116,16 @@ export const AppShell = () => {
   useEffect(() => {
     setMoreOpen(false);
     setQuickOpen(false);
-    setNavMoreOpen(false);
   }, [location.pathname]);
 
-  // The bar's More closes the way a menu does: Escape, or a click anywhere
-  // that is not the menu.
-  useEffect(() => {
-    if (!navMoreOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setNavMoreOpen(false);
-    const onPointer = (e: PointerEvent) => {
-      if (!(e.target as Element).closest('[aria-label="More destinations"], [aria-haspopup="menu"]')) setNavMoreOpen(false);
-    };
-    document.addEventListener('keydown', onKey);
-    document.addEventListener('pointerdown', onPointer);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('pointerdown', onPointer);
-    };
-  }, [navMoreOpen]);
+  const leave = async () => {
+    try {
+      await signOut();
+      navigate('/login', { replace: true });
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Couldn’t sign out', description: errorMessage(e, 'Please try again.') });
+    }
+  };
 
   const toggleMask = () => dispatch({ type: 'update-settings', settings: { maskBalances: !maskBalances } });
   // Somewhere in More is the screen you are on: say so on the tab.
@@ -197,21 +186,22 @@ export const AppShell = () => {
                 {item.label}
               </NavLink>
             ))}
-            <div className="relative 2xl:hidden">
+            <div ref={navMore.ref} className="relative 2xl:hidden">
               <button
                 type="button"
                 aria-haspopup="menu"
-                aria-expanded={navMoreOpen}
-                onClick={() => setNavMoreOpen((v) => !v)}
+                aria-expanded={navMore.open}
+                onClick={() => navMore.setOpen((v) => !v)}
                 className={cn(navPill({ isActive: inPlanning }), 'gap-1.5')}
               >
                 More
-                <Icon name="chevron-down" size={14} className={cn('transition-transform duration-300', navMoreOpen && 'rotate-180')} />
+                <Icon name="chevron-down" size={14} className={cn('transition-transform duration-300', navMore.open && 'rotate-180')} />
               </button>
-              {navMoreOpen && (
+              {navMore.open && (
                 <div
                   role="menu"
                   aria-label="More destinations"
+                  onKeyDown={navMore.onMenuKeyDown}
                   className="chrome absolute right-0 top-full mt-2 w-60 animate-fade-in rounded-[1.5rem] p-1.5 [--bar-alpha:0.97]"
                 >
                   {PLANNING_NAV.map((item) => (
@@ -219,6 +209,7 @@ export const AppShell = () => {
                       key={item.to}
                       to={item.to}
                       role="menuitem"
+                      tabIndex={-1}
                       className={({ isActive }) =>
                         cn(
                           'flex items-center gap-3 rounded-[1.1rem] px-3 py-2.5 text-[14px] transition-colors duration-300',
@@ -253,21 +244,8 @@ export const AppShell = () => {
               New entry
             </button>
             {/* The person, as the reference closes its bar: who is signed in,
-                and the way to their settings. */}
-            <NavLink
-              to="/settings"
-              aria-label="Settings"
-              className="chrome flex h-11 shrink-0 items-center gap-2.5 rounded-full p-1 transition-all duration-300 ease-fluid hover:bg-fill min-[1720px]:pr-2"
-            >
-              <Initials name={state.settings.userName} />
-              <span className="hidden flex-col pr-1 leading-tight min-[1720px]:flex">
-                <span className="text-[13.5px] font-medium text-text">{state.settings.userName}</span>
-                <span className="text-[11.5px] text-muted">{online ? 'Settings' : 'Offline'}</span>
-              </span>
-              <span className="hidden h-9 w-9 items-center justify-center rounded-full bg-fill text-text min-[1720px]:flex">
-                <Icon name="settings" size={16} />
-              </span>
-            </NavLink>
+                their settings, and Sign out. */}
+            <ProfileMenu name={state.settings.userName} email={user?.email} offline={!online} onSignOut={leave} />
           </div>
         </div>
       </header>

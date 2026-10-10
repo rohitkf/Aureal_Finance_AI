@@ -201,12 +201,16 @@ are sentence case.
   on a click outside and on navigation, and is itself drawn as selected while you are on one of
   them. From `2xl` (1536px) all nine are in the row.
 - At the right: round outlined buttons (search, hide balances, theme), the tint-filled
-  **New entry** pill, and the person — their initials in an ink circle, linking to Settings; from
-  1720px their name and a settings disc join it.
+  **New entry** pill, and the person — their initials in an ink circle (from 1720px with their
+  name). It opens the **account menu**: who is signed in and their email, Settings, and
+  **Sign out**, in danger red. It is a WAI-ARIA menu button (`useMenu`): focus moves into it,
+  ↑ ↓ Home End move through it, Escape closes it and returns focus to the button, and a click
+  outside, Tab or a new page closes it. The More menu works the same way.
 
 **Phone and tablet (below `lg`):**
 
-- The mark and round buttons at the top (search, hide balances; theme from `sm`; the person).
+- The mark and round buttons at the top (search, hide balances; theme from `sm`; the person, with
+  the same account menu and Sign out).
 - **A floating `.chrome` tab bar** — Home, Transactions, Budget, Time Machine, More — with the
   selected tab a solid ink pill, and a separate **tint-filled round +** beside it ("Add a
   transaction"), because it does something rather than going somewhere. Tab widths follow their
@@ -226,7 +230,7 @@ The search capsule, the skip link and the offline banner are the same on both.
 | `Button` `secondary` | An outlined pill: a strong hairline, no fill until hover |
 | `Button` `ghost` | Muted text, no outline |
 | `IconButton`, steppers, the sheet close | An outlined circle |
-| Filter chips (`pillClass`) | Outlined pills; the chosen one tint-filled |
+| Filter chips (`pillClass`) | Outlined pills; the chosen one tint-filled. In a multi-select set with **All** (Time Machine's accounts): tapping one while All is on shows that one alone, later taps add or remove one, and taking off the last returns to All — a set is never empty |
 | `SegmentedControl` | A fill track; the chosen option a solid ink pill |
 | `Toggle` | The reference's switch: a pill track with × at one end and ✓ at the other; the knob carries the glyph for the current state — ✓ on a tint-filled knob when on, × on a plain knob when off — so the state never rests on colour |
 | `CheckboxField` | A circle, tint-filled with a check when on |

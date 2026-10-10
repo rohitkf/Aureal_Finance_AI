@@ -1,5 +1,6 @@
 import { resolveAccents } from './accents';
 import { DEFAULT_TINT, isTint } from './tints';
+import type { FollowPatch } from './recurrence';
 import type {
   Account,
   AppState,
@@ -208,6 +209,23 @@ export const toSettings = (row: ProfileRow): Settings => ({
 /* ------------------------------------------------------------------ */
 /* Domain → row, for writes                                            */
 /* ------------------------------------------------------------------ */
+
+/**
+ * A rule's edit, as the columns of the scheduled payments that follow it
+ * (`followRule`). Only what changed is written. A type always goes with its
+ * destination, so a payment never becomes a transfer to nowhere, or stops
+ * being one and keeps a destination.
+ */
+export const followPatchToRow = (p: FollowPatch) => ({
+  ...(p.accountId !== undefined && { account_id: p.accountId }),
+  ...(p.type !== undefined && {
+    type: p.type,
+    to_account_id: p.type === 'transfer' ? (p.toAccountId ?? null) : null,
+  }),
+  ...(p.amount !== undefined && { amount: p.amount }),
+  ...('categoryId' in p && { category_id: p.categoryId || null }),
+  ...(p.merchant !== undefined && { merchant: p.merchant }),
+});
 
 export const transactionToRow = (t: Omit<Transaction, 'id'>) => ({
   account_id: t.accountId,
