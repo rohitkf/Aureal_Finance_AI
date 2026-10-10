@@ -104,7 +104,7 @@ export const MoneyDial = ({
           'flex flex-col gap-4 rounded-2xl bg-fill px-4 pb-4 pt-3.5',
           'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/0.04)]',
           'transition-all duration-400 ease-fluid',
-          'focus-within:shadow-[inset_0_0_0_1px_rgb(var(--primary-strong)/0.5),0_0_0_3px_rgb(var(--primary-strong)/0.16)]',
+          'focus-within:shadow-[inset_0_0_0_1.5px_rgb(var(--primary)),0_0_0_4px_rgb(var(--primary-strong)/0.35)]',
           error && 'shadow-[inset_0_0_0_1px_rgb(var(--danger)/0.55)]',
         )}
       >
@@ -120,7 +120,7 @@ export const MoneyDial = ({
           </button>
 
           <div className="flex min-w-0 flex-1 items-baseline justify-center gap-0.5">
-            <span aria-hidden="true" className="font-display text-[22px] font-semibold leading-none text-text opacity-40">
+            <span aria-hidden="true" className="font-display text-[22px] font-light leading-none text-muted">
               {symbol}
             </span>
             <input
@@ -135,7 +135,7 @@ export const MoneyDial = ({
               onChange={(e) => onChange(sanitizeAmount(e.target.value))}
               className={cn(
                 'tnum w-auto min-w-[2ch] max-w-full border-0 bg-transparent p-0 text-center font-display [field-sizing:content]',
-                'text-[30px] font-bold leading-none tracking-[-0.04em] text-text',
+                'text-[30px] font-light leading-none tracking-[-0.04em] text-text',
                 'placeholder:text-faint/40 focus:outline-none focus:ring-0',
               )}
             />
@@ -165,7 +165,7 @@ export const MoneyDial = ({
           className="slider h-2 w-full cursor-pointer appearance-none rounded-full outline-none"
         />
 
-        <div className="tnum flex justify-between text-[11px] text-faint" aria-hidden="true">
+        <div className="tnum flex justify-between text-[11px] text-muted" aria-hidden="true">
           <span>{money(stops[0], { compact: true })}</span>
           <span>{money(stops[Math.floor((stops.length - 1) / 2)], { compact: true })}</span>
           <span>
@@ -190,6 +190,7 @@ export const MoneyDial = ({
 };
 
 const NUDGE =
-  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-base text-text shadow-thumb dark:bg-surface-bright ' +
-  'transition-all duration-300 ease-fluid hover:brightness-[1.04] active:scale-[0.92] ' +
+  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text ' +
+  'shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))] ' +
+  'transition-all duration-300 ease-fluid hover:bg-fill active:scale-[0.92] ' +
   'disabled:pointer-events-none disabled:opacity-35';

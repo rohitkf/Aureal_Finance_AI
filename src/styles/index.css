@@ -32,79 +32,138 @@
 }
 
 /* ------------------------------------------------------------------ *
- * Design tokens.
+ * Design tokens — the Aureal brand system. DESIGN.md is the reference.
  *
- * "Glass": an iPhone-style material over a living colour wallpaper. A web
- * approximation of Apple's Liquid Glass, not Apple's own — Apple ships that
- * for its platforms only. Two designed palettes, not an inversion:
- *   light — pale frosted panes over a soft sky, lilac and mint wallpaper.
- *   dark  — smoked panes over a deep blue, violet and green wallpaper.
+ * Charcoal and paper with one bright tint. Surfaces are solid and flat;
+ * what lifts a card is its tone against the ground, not a shadow or a
+ * blur. The tint is the person's own: one of seven, chosen in Settings,
+ * carried on <html data-tint>, and every accent in the app — buttons, the
+ * selected chip, the Safe to Spend card, the glow behind the page — is
+ * drawn from it.
  *
  * Every colour is an RGB triplet so opacity modifiers keep working. Every
- * text colour has been checked at AA against a card *and* against the
- * wallpaper at its most saturated point, since titles sit straight on it.
+ * text colour, every tint's ink and the ink that sits on every tint's fill
+ * has been checked at AA (DESIGN.md has the figures).
  * ------------------------------------------------------------------ */
 @layer base {
+  /*
+   * The seven tints. Each is a bright fill that black ink reads on (all of
+   * them are light enough for #141414 at 9.7:1 or better), an ink dark
+   * enough to be text on white, the paper a light card is made of, and the
+   * two greys that read as muted and faint on the fill — at 4.6:1 or better
+   * even inside a well pressed into it.
+   */
+  :root,
+  :root[data-tint='lime'] {
+    --tint: 197 245 79;
+    --tint-ink: 76 104 0;
+    --tint-paper: 239 244 227;
+    --tint-muted: 58 70 30;
+    --tint-faint: 67 80 35;
+  }
+  :root[data-tint='sky'] {
+    --tint: 140 200 255;
+    --tint-ink: 10 90 170;
+    --tint-paper: 235 241 239;
+    --tint-muted: 36 48 58;
+    --tint-faint: 43 56 68;
+  }
+  :root[data-tint='violet'] {
+    --tint: 196 178 255;
+    --tint-ink: 91 63 209;
+    --tint-paper: 239 239 239;
+    --tint-muted: 46 42 57;
+    --tint-faint: 53 48 65;
+  }
+  :root[data-tint='coral'] {
+    --tint: 255 166 133;
+    --tint-ink: 176 58 16;
+    --tint-paper: 243 239 231;
+    --tint-muted: 56 40 33;
+    --tint-faint: 65 46 38;
+  }
+  :root[data-tint='mint'] {
+    --tint: 112 228 194;
+    --tint-ink: 8 112 84;
+    --tint-paper: 233 243 235;
+    --tint-muted: 34 60 52;
+    --tint-faint: 40 69 60;
+  }
+  :root[data-tint='rose'] {
+    --tint: 255 164 202;
+    --tint-ink: 174 24 94;
+    --tint-paper: 243 238 235;
+    --tint-muted: 58 41 48;
+    --tint-faint: 67 47 55;
+  }
+  :root[data-tint='amber'] {
+    --tint: 255 210 92;
+    --tint-ink: 134 88 0;
+    --tint-paper: 243 242 228;
+    --tint-muted: 66 56 31;
+    --tint-faint: 77 66 36;
+  }
+
   :root {
     /* — Light ————————————————————————————————— */
-    --background: 236 239 245;
-    --surface: 236 239 245;
+    --background: 236 237 233;
+    --surface: 236 237 233;
     --surface-lowest: 255 255 255;
-    --surface-low: 248 249 251;
+    --surface-low: 246 247 244;
     --surface-base: 255 255 255;
-    --surface-high: 242 243 247;
-    --surface-highest: 229 231 237;
+    --surface-high: 243 244 240;
+    --surface-highest: 228 229 225;
     --surface-bright: 255 255 255;
 
+    /* A card, and a card that sits a step forward of it. */
+    --card: 255 255 255;
+    --card-raised: 255 255 255;
+    /* The bar, the tab bar and sheets. */
+    --chrome: 255 255 255;
+
     /* Hairlines, expressed as an ink to be laid over a surface at low alpha. */
-    --hairline: 9 9 11;
-    --hairline-alpha: 0.07;
-    --hairline-alpha-strong: 0.12;
-    --border: 226 227 232;
-    --border-strong: 205 207 214;
+    --hairline: 20 20 20;
+    --hairline-alpha: 0.08;
+    --hairline-alpha-strong: 0.14;
+    --border: 226 227 222;
+    --border-strong: 205 206 200;
 
-    /* The glass itself: a tint, how much of it, and the light along its rim. */
-    --glass: 255 255 255;
-    --glass-alpha: 0.74;
-    --glass-strong-alpha: 0.82;
-    --glass-rim: 255 255 255;
-    --glass-rim-alpha: 0.7;
-    --specular: 0.9;
-    /* iOS's tertiary fill: a grey that reads on any tint beneath it. */
-    --fill: 118 118 128;
-    --fill-alpha: 0.1;
+    /* A control's fill — a track, a quiet button — and a well pressed in. */
+    --fill: 20 20 20;
+    --fill-alpha: 0.06;
+    --well: 20 20 20;
+    --well-alpha: 0.045;
 
-    --text: 17 17 21;
-    --muted: 72 72 82;
-    --faint: 84 86 100;
+    --text: 20 20 20;
+    --muted: 80 80 76;
+    --faint: 102 102 98;
 
-    --primary: 0 88 204;
-    --primary-strong: 0 113 227;
-    --on-primary: 255 255 255;
-    --primary-soft: 219 231 255;
+    /* The tint, as the rest of the app asks for it. */
+    --primary: var(--tint-ink);
+    --primary-strong: var(--tint);
+    --on-primary: 20 20 20;
+    --on-tint: 20 20 20;
+    --primary-soft: var(--tint-paper);
 
     --secondary: 79 70 229;
     --on-secondary: 255 255 255;
 
-    --success: 4 120 87;
+    /* Dark enough to hold 4.5:1 on white, on the stone page, in a well and
+       inside a badge's own wash — the smallest text they are ever set in. */
+    --success: 3 103 75;
     --on-success: 255 255 255;
-    --warning: 180 83 9;
+    --warning: 138 65 6;
     --on-warning: 255 255 255;
-    --danger: 190 18 60;
+    --danger: 177 17 56;
     --on-danger: 255 255 255;
     --info: 2 132 199;
 
-    /* Diffused ambient shadow — never a harsh drop shadow. */
-    --ambient: 30 41 82;
-    --ambient-a: 0.05;
-    --ambient-b: 0.12;
+    --ambient: 20 20 20;
+    --ambient-a: 0.04;
+    --ambient-b: 0.08;
 
-    /* The wallpaper behind the glass. */
-    --mesh-1: 120 165 255;
-    --mesh-2: 170 140 255;
-    --mesh-3: 90 210 170;
-    --mesh-4: 255 186 150;
-    --mesh-opacity: 0.3;
+    /* The glow behind the page, in the tint. */
+    --glow-opacity: 0.22;
     --grain-opacity: 0.02;
 
     color-scheme: light;
@@ -112,38 +171,38 @@
 
   .dark {
     /* — Dark ————————————————————————————————— */
-    --background: 7 8 12;
-    --surface: 7 8 12;
-    --surface-lowest: 10 11 15;
-    --surface-low: 18 19 24;
-    --surface-base: 26 27 33;
-    --surface-high: 36 37 44;
-    --surface-highest: 48 50 58;
-    --surface-bright: 64 66 76;
+    --background: 24 24 24;
+    --surface: 24 24 24;
+    --surface-lowest: 18 18 18;
+    --surface-low: 30 30 30;
+    --surface-base: 42 42 42;
+    --surface-high: 50 50 50;
+    --surface-highest: 60 60 60;
+    --surface-bright: 74 74 74;
+
+    --card: 42 42 42;
+    --card-raised: 50 50 50;
+    --chrome: 38 38 38;
 
     --hairline: 255 255 255;
-    --hairline-alpha: 0.08;
-    --hairline-alpha-strong: 0.14;
-    --border: 32 36 44;
-    --border-strong: 58 64 76;
+    --hairline-alpha: 0.09;
+    --hairline-alpha-strong: 0.16;
+    --border: 52 52 52;
+    --border-strong: 72 72 72;
 
-    --glass: 30 30 36;
-    --glass-alpha: 0.7;
-    --glass-strong-alpha: 0.8;
-    --glass-rim: 255 255 255;
-    --glass-rim-alpha: 0.09;
-    --specular: 0.12;
-    --fill: 118 118 128;
-    --fill-alpha: 0.2;
+    --fill: 255 255 255;
+    --fill-alpha: 0.07;
+    /* Wells go darker, not lighter: pressed into the card, as the
+       reference's calendar sits in its card. */
+    --well: 0 0 0;
+    --well-alpha: 0.26;
 
-    --text: 245 245 247;
-    --muted: 174 174 182;
-    --faint: 152 152 162;
+    --text: 245 245 245;
+    --muted: 170 170 170;
+    --faint: 150 150 150;
 
-    --primary: 100 170 255;
-    --primary-strong: 0 113 227;
-    --on-primary: 255 255 255;
-    --primary-soft: 18 34 62;
+    /* On charcoal the tint is bright enough to be its own text. */
+    --primary: var(--tint);
 
     --secondary: 192 193 255;
     --on-secondary: 16 0 169;
@@ -157,15 +216,11 @@
     --info: 125 211 252;
 
     --ambient: 0 0 0;
-    --ambient-a: 0.35;
-    --ambient-b: 0.5;
+    --ambient-a: 0.3;
+    --ambient-b: 0.45;
 
-    --mesh-1: 40 90 255;
-    --mesh-2: 130 60 230;
-    --mesh-3: 16 160 120;
-    --mesh-4: 200 70 120;
-    --mesh-opacity: 0.3;
-    --grain-opacity: 0.03;
+    --glow-opacity: 0.16;
+    --grain-opacity: 0.025;
 
     color-scheme: dark;
   }
@@ -191,15 +246,13 @@
 
   /* One focus ring, always visible, never removed. */
   :focus-visible {
-    @apply outline-none ring-2 ring-primary-strong ring-offset-[3px] ring-offset-background;
+    @apply outline-none ring-2 ring-text ring-offset-[3px] ring-offset-background;
   }
 
-  /* Some people turn transparency off; give them solid panes. */
+  /* Some people turn transparency off; the chrome goes solid. */
   @media (prefers-reduced-transparency: reduce) {
     :root {
-      --glass-alpha: 0.97;
-      --glass-strong-alpha: 0.98;
-      --bar-alpha: 0.97;
+      --bar-alpha: 1;
     }
   }
 
@@ -221,69 +274,129 @@
 
 @layer components {
   /* ---------------------------------------------------------------- *
-   * Glass
+   * Surfaces
    *
-   * Every surface is a pane of frosted glass over the wallpaper: a tint, a
-   * bright rim of light along its edge, a specular line across the top, and
-   * a wide soft shadow beneath. There is deliberately no `backdrop-filter`
-   * on these: they scroll, and a blur under a scrolling element is
-   * re-rasterised on every frame. The wallpaper behind them is a set of
-   * smooth radial fields, so a blur would change nothing you could see — the
-   * tint alone gives the frosted read for free. Real blur is kept for the
-   * fixed chrome (`.glass-bar`), where it is composited once.
+   * Solid and flat. A card is a tone a step off the ground — charcoal on
+   * charcoal, white on stone — with large concentric radii. No glass, no
+   * specular line, and in dark no shadow at all: on near-black a shadow is
+   * invisible, and a hairline that nobody sees is noise.
    * ---------------------------------------------------------------- */
 
-  /*
-   * The hero pane. `.bezel` was a tray holding a plate; the tray is gone, so
-   * it is now only the frame the hero sits in, and `.bezel-core` is the glass.
-   * The class names stay so nothing that composes them has to change.
-   */
+  /* The hero card. `.bezel` is only the frame it sits in. */
   .bezel {
-    @apply rounded-[1.75rem];
+    @apply rounded-[2rem];
   }
 
   .bezel-core {
-    @apply relative rounded-[1.75rem];
-    background:
-      linear-gradient(180deg, rgb(255 255 255 / calc(var(--specular) * 0.22)) 0%, transparent 38%),
-      rgb(var(--glass) / var(--glass-strong-alpha));
+    @apply relative rounded-[2rem];
+    background: rgb(var(--card));
     box-shadow:
-      inset 0 0 0 1px rgb(var(--glass-rim) / var(--glass-rim-alpha)),
-      inset 0 1px 0 0 rgb(255 255 255 / var(--specular)),
+      inset 0 0 0 1px rgb(var(--hairline) / calc(var(--hairline-alpha) * 0.5)),
       0 1px 2px rgb(var(--ambient) / var(--ambient-a)),
-      0 30px 60px -30px rgb(var(--ambient) / var(--ambient-b));
+      0 24px 48px -32px rgb(var(--ambient) / var(--ambient-b));
   }
 
-  /* An ordinary card: one pane of glass. */
+  /* An ordinary card. */
   .plate {
-    @apply rounded-[1.5rem];
-    background: rgb(var(--glass) / var(--glass-alpha));
+    @apply rounded-[1.75rem];
+    background: rgb(var(--card));
     box-shadow:
-      inset 0 0 0 1px rgb(var(--glass-rim) / var(--glass-rim-alpha)),
-      inset 0 1px 0 0 rgb(255 255 255 / var(--specular)),
-      0 1px 2px rgb(var(--ambient) / var(--ambient-a)),
-      0 20px 44px -28px rgb(var(--ambient) / var(--ambient-b));
+      inset 0 0 0 1px rgb(var(--hairline) / calc(var(--hairline-alpha) * 0.5)),
+      0 1px 2px rgb(var(--ambient) / var(--ambient-a));
   }
 
-  /* An inset well: a grey fill pressed into the glass, as iOS fills are. */
+  /* A well: pressed into its card. Darker on charcoal, greyer on white. */
   .well {
-    @apply rounded-2xl;
-    background: rgb(var(--fill) / var(--fill-alpha));
+    @apply rounded-[1.25rem];
+    background: rgb(var(--well) / var(--well-alpha));
   }
 
   /*
-   * Fixed chrome — the top bar, tab bar, sidebar and sheets. These are the
-   * only surfaces that blur what is behind them, because they are the only
-   * ones that do not move.
+   * Paper — a light card in either theme, the colour of the tint at a
+   * whisper. In dark it is the reference's pale subscription cards: the one
+   * light thing on the page, so it reads first. Everything inside is
+   * re-themed by redeclaring the tokens, so a child asking for `text-muted`
+   * gets the muted that works on paper without knowing it is on paper.
    */
-  .glass-bar {
-    background: rgb(var(--glass) / var(--bar-alpha, 0.62));
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
-    backdrop-filter: blur(28px) saturate(180%);
+  .paper {
+    background: rgb(var(--tint-paper));
+    color: rgb(20 20 20);
+    --card: var(--tint-paper);
+    --card-raised: 255 255 255;
+    --surface-base: 255 255 255;
+    --surface-bright: 255 255 255;
+    --hairline: 20 20 20;
+    --hairline-alpha: 0.08;
+    --hairline-alpha-strong: 0.14;
+    --fill: 20 20 20;
+    --fill-alpha: 0.07;
+    --well: 20 20 20;
+    --well-alpha: 0.05;
+    --text: 20 20 20;
+    --muted: 72 72 68;
+    --faint: 92 92 88;
+    --primary: var(--tint-ink);
+    /* A step darker than the light theme's: these hold 4.5:1 on all seven
+       papers, on a well pressed into them and inside a badge's 15% wash. */
+    --success: 2 100 72;
+    --warning: 140 64 4;
+    --danger: 168 14 52;
+    --secondary: 79 70 229;
+    box-shadow: 0 1px 2px rgb(var(--ambient) / var(--ambient-a));
+  }
+
+  /*
+   * Tinted — a card made of the tint itself, as the reference's "Pay from"
+   * is made of lime. Kept for the one surface that matters most on a screen
+   * (Safe to Spend). Inside it the ink is near-black and money in and out
+   * keep their meaning in dark inks that read on every one of the seven.
+   */
+  .tinted {
+    background: rgb(var(--tint));
+    color: rgb(var(--on-tint));
+    --card: var(--tint);
+    --card-raised: var(--tint);
+    --surface-base: 255 255 255;
+    --surface-bright: 255 255 255;
+    --hairline: 0 0 0;
+    --hairline-alpha: 0.12;
+    --hairline-alpha-strong: 0.2;
+    --fill: 0 0 0;
+    --fill-alpha: 0.1;
+    --well: 0 0 0;
+    --well-alpha: 0.08;
+    --text: var(--on-tint);
+    --muted: var(--tint-muted);
+    --faint: var(--tint-faint);
+    --primary: var(--on-tint);
+    --primary-strong: var(--on-tint);
+    --on-primary: var(--tint);
+    --success: 6 74 43;
+    --warning: 110 60 0;
+    --danger: 122 12 39;
+  }
+
+  /*
+   * Fixed chrome — the top bar, the tab bar and sheets. The only surfaces
+   * allowed a backdrop blur, because they are the only ones that do not
+   * move.
+   */
+  .chrome {
+    background: rgb(var(--chrome) / var(--bar-alpha, 0.86));
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
     box-shadow:
-      inset 0 0 0 1px rgb(var(--glass-rim) / var(--glass-rim-alpha)),
-      inset 0 1px 0 0 rgb(255 255 255 / var(--specular)),
-      0 12px 40px -12px rgb(var(--ambient) / var(--ambient-b));
+      inset 0 0 0 1px rgb(var(--hairline) / var(--hairline-alpha)),
+      0 12px 32px -16px rgb(var(--ambient) / var(--ambient-b));
+  }
+
+  /*
+   * A figure, set the way the brand sets money: light weight, tight, with
+   * the currency symbol small and raised beside it (`Figure`).
+   */
+  .figure {
+    @apply font-display font-light tracking-[-0.045em];
+    font-variant-numeric: tabular-nums;
   }
 
   /* A sentence-case heading over a group of rows, as in iOS Settings. */

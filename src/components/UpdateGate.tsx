@@ -56,7 +56,7 @@ export const UpdateGate = () => {
         aria-modal="true"
         aria-labelledby="update-gate-title"
         aria-describedby="update-gate-body"
-        className="relative w-full max-w-md rounded-[1.75rem] bg-[rgb(var(--surface-base))] p-7 text-center shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),inset_0_1px_0_0_rgb(255_255_255/0.06),0_32px_80px_-24px_rgb(var(--ambient)/0.8)]"
+        className="relative w-full max-w-md rounded-[1.75rem] bg-[rgb(var(--card))] p-7 text-center shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),0_32px_80px_-24px_rgb(var(--ambient)/0.8)]"
       >
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <Icon name="sync" size={22} />

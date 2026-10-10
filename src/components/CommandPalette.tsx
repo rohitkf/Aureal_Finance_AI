@@ -175,8 +175,8 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
         role="dialog"
         aria-modal="true"
         aria-label="Search"
-        // Spotlight's shape: one pane of glass, the field across its top.
-        className="glass-bar relative flex max-h-[70vh] w-full max-w-xl animate-slide-up flex-col overflow-hidden rounded-[1.75rem] [--bar-alpha:0.9]"
+        // Spotlight's shape: one sheet of chrome, the field across its top.
+        className="chrome relative flex max-h-[70vh] w-full max-w-xl animate-slide-up flex-col overflow-hidden rounded-[1.75rem] [--bar-alpha:0.9]"
       >
         <div className="flex items-center gap-3 px-4 shadow-[inset_0_-1px_0_0_rgb(var(--hairline)/var(--hairline-alpha))]">
           <Icon name="search" size={18} className="shrink-0 text-faint" />

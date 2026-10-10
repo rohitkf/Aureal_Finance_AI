@@ -42,6 +42,17 @@ begin
   update public.profiles set minimum_balance = 0 where id = v_user;
   update public.profiles set minimum_balance = 1000 where id = v_user;
 
+  -- The tint names a colour the stylesheet defines; any other word would
+  -- draw no colour at all.
+  assert (select tint from public.profiles where id = v_user) = 'lime',
+    'a new profile should start on the lime tint';
+  update public.profiles set tint = 'violet' where id = v_user;
+  begin
+    update public.profiles set tint = 'chartreuse' where id = v_user;
+    assert false, 'a tint the stylesheet does not define should be rejected';
+  exception when check_violation then null;
+  end;
+
   ---------------------------------------------------------------- accounts
   begin
     update public.accounts set credit_limit = -100 where id = v_card;

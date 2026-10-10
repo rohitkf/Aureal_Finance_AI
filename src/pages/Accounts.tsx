@@ -237,7 +237,7 @@ export const Accounts = () => {
                 <div className="flex items-baseline justify-between gap-3 px-4 pb-2">
                   <h2
                     id={`half-${half.side}`}
-                    className="font-display text-[20px] font-bold tracking-[-0.02em] text-text"
+                    className="font-display text-[20px] font-medium tracking-[-0.02em] text-text"
                   >
                     {half.side === 'asset' ? 'Assets' : 'Liabilities'}
                   </h2>
@@ -348,7 +348,7 @@ export const Accounts = () => {
             {archived.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-baseline justify-between gap-3 px-4">
-                  <h2 className="font-display text-[20px] font-bold tracking-[-0.02em] text-muted">Closed</h2>
+                  <h2 className="font-display text-[20px] font-medium tracking-[-0.02em] text-muted">Closed</h2>
                   {/* Its own figure, because the two halves above cover what
                       is in use — so without this the headline net worth would
                       not visibly add up. */}
@@ -402,7 +402,7 @@ export const Accounts = () => {
       {/* ---------------- Virtual accounts ---------------- */}
       <section className="space-y-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4">
-          <h2 className="font-display text-[20px] font-bold tracking-[-0.02em] text-text">Virtual accounts</h2>
+          <h2 className="font-display text-[20px] font-medium tracking-[-0.02em] text-text">Virtual accounts</h2>
           <span className="tnum text-[13px] text-muted">{money(allocated, { compact: true })} allocated</span>
           <Button
             size="sm"

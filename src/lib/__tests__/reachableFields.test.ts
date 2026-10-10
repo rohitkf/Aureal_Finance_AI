@@ -60,9 +60,11 @@ const NOT_TYPED = new Set([
   /**
    * Settable, but through `useTheme`, which owns the dispatch — so the page
    * never names the field. A real reachable-by-another-route, not a field
-   * with no home: the Appearance card has the three buttons.
+   * with no home: the Appearance card has the three theme buttons and the
+   * seven accent swatches.
    */
   'theme',
+  'tint',
 ]);
 
 const types = readFileSync('src/lib/types.ts', 'utf8');

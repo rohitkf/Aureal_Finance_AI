@@ -1,5 +1,6 @@
 /** Domain model for Aureal Finance AI. All money is stored in pounds as a number. */
 import type { AccentName, LedgerKind } from './accents';
+import type { Tint } from './tints';
 
 export type AccountType =
   | 'current'
@@ -322,6 +323,8 @@ export interface Settings {
    * March. 0 turns the labels off.
    */
   dueHorizonDays: number;
+  /** The app's accent colour — every button, selection and glow is drawn in it. */
+  tint: Tint;
 }
 
 /** One occurrence of a rule that should not be projected at all. */

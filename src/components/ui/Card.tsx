@@ -1,14 +1,16 @@
 import { useId, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
+import { FigureText } from './Figure';
 import { Icon } from './Icon';
 
 interface CardProps {
   children: ReactNode;
   className?: string;
   /**
-   * `bezel` is the hero pane, reserved for the one or two surfaces that lead
-   * a screen. `plate` is an ordinary pane of glass. `well` is a grey fill
-   * pressed into its parent rather than floating on it.
+   * `bezel` is the hero card, reserved for the one or two surfaces that lead
+   * a screen. `plate` is an ordinary card. `well` is a fill darker than its
+   * parent, pressed into it rather than floating on it. For a card on paper
+   * or in the tint, add `paper` or `tinted` to `className`.
    */
   tone?: 'plate' | 'bezel' | 'well';
   as?: 'div' | 'section' | 'article' | 'li';
@@ -53,7 +55,7 @@ interface CardHeaderProps {
 export const CardHeader = ({ title, description, action, className }: CardHeaderProps) => (
   <div className={cn('flex items-start justify-between gap-5', className)}>
     <div className="min-w-0">
-      <h2 className="font-display text-[19px] font-semibold leading-tight tracking-[-0.02em] text-text">{title}</h2>
+      <h2 className="font-display text-[19px] font-medium leading-tight tracking-[-0.02em] text-text">{title}</h2>
       {description && <p className="mt-1 text-[13px] leading-relaxed text-muted">{description}</p>}
     </div>
     {action && <div className="shrink-0">{action}</div>}
@@ -79,7 +81,7 @@ export const Eyebrow = ({
 }) => (
   <span
     className={cn(
-      'inline-flex items-center gap-1.5 text-[13px] font-semibold leading-tight tracking-[-0.005em]',
+      'inline-flex items-center gap-1.5 text-[14px] font-medium leading-tight tracking-[-0.01em]',
       tone === 'accent' ? 'text-primary' : 'text-muted',
       className,
     )}
@@ -122,7 +124,7 @@ export const PageHeader = ({
   <header className={cn('flex flex-col gap-4', className)}>
     <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
       <div className="min-w-0">
-        <h1 className="font-display text-[clamp(1.875rem,4vw,2.375rem)] font-bold leading-[1.1] tracking-[-0.03em] text-text">
+        <h1 className="font-display text-[clamp(2rem,4.4vw,2.875rem)] font-normal leading-[1.08] tracking-[-0.035em] text-text">
           {title}
         </h1>
         {subtitle && <div className="mt-1.5 text-[14px] leading-relaxed text-muted">{subtitle}</div>}
@@ -193,18 +195,18 @@ const STAT_TONES: Record<NonNullable<Stat['tone']>, string> = {
 };
 
 /**
- * Two to four headline figures in one pane, side by side.
+ * Two to four headline figures, side by side, standing on the page itself.
  *
- * Each of these used to be a card of its own, and on a phone they stacked:
- * three figures took a whole screen of scrolling before anything you could
- * act on. Together in one pane they are read at a glance, the way the
- * Wallet or Health summaries are. Below `sm` a set of three or four wraps to
- * two columns, so no figure is squeezed below a readable size.
+ * Set the way the reference sets "Overall balance 860,513 $": a quiet label
+ * over a large figure in a light weight, the currency symbol small and
+ * raised, and nothing boxing them in — the figures are the design. Below
+ * `sm` a set of three or four wraps to two columns, so no figure is squeezed
+ * below a readable size, and none is ever cut short with an ellipsis.
  */
 export const StatGroup = ({ stats, className }: { stats: Stat[]; className?: string }) => (
   <dl
     className={cn(
-      'plate grid gap-px overflow-hidden p-0',
+      'grid gap-x-6 gap-y-5 px-1',
       stats.length === 2 && 'grid-cols-2',
       stats.length === 3 && 'grid-cols-2 sm:grid-cols-3',
       stats.length >= 4 && 'grid-cols-2 lg:grid-cols-4',
@@ -215,27 +217,22 @@ export const StatGroup = ({ stats, className }: { stats: Stat[]; className?: str
       <div
         key={s.label}
         className={cn(
-          'min-w-0 p-4 sm:p-5',
+          'min-w-0',
           // A three-up on a phone: the third figure takes the full width of
           // the second row instead of leaving a hole beside it.
           stats.length === 3 && i === 2 && 'col-span-2 sm:col-span-1',
-          i > 0 && 'shadow-[inset_1px_0_0_0_rgb(var(--hairline)/var(--hairline-alpha))]',
-          stats.length === 3 && i === 2 && 'max-sm:shadow-[inset_0_1px_0_0_rgb(var(--hairline)/var(--hairline-alpha))]',
-          stats.length >= 4 && i >= 2 && 'max-lg:shadow-[inset_0_1px_0_0_rgb(var(--hairline)/var(--hairline-alpha))]',
         )}
       >
-        <dt className="truncate text-[12.5px] font-medium text-muted">{s.label}</dt>
+        <dt className="truncate text-[14px] text-muted">{s.label}</dt>
         <dd
           className={cn(
-            // Never truncated: a figure with its last digits replaced by an
-            // ellipsis reads as a different, wrong, figure.
-            'tnum mt-1 whitespace-nowrap font-display text-[clamp(1.125rem,5vw,1.625rem)] font-semibold leading-tight tracking-[-0.03em]',
+            'figure mt-1 whitespace-nowrap text-[clamp(1.75rem,5.6vw,2.75rem)] leading-[1.05]',
             STAT_TONES[s.tone ?? 'text'],
           )}
         >
-          {s.value}
+          {typeof s.value === 'string' || typeof s.value === 'number' ? <FigureText text={String(s.value)} /> : s.value}
         </dd>
-        {s.note && <dd className="mt-1 text-[12.5px] leading-snug text-muted">{s.note}</dd>}
+        {s.note && <dd className="mt-1.5 text-[12.5px] leading-snug text-muted">{s.note}</dd>}
       </div>
     ))}
   </dl>

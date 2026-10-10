@@ -148,11 +148,11 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
         // A dialog with no field of its own (a confirmation) focuses the panel
         // rather than its destructive button.
         tabIndex={-1}
-        // A sheet of glass: the one surface besides the bars that is allowed
+        // Chrome, like the bars: the one surface besides them that is allowed
         // a real backdrop blur, because it is fixed and its content scrolls
         // inside it rather than it scrolling over anything.
         className={cn(
-          'glass-bar relative flex max-h-[92vh] w-full flex-col [--bar-alpha:0.9]',
+          'chrome relative flex max-h-[92vh] w-full flex-col [--bar-alpha:0.9]',
           widths[size],
           isDesktop ? 'animate-slide-up rounded-[2rem]' : 'animate-sheet-up rounded-t-[2rem] pb-[env(safe-area-inset-bottom)]',
         )}
@@ -160,17 +160,18 @@ export const Modal = ({ open, onClose, title, description, children, footer, siz
         {!isDesktop && <div className="mx-auto mt-2 h-[5px] w-9 shrink-0 rounded-full bg-[rgb(var(--hairline)/0.22)]" />}
         <div className="flex items-start justify-between gap-4 px-6 pb-3 pt-4">
           <div className="min-w-0 pt-1">
-            <h2 className="font-display text-[20px] font-bold tracking-[-0.025em] text-text">{title}</h2>
+            <h2 className="font-display text-[20px] font-medium tracking-[-0.025em] text-text">{title}</h2>
             {description && <p className="mt-1 text-[13px] leading-relaxed text-muted">{description}</p>}
           </div>
-          {/* iOS's close: a small grey disc with a cross, out of the way of
-              the title and never the thing that takes focus. */}
+          {/* Close: an outlined circle with a cross, as the reference draws
+              its round controls — out of the way of the title and never the
+              thing that takes focus. */}
           <button
             type="button"
             aria-label="Close"
             title="Close"
             onClick={onClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fill text-muted transition-all duration-300 ease-fluid hover:text-text active:scale-[0.92]"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))] transition-all duration-300 ease-fluid hover:bg-fill hover:text-text active:scale-[0.92]"
           >
             <Icon name="close" size={15} />
           </button>

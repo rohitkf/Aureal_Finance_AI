@@ -7,23 +7,20 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'succ
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 /**
- * iOS's button family. A filled blue for the one thing a screen is for, a
- * grey fill for everything else, and plain text for the quiet ones. The
- * glow under the primary is gone: on glass, colour alone already lifts it.
+ * The brand's buttons. The tint, filled, with black ink, for the one thing a
+ * screen is for; an outlined pill for everything else; plain text for the
+ * quiet ones. No glows — on charcoal a bright fill already lifts itself.
  */
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary:
-    'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2),0_6px_16px_-8px_rgb(var(--primary-strong)/0.55)] hover:brightness-[1.08]',
+  primary: 'bg-primary-strong text-[rgb(var(--on-primary))] hover:brightness-[1.06]',
   secondary:
-    'bg-fill text-text shadow-[inset_0_1px_0_0_rgb(255_255_255/calc(var(--specular)*0.5))] hover:bg-[rgb(var(--fill)/calc(var(--fill-alpha)*1.6))]',
+    'text-text shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))] hover:bg-fill',
   ghost: 'text-muted hover:bg-fill hover:text-text',
-  danger:
-    'bg-danger text-[rgb(var(--on-danger))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2)] hover:brightness-[1.07]',
-  success:
-    'bg-success text-[rgb(var(--on-success))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.2)] hover:brightness-[1.07]',
+  danger: 'bg-danger text-[rgb(var(--on-danger))] hover:brightness-[1.07]',
+  success: 'bg-success text-[rgb(var(--on-success))] hover:brightness-[1.07]',
 };
 
-// Capsules, as iOS draws them; 44px tall from `md` up, the size of a fingertip.
+// Capsules; 44px tall from `md` up, the size of a fingertip.
 const SIZES: Record<ButtonSize, string> = {
   sm: 'h-9 pl-4 pr-4 text-[13px] gap-1.5',
   md: 'h-11 pl-5 pr-5 text-[14px] gap-2',
@@ -38,7 +35,7 @@ const NEST = {
 };
 
 const BASE =
-  'group relative inline-flex select-none items-center justify-center whitespace-nowrap rounded-full font-semibold tracking-[-0.01em] ' +
+  'group relative inline-flex select-none items-center justify-center whitespace-nowrap rounded-full font-medium tracking-[-0.01em] ' +
   'transition-all duration-300 ease-fluid active:scale-[0.97] active:opacity-80 disabled:pointer-events-none disabled:opacity-40';
 
 interface CommonProps {
@@ -135,7 +132,10 @@ export const ButtonLink = ({
   </Link>
 );
 
-/** A circular icon-only key. Always carries an accessible label. */
+/**
+ * A circular icon-only key, outlined, as the reference draws its pencil
+ * buttons. Always carries an accessible label.
+ */
 export const IconButton = forwardRef<
   HTMLButtonElement,
   ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -152,7 +152,9 @@ export const IconButton = forwardRef<
     className={cn(
       'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
       'transition-all duration-300 ease-fluid active:scale-[0.92] active:opacity-80',
-      VARIANTS[variant],
+      variant === 'ghost'
+        ? 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))] hover:bg-fill hover:text-text'
+        : VARIANTS[variant],
       className,
     )}
     {...rest}

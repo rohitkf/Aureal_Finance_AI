@@ -7,7 +7,7 @@
  * so leaving the field — or, now that it is a dial, nudging it — saved a
  * number worked out from £0 over the real buffer.
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,6 +17,7 @@ import type { AppState } from '@/lib/types';
 const dispatch = vi.fn();
 let minimumBalance = 0;
 let userName = 'Rohit';
+let tint = 'lime';
 
 const state = () =>
   ({
@@ -38,6 +39,7 @@ const state = () =>
       theme: 'system',
       accents: DEFAULT_ACCENTS,
       dueHorizonDays: 2,
+      tint,
     },
   }) as unknown as AppState;
 
@@ -62,6 +64,8 @@ beforeEach(() => {
   dispatch.mockClear();
   minimumBalance = 0;
   userName = 'Rohit';
+  tint = 'lime';
+  delete document.documentElement.dataset.tint;
 });
 
 describe('the minimum balance, when Settings draws before the profile loads', () => {
@@ -102,5 +106,37 @@ describe('your name, when Settings draws before the profile loads', () => {
     await user.click(screen.getByLabelText('Name'));
     await user.click(document.body);
     expect(dispatch).not.toHaveBeenCalledWith({ type: 'update-settings', settings: { userName: 'You' } });
+  });
+});
+
+describe('the accent colour', () => {
+  it('offers all seven tints, with the chosen one marked', () => {
+    tint = 'sky';
+    render(page());
+    const group = screen.getByRole('radiogroup', { name: 'Accent colour' });
+    const options = within(group).getAllByRole('radio');
+    expect(options.map((o) => o.getAttribute('aria-label'))).toEqual([
+      'Lime',
+      'Sky',
+      'Violet',
+      'Coral',
+      'Mint',
+      'Rose',
+      'Amber',
+    ]);
+    expect(within(group).getByRole('radio', { name: 'Sky' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('saves the tint chosen, so it follows you to every device', async () => {
+    const user = userEvent.setup();
+    render(page());
+    await user.click(screen.getByRole('radio', { name: 'Coral' }));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'update-settings', settings: { tint: 'coral' } });
+  });
+
+  it('puts the stored tint on the page, where every colour in the app is read from', () => {
+    tint = 'mint';
+    render(page());
+    expect(document.documentElement.dataset.tint).toBe('mint');
   });
 });

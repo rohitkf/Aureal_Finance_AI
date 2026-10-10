@@ -207,7 +207,19 @@ describe('toSettings', () => {
       accents: DEFAULT_ACCENTS,
       // Absent on an old profile row; today and tomorrow is the default.
       dueHorizonDays: 2,
+      // Absent before the tint migration: lime, as the column defaults to.
+      tint: 'lime',
     });
+  });
+
+  it('reads the tint the profile chose', () => {
+    const s = toSettings({ display_name: 'Rohit', locale: 'en-GB', tint: 'violet' } as unknown as ProfileRow);
+    expect(s.tint).toBe('violet');
+  });
+
+  it('falls back to lime for a tint the stylesheet cannot draw, rather than to no colour', () => {
+    const s = toSettings({ display_name: 'Rohit', locale: 'en-GB', tint: 'chartreuse' } as unknown as ProfileRow);
+    expect(s.tint).toBe('lime');
   });
 });
 

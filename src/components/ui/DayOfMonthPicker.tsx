@@ -68,7 +68,7 @@ export const DayOfMonthPicker = ({ value, onChange, label, hint, id, optional }:
           'transition-all duration-400 ease-fluid active:scale-[0.96]',
           span, span && 'px-3',
           active
-            ? 'bg-primary-strong text-[rgb(var(--on-primary))] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.22),0_6px_16px_-8px_rgb(var(--primary-strong)/0.8)]'
+            ? 'bg-primary-strong font-medium text-[rgb(var(--on-primary))]'
             : 'bg-fill text-muted hover:text-text',
         )}
       >

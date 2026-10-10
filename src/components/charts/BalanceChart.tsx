@@ -184,7 +184,8 @@ export const BalanceChart = ({
         <path
           d={line(splitAt, points.length - 1)}
           fill="none"
-          stroke="rgb(var(--primary-strong))"
+          stroke="rgb(var(--primary))"
+          strokeOpacity={0.75}
           strokeWidth={2.5}
           strokeDasharray="7 5"
           strokeLinecap="round"
@@ -195,7 +196,7 @@ export const BalanceChart = ({
           cx={points[troughIndex]!.x}
           cy={points[troughIndex]!.y}
           r={5.5}
-          fill="rgb(var(--surface))"
+          fill="rgb(var(--card))"
           stroke="rgb(var(--warning))"
           strokeWidth={2.5}
         />
@@ -203,7 +204,7 @@ export const BalanceChart = ({
           cx={points[0]!.x}
           cy={points[0]!.y}
           r={4.5}
-          fill="rgb(var(--surface))"
+          fill="rgb(var(--card))"
           stroke="rgb(var(--primary))"
           strokeWidth={2.5}
         />
@@ -211,7 +212,7 @@ export const BalanceChart = ({
         {active && (
           <g pointerEvents="none">
             <line x1={active.x} x2={active.x} y1={pad.top} y2={baseline} stroke="rgb(var(--border-strong))" />
-            <circle cx={active.x} cy={active.y} r={5} fill="rgb(var(--primary-strong))" />
+            <circle cx={active.x} cy={active.y} r={5} fill="rgb(var(--primary))" />
           </g>
         )}
 

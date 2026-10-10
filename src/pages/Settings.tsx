@@ -46,6 +46,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, CardHeader, Label, PageHeader } from '@/components/ui/Card';
 import { IconTile } from '@/components/ui/List';
+import { TINTS, TINT_LABELS, TINT_SWATCH } from '@/lib/tints';
 import { MoneyDial } from '@/components/ui/MoneyDial';
 import { SelectField, TextField, Toggle } from '@/components/ui/Field';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -57,7 +58,7 @@ import type { Category, Label as LabelType } from '@/lib/types';
 /** Where the jump links at the top of the page go, in page order. */
 const SECTIONS = [
   { id: 'account', label: 'Account' },
-  { id: 'appearance', label: 'Appearance' },
+  { id: 'appearance', label: 'Appearance & colour' },
   { id: 'safe-to-spend', label: 'Safe to Spend' },
   { id: 'region', label: 'Currency' },
   { id: 'categories', label: 'Categories' },
@@ -85,7 +86,7 @@ export const Settings = () => {
   const state = useAppState();
   const { dispatch, clearAll, loadSampleData } = useStore();
   const { user, signOut } = useAuth();
-  const { preference, setTheme } = useTheme();
+  const { preference, setTheme, tint, setTint } = useTheme();
   const categories = useCategories();
   const labels = useLabels();
   const toast = useToast();
@@ -212,8 +213,46 @@ export const Settings = () => {
       <Card className="scroll-mt-24 space-y-6" id="appearance">
         <CardHeader
           title="Appearance"
-          description="Light and dark are designed separately. Pick whichever reads better."
+          description="Light and dark are designed separately, and the accent colour runs through both."
         />
+
+        {/* The tint. Every button, selection, chart line and the Safe to
+            Spend card are drawn in it, so choosing one is seen at once,
+            everywhere, and follows you to every device you sign in on. */}
+        <div className="space-y-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[14px] font-medium text-text">Accent colour</p>
+            <p className="text-[13px] text-muted">{TINT_LABELS[tint]}</p>
+          </div>
+          <div role="radiogroup" aria-label="Accent colour" className="flex flex-wrap gap-2.5">
+            {TINTS.map((option) => {
+              const chosen = tint === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={chosen}
+                  aria-label={TINT_LABELS[option]}
+                  title={TINT_LABELS[option]}
+                  onClick={() => setTint(option)}
+                  className={cn(
+                    'flex h-12 w-12 items-center justify-center rounded-full transition-all duration-300 ease-fluid active:scale-[0.92]',
+                    TINT_SWATCH[option],
+                    // A ring in the ink colour, offset from the swatch, says
+                    // which is chosen; the tick inside says it again.
+                    chosen
+                      ? 'shadow-[0_0_0_3px_rgb(var(--card)),0_0_0_5px_rgb(var(--text))]'
+                      : 'shadow-[inset_0_0_0_1px_rgb(0_0_0/0.08)] hover:scale-105',
+                  )}
+                >
+                  {chosen && <Icon name="check" size={18} className="text-[rgb(20_20_20)]" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-3">
           {THEMES.map((t) => (
             <button
@@ -222,24 +261,22 @@ export const Settings = () => {
               onClick={() => setTheme(t.value)}
               aria-pressed={preference === t.value}
               className={cn(
-                'flex items-center gap-3.5 rounded-2xl p-4 text-left transition-all duration-300 ease-fluid active:scale-[0.98]',
+                'flex items-center gap-3.5 rounded-[1.25rem] p-4 text-left transition-all duration-300 ease-fluid active:scale-[0.98]',
                 preference === t.value
-                  ? 'bg-primary/15 shadow-[inset_0_0_0_1.5px_rgb(var(--primary)/0.55)]'
-                  : 'bg-fill text-muted hover:text-text',
+                  ? 'bg-primary-strong text-[rgb(var(--on-primary))]'
+                  : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))] hover:bg-fill hover:text-text',
               )}
             >
               <span
                 className={cn(
                   'flex h-9 w-9 items-center justify-center rounded-full',
-                  preference === t.value
-                    ? 'bg-primary/15 text-primary'
-                    : 'bg-[rgb(var(--hairline)/0.08)] text-muted',
+                  preference === t.value ? 'bg-black/10' : 'bg-fill text-muted',
                 )}
               >
                 <Icon name={t.icon} size={17} />
               </span>
-              <span className="text-[14px] font-medium text-text">{t.label}</span>
-              {preference === t.value && <Icon name="check" size={16} className="ml-auto text-primary" />}
+              <span className={cn('text-[14px] font-medium', preference !== t.value && 'text-text')}>{t.label}</span>
+              {preference === t.value && <Icon name="check" size={16} className="ml-auto" />}
             </button>
           ))}
         </div>
@@ -501,8 +538,8 @@ export const Settings = () => {
                         'flex min-h-[34px] items-center gap-2 rounded-full px-3.5 py-1.5 text-[13px]',
                         'transition-all duration-300 ease-fluid active:scale-[0.96]',
                         chosen
-                          ? 'bg-surface-base font-semibold text-text shadow-thumb dark:bg-surface-bright'
-                          : 'bg-fill font-medium text-muted hover:text-text',
+                          ? 'bg-text font-medium text-[rgb(var(--card))]'
+                          : 'text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))] hover:bg-fill hover:text-text',
                       )}
                     >
                       <span className={cn('h-2.5 w-2.5 rounded-full', ACCENT_SWATCH[accent])} />

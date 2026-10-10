@@ -1,23 +1,19 @@
-/** The Aureal mark: an aperture "A" with an accent point of light. */
+/**
+ * The Aureal mark: an aperture "A" with a point of light, in charcoal on a
+ * disc of the person's tint — so the mark changes colour with everything
+ * else when the tint does. A circle, as every control in the brand is.
+ */
 export const Logo = ({ size = 32, className }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 40 40" fill="none" className={className} aria-hidden="true">
-    <rect width="40" height="40" rx="10" fill="#0B132B" />
-    <rect x="0.5" y="0.5" width="39" height="39" rx="9.5" stroke="#23304E" />
+    <circle cx="20" cy="20" r="20" fill="rgb(var(--tint))" />
     <path
-      d="M20 9L11 27H15.5L17.5 23H22.5L24.5 27H29L20 9Z"
-      fill="url(#aureal-grad)"
-      stroke="#3B82F6"
-      strokeWidth="1.5"
+      d="M20 10.5L12 27.5H16.2L17.9 23.8H22.1L23.8 27.5H28L20 10.5Z"
+      fill="#141414"
+      stroke="#141414"
+      strokeWidth="1.2"
       strokeLinejoin="round"
     />
-    <path d="M18.2 21H21.8L20 16.5L18.2 21Z" fill="#0B132B" />
-    <circle cx="20" cy="18.5" r="2" fill="#38BDF8" />
-    <circle cx="28.5" cy="11.5" r="2.5" fill="#F59E0B" />
-    <defs>
-      <linearGradient id="aureal-grad" x1="11" y1="9" x2="29" y2="27" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#3B82F6" />
-        <stop offset="1" stopColor="#1D4ED8" />
-      </linearGradient>
-    </defs>
+    <path d="M18.6 20.6H21.4L20 17.2L18.6 20.6Z" fill="rgb(var(--tint))" />
+    <circle cx="28.5" cy="11.5" r="2.2" fill="#141414" />
   </svg>
 );

@@ -11,7 +11,7 @@ import {
   safeToSpend,
 } from '@/lib/finance';
 import { formatDay, formatMonthYear, greeting, monthKey, relativeDueLabel } from '@/lib/date';
-import { money, moneyParts, round2 } from '@/lib/format';
+import { money, round2 } from '@/lib/format';
 import { useAppState, useCategoryLookup, useLoading, useSettings, useToday } from '@/lib/store';
 import { BalanceChart } from '@/components/charts/BalanceChart';
 import { Sparkline } from '@/components/charts/Sparkline';
@@ -20,6 +20,7 @@ import { SafeToSpendCard } from '@/components/SafeToSpendCard';
 import { Badge } from '@/components/ui/Badge';
 import { ArrowLink, ButtonLink } from '@/components/ui/Button';
 import { Card, CardHeader, Eyebrow, Label, PageHeader, StatGroup } from '@/components/ui/Card';
+import { FigureText } from '@/components/ui/Figure';
 import { Reveal } from '@/components/ui/Reveal';
 import { SegmentedControl } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
@@ -75,7 +76,6 @@ export const Dashboard = () => {
   // What actually moved this month, rather than a figure baked into the design.
   const monthChange = useMemo(() => monthIncome(state, month) - monthSpend(state, month), [state, month]);
   const spentThisMonth = monthSpend(state, month);
-  const balanceParts = moneyParts(filteredTotal, maskBalances);
 
   // The next two weeks of money movements, for the cash-flow timeline.
   const upcoming = useMemo(
@@ -165,11 +165,8 @@ export const Dashboard = () => {
                     )}
                   </div>
 
-                  <p className="tnum mt-4 font-display text-[clamp(2.75rem,8vw,4.25rem)] font-bold leading-[0.95] tracking-[-0.045em] text-text">
-                    {balanceParts.main}
-                    <span className="text-[0.42em] font-semibold tracking-[-0.02em] text-faint">
-                      {balanceParts.fraction}
-                    </span>
+                  <p className="figure mt-4 text-[clamp(3rem,8.5vw,4.75rem)] leading-[0.95] text-text">
+                    <FigureText text={money(filteredTotal, { masked: maskBalances })} />
                   </p>
                   <p className="mt-2 text-[13.5px] text-muted">
                     {filter === 'all'
@@ -218,14 +215,14 @@ export const Dashboard = () => {
                 <dl className="grid grid-cols-2 gap-3">
                   <div className="well p-4">
                     <dt className="text-[13px] font-medium text-muted">In this month</dt>
-                    <dd className="tnum mt-1 font-display text-[21px] font-semibold tracking-[-0.025em] text-success">
-                      {money(monthToDateIncome, { compact: true, masked: maskBalances })}
+                    <dd className="figure mt-1 whitespace-nowrap text-[clamp(1.5rem,3vw,1.875rem)] leading-tight text-success">
+                      <FigureText text={money(monthToDateIncome, { compact: true, masked: maskBalances })} />
                     </dd>
                   </div>
                   <div className="well p-4">
                     <dt className="text-[13px] font-medium text-muted">Out this month</dt>
-                    <dd className="tnum mt-1 font-display text-[21px] font-semibold tracking-[-0.025em] text-text">
-                      {money(spentThisMonth, { compact: true, masked: maskBalances })}
+                    <dd className="figure mt-1 whitespace-nowrap text-[clamp(1.5rem,3vw,1.875rem)] leading-tight text-text">
+                      <FigureText text={money(spentThisMonth, { compact: true, masked: maskBalances })} />
                     </dd>
                   </div>
                 </dl>
@@ -318,7 +315,7 @@ export const Dashboard = () => {
                   <span className="h-0.5 w-5 rounded-full bg-primary" /> Confirmed
                 </span>
                 <span className="flex items-center gap-2 text-[12px] text-muted">
-                  <span className="h-0 w-5 rounded-full border-t-2 border-dashed border-primary-strong" /> Projected
+                  <span className="h-0 w-5 rounded-full border-t-2 border-dashed border-primary opacity-75" /> Projected
                 </span>
                 <span className="flex items-center gap-2 text-[12px] text-muted">
                   <span className="h-0 w-5 rounded-full border-t-2 border-dashed border-warning" /> Minimum balance
@@ -393,7 +390,8 @@ export const Dashboard = () => {
               </ol>
             </Card>
 
-            <Card className="flex min-w-0 flex-col justify-between gap-5 lg:col-span-5">
+            {/* On paper, as the reference sets its light cards beside the dark. */}
+            <Card className="paper flex min-w-0 flex-col justify-between gap-5 lg:col-span-5">
               <div className="space-y-4">
                 <CardHeader title="Budgets" description={`Where you are for ${formatMonthYear(today)}`} />
 
@@ -472,11 +470,11 @@ const Stat = ({
     <Label className="col-start-1 row-start-1 block">{label}</Label>
     <p
       className={cn(
-        'tnum col-start-2 row-span-2 row-start-1 whitespace-nowrap font-display text-[19px] font-semibold tracking-[-0.03em] sm:mt-1 sm:text-[clamp(1.125rem,2vw,1.5rem)]',
+        'figure col-start-2 row-span-2 row-start-1 whitespace-nowrap text-[22px] leading-tight sm:mt-1 sm:text-[clamp(1.375rem,2.4vw,1.75rem)]',
         { text: 'text-text', primary: 'text-primary', warning: 'text-warning', danger: 'text-danger' }[tone],
       )}
     >
-      {value}
+      <FigureText text={value} />
     </p>
     {note && <p className="col-start-1 row-start-2 mt-0.5 text-[12px] leading-snug text-muted">{note}</p>}
   </div>

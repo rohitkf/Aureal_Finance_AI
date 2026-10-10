@@ -96,7 +96,8 @@ Vocabulary that is easy to get wrong:
 | **Cash flow** | Whether an account is money you can spend — Safe to Spend and the forecast start from these. Null means by type, so nothing moved for accounts nobody has switched. |
 | **`asset` / `liability`** | Account types for a thing you own that is not money (a house) and a thing you owe that is not a card (a loan). |
 | **An opening balance** | What an account held when it was added. Written as an income (or an expense on something you owe) because balances are derived from transactions — and marked `is_opening`, because it is not money that arrived and must not be coloured as if it were. |
-| **An accent** | Which of the six semantic colours a kind of line is drawn in. `DEFAULT_ACCENTS` is the design; `profiles.row_accents` is the person's override, merged over it by `resolveAccents`. |
+| **An accent** | Which of the six semantic colours a kind of line is drawn in. `DEFAULT_ACCENTS` is the design; `profiles.row_accents` is the person's override, merged over it by `resolveAccents`. Not the tint. |
+| **A tint** | The person's brand colour for the whole app — lime by default, one of seven (`lib/tints.ts`). `profiles.tint`, put on `<html data-tint>` by `useTheme` and mirrored to `localStorage['aureal.tint']` for the boot script. Every filled button, chosen chip, switch, ring, the logo and the Safe to Spend card follow it. Components ask for `primary` (a line or a word) or `primary-strong` (a fill), never the tint by name. DESIGN.md §2. |
 | **A label** | A tag that cuts across categories — which holiday, which flat, which client. A transaction has exactly one category and any number of labels. Case-insensitively unique per person: two spellings of one label is how a set of tags rots. |
 | **A category split** | One payment, one account, filed under several headings. Rows in `transaction_splits`, which must total the payment — a deferred trigger enforces it. |
 | **An account split** | One payment taken out of several accounts. Ordinary sibling transactions sharing `split_group_id`, never a side table: each part genuinely moves its own account's balance, and the trigger works off `account_id`. |
@@ -175,6 +176,13 @@ Routes are in `src/App.tsx`. `/login`, `/signup`, `/forgot-password` and
   or a shadow, the answer already has a name in `DESIGN.md`. Something
   missing? Add it to the primitive, do not inline it.
 - **No `1px solid` borders.** Every edge is an inset hairline. See DESIGN.md.
+- **A fill is `primary-strong`, a line or a word is `primary`.** On white the
+  lime fill is 1.3:1 as text; its ink is 6.4:1. Text on a tint fill is
+  `text-[rgb(var(--on-primary))]` (near-black), never white.
+- **Inside `.paper` and `.tinted`, write classes as you would anywhere.** They
+  re-declare the tokens for their own background, so `text-muted` reads there.
+- **No fading text with `opacity-*` to quieten it.** Use `muted`, `faint`, a
+  lighter weight or a smaller size; a faded word fails AA on paper and the tint.
 - **Tailwind only sees class names written literally in the source.** A name
   built at runtime — `` `text-${tone}` `` — produces no CSS at all. Write each
   one out in full and look it up from a map. This has already shipped as a

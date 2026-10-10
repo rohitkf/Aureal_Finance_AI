@@ -26,6 +26,7 @@ const SETTINGS: Settings = {
   theme: 'system',
   accents: DEFAULT_ACCENTS,
   dueHorizonDays: 2,
+  tint: 'lime',
 };
 
 const CATEGORIES: Category[] = [

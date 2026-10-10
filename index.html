@@ -8,7 +8,7 @@
       name="description"
       content="Aureal Finance AI is a personal financial operating system: balances, budgets, forecasting and a Safe-to-Spend figure calculated for you."
     />
-    <meta name="theme-color" content="#07080c" />
+    <meta name="theme-color" content="#181818" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Aureal" />
@@ -30,7 +30,13 @@
           document.documentElement.classList.toggle('dark', dark);
           document
             .querySelector('meta[name="theme-color"]')
-            .setAttribute('content', dark ? '#07080c' : '#eceff5');
+            .setAttribute('content', dark ? '#181818' : '#ecede9');
+          // The tint, mirrored from the profile by useTheme. Only a name the
+          // stylesheet defines is applied; anything else leaves the default.
+          var tint = localStorage.getItem('aureal.tint');
+          if (/^(lime|sky|violet|coral|mint|rose|amber)$/.test(tint || '')) {
+            document.documentElement.setAttribute('data-tint', tint);
+          }
         } catch (e) {
           document.documentElement.classList.add('dark');
         }

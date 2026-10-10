@@ -370,7 +370,7 @@ export const Transactions = () => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             containerClassName="flex-1"
-            className="h-11 bg-[rgb(var(--glass)/var(--glass-alpha))]"
+            className="h-11 bg-[rgb(var(--card))]"
             type="search"
           />
           <Button

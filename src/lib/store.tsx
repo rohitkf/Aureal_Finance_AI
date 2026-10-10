@@ -23,6 +23,7 @@ import type {
   VirtualAccount,
 } from './types';
 import { DEFAULT_ACCENTS } from './accents';
+import { DEFAULT_TINT } from './tints';
 import { BACKUP_TABLES, type Backup } from './backup';
 import { batch } from '@/data/sample';
 import { describeError, errorMessage } from './errors';
@@ -132,6 +133,7 @@ const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   accents: DEFAULT_ACCENTS,
   dueHorizonDays: 2,
+  tint: DEFAULT_TINT,
 };
 
 interface StoreValue {
@@ -1012,6 +1014,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             // `resolveAccents` merges it over the defaults on the way back in.
             if (s.accents !== undefined) patch.row_accents = s.accents;
             if (s.dueHorizonDays !== undefined) patch.due_horizon_days = s.dueHorizonDays;
+            if (s.tint !== undefined) patch.tint = s.tint;
             // Reflect it immediately — these are preferences, not money.
             setState((prev) => ({ ...prev, settings: { ...prev.settings, ...s } }));
             if (Object.keys(patch).length > 0) {

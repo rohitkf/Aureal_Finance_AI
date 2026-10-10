@@ -2,12 +2,13 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { formatDay, formatMediumDate, relativeDueLabel } from '@/lib/date';
-import { money, moneyParts } from '@/lib/format';
+import { money } from '@/lib/format';
 import { useSettings, useToday } from '@/lib/store';
 import type { SafeToSpend } from '@/lib/finance';
 import type { ForecastEvent } from '@/lib/types';
 import { ArrowLink } from './ui/Button';
 import { Eyebrow } from './ui/Card';
+import { FigureText } from './ui/Figure';
 import { Icon } from './ui/Icon';
 
 /**
@@ -21,25 +22,29 @@ import { Icon } from './ui/Icon';
  * that hide a list (what is coming, what is owed) open to show it. It also
  * says what the figure is per day, which is how a month's money is spent, and
  * what is free before payday, which is the figure that matters this afternoon.
+ *
+ * It is the one card drawn in the tint — the reference's lime "Pay from" card —
+ * because it is the one figure the whole app exists to produce. `.tinted`
+ * re-points the text tokens at ink that reads on the fill, so everything
+ * inside is written as it would be anywhere else.
  */
 export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; className?: string }) => {
   const { maskBalances } = useSettings();
   const today = useToday();
   const [open, setOpen] = useState<{ in: boolean; out: boolean }>({ in: false, out: false });
   const toggle = (which: 'in' | 'out') => setOpen((o) => ({ ...o, [which]: !o[which] }));
-  const parts = moneyParts(data.amount, maskBalances);
   const negative = data.amount < 0;
   const m = (value: number) => money(value, { masked: maskBalances });
   const nextIncome = data.incoming[0];
 
   return (
-    <section className={cn('bezel', className)} aria-labelledby="sts-heading">
-      <div className="bezel-core relative flex h-full flex-col overflow-hidden p-5 sm:p-7">
+    <section className={cn('tinted relative flex flex-col overflow-hidden rounded-[2rem] p-5 sm:p-7', className)} aria-labelledby="sts-heading">
+      <div className="relative flex h-full flex-col">
 
         <div className="relative">
           <div className="flex items-center justify-between gap-3">
             <h2 id="sts-heading">
-              <Eyebrow tone={negative ? 'quiet' : 'accent'}>
+              <Eyebrow className="text-text">
                 <Icon name="shield" size={15} />
                 Safe to spend
               </Eyebrow>
@@ -49,12 +54,11 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
 
           <p
             className={cn(
-              'tnum mt-5 font-display text-[clamp(2.75rem,7vw,3.75rem)] font-bold leading-[0.95] tracking-[-0.045em]',
+              'figure mt-5 text-[clamp(3rem,8vw,4.25rem)] leading-[0.95]',
               negative ? 'text-danger' : 'text-text',
             )}
           >
-            {parts.main}
-            <span className="text-[0.46em] font-semibold tracking-[-0.02em] text-faint">{parts.fraction}</span>
+            <FigureText text={m(data.amount)} />
           </p>
 
           {!negative && (
@@ -136,7 +140,7 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
             {data.allocated > 0 && (
               <Row label="Locked pots" value={`−${m(data.allocated)}`} note="Money you’ve set aside and locked" />
             )}
-            <div className="!my-1.5 mx-2 h-px bg-[rgb(var(--hairline)/0.1)]" />
+            <div className="!my-1.5 mx-2 h-px bg-[rgb(var(--hairline)/var(--hairline-alpha-strong))]" />
             <Row label="Safe to spend" value={m(data.amount)} strong tone={negative ? 'danger' : 'neutral'} />
           </dl>
         </div>

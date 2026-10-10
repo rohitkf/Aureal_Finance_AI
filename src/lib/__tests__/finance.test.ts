@@ -72,6 +72,7 @@ const minimal = (): AppState => ({
     theme: 'dark',
     accents: DEFAULT_ACCENTS,
     dueHorizonDays: 2,
+    tint: 'lime',
   },
 });
 
