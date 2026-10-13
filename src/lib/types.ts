@@ -88,27 +88,23 @@ export interface Account {
    */
   groupId?: string;
   /**
+   * The bank account this virtual account is part of — a pocket of it, as a
+   * Revolut Pocket or a Monzo Pot is part of a current account.
+   *
+   * Its money is counted in that account's total (`accountTotal`), money moves
+   * in and out of it by transfers to and from that account, bills can be paid
+   * from it, and when it cannot cover one the rest comes out of that account
+   * (`pocketTopUps`). Absent: it stands on its own — an investment platform,
+   * a fund kept somewhere the app cannot see. Never more than one level deep,
+   * and never part of a card or a loan; the database refuses both.
+   */
+  parentAccountId?: string;
+  /**
    * Whether it counts as money you can spend — Safe to Spend and the forecast.
    * Set on Cash Flow Setup. Absent means by type: current, savings and cash
    * count, which is how every account behaved before it could be chosen.
    */
   cashFlow?: boolean;
-}
-
-/**
- * A virtual account is an *allocation* of money that already exists inside a
- * real account. It never adds to net worth — the UI must always say so.
- */
-export interface VirtualAccount {
-  id: string;
-  parentAccountId: string;
-  name: string;
-  description: string;
-  allocated: number;
-  target?: number;
-  targetDate?: string;
-  icon: string;
-  locked?: boolean;
 }
 
 /**
@@ -336,7 +332,6 @@ export interface RecurringSkip {
 
 export interface AppState {
   accounts: Account[];
-  virtualAccounts: VirtualAccount[];
   categories: Category[];
   labels: Label[];
   accountGroups: AccountGroup[];
@@ -358,6 +353,11 @@ export interface ForecastEvent {
   direction: 'in' | 'out';
   kind: 'recurring' | 'scheduled' | 'subscription' | 'oneoff';
   accountId: string;
+  /**
+   * Where a transfer goes. Its direction says only what it does to spendable
+   * money, which is not enough to follow money into and out of a pocket.
+   */
+  toAccountId?: string;
   categoryId: string;
   /** Projected money is never displayed like confirmed money. */
   projected: boolean;

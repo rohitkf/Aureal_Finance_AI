@@ -155,7 +155,6 @@ describe('seedSampleData', () => {
   // rather than inferred. See 20260917055955_init_core_schema.sql.
   it.each([
     ['recurring_payments', 'is_subscription'],
-    ['virtual_accounts', 'locked'],
   ])('gives every %s row a real %s', async (table, column) => {
     await seedSampleData();
     const rows = inserts().filter((c) => c.table === table).flatMap((c) => c.rows!);
@@ -181,13 +180,12 @@ describe('seedSampleData', () => {
       await expect(seedSampleData()).rejects.toThrow('boom in net_worth_snapshots');
 
       const deletes = calls.filter((c) => c.op === 'delete');
-      // Accounts go last: transactions and virtual accounts hang off them.
+      // Accounts go last: transactions and goals hang off them.
       expect(deletes.map((d) => d.table)).toEqual([
         'transactions',
         'recurring_payments',
         'budgets',
         'goals',
-        'virtual_accounts',
         'accounts',
       ]);
       // Everything it inserted before the failure is accounted for, exactly once.
@@ -204,5 +202,48 @@ describe('seedSampleData', () => {
       await expect(seedSampleData()).rejects.toThrow('boom in accounts');
       expect(calls.filter((c) => c.op === 'delete')).toEqual([]);
     });
+  });
+});
+
+/*
+ * Virtual accounts: accounts in the Virtual Accounts group, filled by a
+ * transfer out of the account the money was in — two of them pockets of a
+ * bank account, as Revolut and Monzo have them, and one standing alone.
+ */
+describe('the sample virtual accounts', () => {
+  const rowsOf = (table: string) => inserts().filter((c) => c.table === table).flatMap((c) => c.rows!);
+
+  it('are accounts in the Virtual Accounts group, out of cash flow', async () => {
+    await seedSampleData();
+    const virtual = rowsOf('accounts').filter((a) => a.type === 'asset');
+    expect(virtual.map((a) => a.name)).toEqual(['Subscriptions', 'Holiday', 'Investment portal']);
+    for (const a of virtual) expect(a.cash_flow).toBe(false);
+  });
+
+  it('has two pockets of a bank account and one that stands on its own', async () => {
+    await seedSampleData();
+    const virtual = rowsOf('accounts').filter((a) => a.type === 'asset');
+    expect(virtual.map((a) => a.parent_account_id === null)).toEqual([false, false, true]);
+  });
+
+  it('fills the pockets by transfers, so the money is in one place, not both', async () => {
+    await seedSampleData();
+    const moves = rowsOf('transactions').filter((t) => t.type === 'transfer' && typeof t.to_account_id === 'string');
+    expect(moves.map((t) => [t.merchant, t.amount])).toEqual(
+      expect.arrayContaining([
+        ['Into Subscriptions', 45],
+        ['Holiday fund', 420],
+      ]),
+    );
+  });
+
+  it('pays the subscriptions from their pocket and tops it up every month', async () => {
+    await seedSampleData();
+    const rules = rowsOf('recurring_payments');
+    const regular = rules.filter((r) => r.direction === 'transfer').map((r) => [r.name, r.amount]);
+    expect(regular).toEqual([
+      ['Into Subscriptions', 45],
+      ['Investment portal', 200],
+    ]);
   });
 });

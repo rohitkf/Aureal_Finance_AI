@@ -35,7 +35,6 @@ const SEEDED_TABLES = [
   'recurring_payments',
   'budgets',
   'goals',
-  'virtual_accounts',
   'net_worth_snapshots',
   'accounts',
 ] as const;
@@ -196,6 +195,98 @@ const writeSampleData = async (add: Add): Promise<void> => {
 
   await add('transactions', opening);
 
+  // --- virtual accounts -----------------------------------------------------
+  // Accounts of their own in the Virtual Accounts group, filled by a transfer
+  // out of the account the money was in — so it is in one place, not both.
+  // Two are pockets, part of a bank account the way a Revolut Pocket or a
+  // Monzo Pot is: Subscriptions inside the current account, which the
+  // subscriptions are paid from, and Holiday inside Savings. The third stands
+  // on its own — an investment platform the app cannot connect to — and is
+  // paid into every month. Plain assets, so out of cash flow: set aside.
+  const { data: groupRows, error: groupErr } = await supabase.from('account_groups').select('id, name, side');
+  failOn(groupErr);
+  const virtualGroup = groupRows?.find((g) => g.name === 'Virtual Accounts' && g.side === 'asset')?.id ?? null;
+
+  const virtual = await add(
+    'accounts',
+    [
+      {
+        name: 'Subscriptions',
+        type: 'asset',
+        institution: '',
+        balance: 0,
+        group_id: virtualGroup,
+        parent_account_id: current,
+        cash_flow: false,
+        note: 'Netflix and the gym are paid from here',
+        sort_order: 50,
+      },
+      {
+        name: 'Holiday',
+        type: 'asset',
+        institution: '',
+        balance: 0,
+        group_id: virtualGroup,
+        parent_account_id: savings,
+        cash_flow: false,
+        note: 'Lisbon in the spring',
+        sort_order: 60,
+      },
+      {
+        name: 'Investment portal',
+        type: 'asset',
+        institution: 'Sample Invest',
+        balance: 0,
+        group_id: virtualGroup,
+        parent_account_id: null,
+        cash_flow: false,
+        sort_order: 70,
+      },
+    ],
+    { returning: 'id, name' },
+  );
+  const subscriptions = virtual.find((a) => a.name === 'Subscriptions')!.id;
+  const holiday = virtual.find((a) => a.name === 'Holiday')!.id;
+  const portal = virtual.find((a) => a.name === 'Investment portal')!.id;
+
+  await add('transactions', [
+    {
+      account_id: current,
+      to_account_id: subscriptions,
+      category_id: cat('Internal Transfer'),
+      merchant: 'Into Subscriptions',
+      amount: 45,
+      type: 'transfer',
+      occurred_on: day(-20),
+      status: 'cleared',
+    },
+    {
+      account_id: savings,
+      to_account_id: holiday,
+      category_id: cat('Internal Transfer'),
+      merchant: 'Holiday fund',
+      amount: 420,
+      type: 'transfer',
+      occurred_on: day(-45),
+      status: 'cleared',
+    },
+    {
+      // What the platform already held: money that was never in these
+      // accounts, so an opening balance, not a transfer.
+      account_id: portal,
+      to_account_id: null,
+      category_id: cat('Other Income'),
+      merchant: 'Opening balance',
+      amount: 2500,
+      type: 'income',
+      occurred_on: day(-120),
+      status: 'cleared',
+      is_opening: true,
+    },
+    // One row says it is an opening balance; a batch writes the column for
+    // all of them, and it is not nullable.
+  ], { defaults: { is_opening: false } });
+
   // --- recurring commitments ---------------------------------------------
   const recurring = await add(
     'recurring_payments',
@@ -245,7 +336,8 @@ const writeSampleData = async (add: Add): Promise<void> => {
         amount: 17.99,
         direction: 'out',
         category_id: cat('Subscriptions'),
-        account_id: current,
+        // Paid from the Subscriptions pocket, not the current account.
+        account_id: subscriptions,
         frequency: 'monthly',
         anchor_day: 18,
         start_date: onDay(18, -6),
@@ -267,7 +359,7 @@ const writeSampleData = async (add: Add): Promise<void> => {
         amount: 26.99,
         direction: 'out',
         category_id: cat('Health & Fitness'),
-        account_id: current,
+        account_id: subscriptions,
         frequency: 'monthly',
         anchor_day: 3,
         start_date: onDay(3, -6),
@@ -283,8 +375,32 @@ const writeSampleData = async (add: Add): Promise<void> => {
         anchor_day: 26,
         start_date: onDay(26, -6),
       },
+      {
+        // The regular deposit that keeps the Subscriptions pocket topped up,
+        // on payday, as Revolut and Monzo fill a bills pocket.
+        name: 'Into Subscriptions',
+        amount: 45,
+        direction: 'transfer',
+        category_id: cat('Internal Transfer'),
+        account_id: current,
+        to_account_id: subscriptions,
+        frequency: 'monthly',
+        anchor_day: 18,
+        start_date: onDay(18, 1),
+      },
+      {
+        name: 'Investment portal',
+        amount: 200,
+        direction: 'transfer',
+        category_id: cat('Internal Transfer'),
+        account_id: current,
+        to_account_id: portal,
+        frequency: 'monthly',
+        anchor_day: 19,
+        start_date: onDay(19, 1),
+      },
     ],
-    // Only the three subscriptions say so; the other five are ordinary
+    // Only the three subscriptions say so; the other seven are ordinary
     // commitments, and `is_subscription` is not nullable.
     { defaults: { is_subscription: false }, returning: 'id, name' },
   );
@@ -388,43 +504,9 @@ const writeSampleData = async (add: Add): Promise<void> => {
       target_date: addMonths(ISO(today), 9),
       monthly_contribution: 120,
       icon: 'plane',
+      linked_account_id: holiday,
     },
   ]);
-
-  await add(
-    'virtual_accounts',
-    [
-      {
-        parent_account_id: current,
-        name: 'Fixed Bills',
-        description: 'Rent, council tax, energy & utilities',
-        allocated: 1200,
-        target: 1200,
-        icon: 'receipt',
-        locked: true,
-        sort_order: 10,
-      },
-      {
-        parent_account_id: current,
-        name: 'Emergency Fund',
-        description: 'Three months of baseline living costs',
-        allocated: 600,
-        target: 2000,
-        icon: 'shield',
-        sort_order: 20,
-      },
-      {
-        parent_account_id: current,
-        name: 'Flexible Spending',
-        description: 'Discretionary day-to-day money',
-        allocated: 500,
-        icon: 'bag',
-        sort_order: 30,
-      },
-    ],
-    // Only Fixed Bills is held back, and `locked` is not nullable either.
-    { defaults: { locked: false } },
-  );
 
   // --- a little net worth history ----------------------------------------
   await add(

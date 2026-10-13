@@ -10,7 +10,6 @@ import type {
   ForecastEvent,
   NetWorthPoint,
   Transaction,
-  VirtualAccount,
 } from './types';
 import { addDays, addMonths, daysBetween, endOfMonth, monthKey } from './date';
 import { expandRecurrence, monthlyEquivalent } from './recurrence';
@@ -97,7 +96,6 @@ export const reported = (state: AppState): AppState => {
     // from, so only the account a row belongs to decides.
     transactions: state.transactions.filter((t) => !out.has(t.accountId)),
     recurring: state.recurring.filter((r) => !out.has(r.accountId)),
-    virtualAccounts: state.virtualAccounts.filter((v) => !out.has(v.parentAccountId)),
   };
 };
 
@@ -343,7 +341,15 @@ const touchesCash = (accounts: Account[], accountId: string): boolean => {
 export const forecastEvents = (state: AppState, today: string, to: string): ForecastEvent[] => {
   // Excluded accounts are not part of any figure; see `reported`.
   state = reported(state);
+  const events = scheduledEvents(state, today, to);
+  return [...events, ...pocketTopUps(state.accounts, events, today)].sort(byDateThenSize);
+};
 
+const byDateThenSize = (a: ForecastEvent, b: ForecastEvent) =>
+  a.date === b.date ? b.amount - a.amount : a.date < b.date ? -1 : 1;
+
+/** Everything scheduled or predicted, before any pocket needs topping up. */
+const scheduledEvents = (state: AppState, today: string, to: string): ForecastEvent[] => {
   const events: ForecastEvent[] = [];
   const claimed = new Set<string>();
 
@@ -373,6 +379,7 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
       direction: t.type === 'income' ? 'in' : t.type === 'transfer' ? (effect ?? 'out') : 'out',
       kind: t.recurringId ? 'recurring' : 'scheduled',
       accountId: t.accountId,
+      toAccountId: t.type === 'transfer' ? t.toAccountId : undefined,
       categoryId: t.categoryId,
       projected: true,
       overdue,
@@ -399,6 +406,7 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
         direction: rule.direction === 'transfer' ? (effect ?? 'out') : rule.direction,
         kind: rule.isSubscription ? 'subscription' : 'recurring',
         accountId: rule.accountId,
+        toAccountId: rule.direction === 'transfer' ? rule.toAccountId : undefined,
         categoryId: rule.categoryId,
         projected: true,
         overdue: false,
@@ -407,7 +415,144 @@ export const forecastEvents = (state: AppState, today: string, to: string): Fore
     }
   }
 
-  return events.sort((a, b) => (a.date === b.date ? b.amount - a.amount : a.date < b.date ? -1 : 1));
+  return events.sort(byDateThenSize);
+};
+
+/* ------------------------------------------------------------------ */
+/* Pockets                                                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The virtual accounts that are part of this account — its pockets, as Revolut
+ * and Monzo have them. Excluded ones are left out, as they are of every figure.
+ */
+export const pocketsOf = (accountId: string, accounts: Account[]): Account[] =>
+  accounts.filter((a) => a.parentAccountId === accountId && !a.excluded);
+
+/** Whether an account can hold pockets: one that holds money, and is not a pocket itself. */
+export const canHoldPockets = (account: Account): boolean =>
+  !account.parentAccountId && (account.type === 'current' || account.type === 'savings' || account.type === 'cash');
+
+/** A virtual account: part of a bank account, or one standing in the Virtual Accounts group. */
+export const isVirtual = (account: Account, groupName?: string): boolean =>
+  Boolean(account.parentAccountId) || groupName?.trim().toLowerCase() === 'virtual accounts';
+
+/**
+ * Everything an account holds, its pockets included.
+ *
+ * The account's own balance is its main balance: what is left once money has
+ * been moved into its pockets, which is the money you spend from. Monzo is
+ * plain that pot money "is still part of your current account balance", so
+ * this is the figure to show as the account's total. Net worth never uses it —
+ * each pocket is an account of its own there, counted once.
+ */
+export const accountTotal = (account: Account, accounts: Account[]): number =>
+  round2(account.balance + pocketsOf(account.id, accounts).reduce((sum, p) => sum + p.balance, 0));
+
+/** How one upcoming movement changes what a pocket holds. */
+const pocketDelta = (e: ForecastEvent, pocketId: string): number => {
+  if (e.toAccountId === pocketId) return e.amount;
+  if (e.accountId !== pocketId) return 0;
+  // Out of the pocket: a bill paid from it, or money moved back out. Money
+  // only arrives in it, from its own side, as income.
+  return e.toAccountId === undefined && e.direction === 'in' ? e.amount : -e.amount;
+};
+
+/** A pocket's own movements in the order they land: money in before money out on a day. */
+const pocketTimeline = (events: ForecastEvent[], pocketId: string, today: string) =>
+  events
+    .filter((e) => pocketDelta(e, pocketId) !== 0)
+    .map((e) => ({ event: e, date: e.date < today ? today : e.date, delta: pocketDelta(e, pocketId) }))
+    .sort((a, b) => (a.date === b.date ? b.delta - a.delta : a.date < b.date ? -1 : 1));
+
+/**
+ * When a pocket cannot cover a bill paid from it, the rest comes out of the
+ * account it is part of.
+ *
+ * That is what Monzo does with a Bills Pot — "we'll take what we can from the
+ * Pot and then make up the difference from your main account" — and what
+ * Revolut is reported to do for a Pocket's Direct Debits. So a pocket heading
+ * below nothing is not money that vanishes from the forecast: it is a top-up,
+ * leaving the account on the day the bill does, and Safe to Spend has to hold
+ * it back like any other bill.
+ *
+ * Each top-up is just enough to bring the pocket back to nothing, so it never
+ * claims more than the bill needs, and money that later arrives in the pocket
+ * is not spent twice.
+ */
+export const pocketTopUps = (accounts: Account[], events: ForecastEvent[], today: string): ForecastEvent[] => {
+  const out: ForecastEvent[] = [];
+  for (const pocket of accounts) {
+    if (!pocket.parentAccountId || owesMoney(pocket)) continue;
+    const parent = accounts.find((a) => a.id === pocket.parentAccountId);
+    if (!parent) continue;
+    const effect = transferEffect(accounts, parent.id, pocket.id);
+
+    let balance = pocket.balance;
+    for (const { event, date, delta } of pocketTimeline(events, pocket.id, today)) {
+      balance = round2(balance + delta);
+      if (balance >= 0) continue;
+      out.push({
+        id: `top-up:${pocket.id}:${event.id}`,
+        date,
+        label: `${pocket.name} short for ${event.label}`,
+        amount: -balance,
+        direction: effect ?? 'out',
+        kind: 'scheduled',
+        accountId: parent.id,
+        toAccountId: pocket.id,
+        categoryId: event.categoryId,
+        projected: true,
+        overdue: false,
+        affectsAvailable: effect !== null,
+      });
+      balance = 0;
+    }
+  }
+  return out;
+};
+
+/** The top-ups a window will need, for screens that walk their own timeline. */
+export const upcomingTopUps = (state: AppState, today: string, to: string): ForecastEvent[] => {
+  state = reported(state);
+  return pocketTopUps(state.accounts, scheduledEvents(state, today, to), today);
+};
+
+export interface PocketOutlook {
+  /** Bills paid from the pocket in the window, in date order. */
+  bills: ForecastEvent[];
+  /** Money arriving in it in the window — regular deposits above all. */
+  deposits: ForecastEvent[];
+  /** What it will have to take from its account to pay them; 0 when on track. */
+  shortBy: number;
+  /** The first day it cannot cover a bill, and which bill. */
+  shortOn?: { date: string; label: string };
+}
+
+/**
+ * Whether a pocket will cover what is paid from it — Revolut tells you if a
+ * Pocket is "on track to cover all their upcoming payments".
+ *
+ * Looks a little over a month ahead, which is one of every monthly bill and
+ * the deposit meant to pay for it.
+ */
+export const pocketOutlook = (state: AppState, pocket: Account, today: string, days = 35): PocketOutlook => {
+  const events = scheduledEvents(reported(state), today, addDays(today, days));
+  const timeline = pocketTimeline(events, pocket.id, today);
+  const bills = timeline.filter((m) => m.delta < 0).map((m) => m.event);
+  const deposits = timeline.filter((m) => m.delta > 0).map((m) => m.event);
+
+  let balance = pocket.balance;
+  let shortBy = 0;
+  let shortOn: PocketOutlook['shortOn'];
+  for (const { event, date, delta } of timeline) {
+    balance = round2(balance + delta);
+    if (balance >= 0) continue;
+    shortBy = round2(shortBy - balance);
+    shortOn ??= { date, label: event.label };
+    balance = 0;
+  }
+  return { bills, deposits, shortBy, shortOn };
 };
 
 /** Day-by-day projected balance over a horizon, starting from today's cash. */
@@ -605,8 +750,6 @@ export interface SafeToSpend {
   /** The part of `committed` whose date has already passed. */
   overdue: number;
   reserve: number;
-  /** Locked virtual-account allocations: in the balance, but spoken for. */
-  allocated: number;
   through: string;
   /** Days from today to `through`, both counted: today is still a day to spend in. */
   daysLeft: number;
@@ -625,31 +768,6 @@ export interface SafeToSpend {
    */
   beforeIncome: number;
 }
-
-/**
- * Money sitting in a real account that the person has set aside and locked.
- *
- * A virtual account is a label on money that is already there, so it stays in
- * `availableNow` — that is the whole point of it, and why this screen is
- * emphatic that allocations are not additional funds. But a locked one is
- * money its owner has said is spoken for, and the Accounts screen has been
- * telling them it is "held back from Safe to Spend". It was not. Offering it
- * back to them is the one thing this number must never do.
- *
- * Unlocked allocations are deliberately not counted: they are a plan for the
- * money rather than a commitment, and the screen says so.
- */
-export const lockedAllocations = (virtualAccounts: VirtualAccount[], accounts: Account[]): number => {
-  // Only money that was in "available" to begin with can be held back from it.
-  // An allocation inside an investment account was never counted as
-  // spendable, so subtracting it as well took it off twice.
-  const spendable = new Set(accounts.filter((a) => isCounted(a) && isSpendable(a)).map((a) => a.id));
-  return round2(
-    virtualAccounts
-      .filter((v) => v.locked && spendable.has(v.parentAccountId))
-      .reduce((sum, v) => sum + v.allocated, 0),
-  );
-};
 
 /**
  * What the user can spend between now and the end of the month while still
@@ -671,8 +789,10 @@ export const safeToSpend = (state: AppState, today: string): SafeToSpend => {
   const overdue = round2(outgoing.filter((e) => e.overdue).reduce((s, e) => s + e.amount, 0));
   const available = availableNow(state.accounts);
   const reserve = state.settings.minimumBalance;
-  const allocated = lockedAllocations(state.virtualAccounts, state.accounts);
-  const amount = round2(available + expectedIncome - committed - reserve - allocated);
+  // Money set aside in a virtual account is not in `available` to begin
+  // with: it was moved out by a transfer, and its account is out of cash
+  // flow unless somebody switched it in. Nothing to take off a second time.
+  const amount = round2(available + expectedIncome - committed - reserve);
   const daysLeft = daysBetween(today, through) + 1;
 
   return {
@@ -682,7 +802,6 @@ export const safeToSpend = (state: AppState, today: string): SafeToSpend => {
     committed,
     overdue,
     reserve,
-    allocated,
     through,
     daysLeft,
     perDay: round2(Math.max(0, amount) / daysLeft),
@@ -988,6 +1107,14 @@ export const accountTrace = (
         },
       });
     }
+  }
+
+  // A pocket short for a bill is topped up from the account it is part of:
+  // up on the pocket's chart, down on the account's — so neither draws a
+  // pocket below nothing that the bank would never let it reach.
+  for (const e of upcomingTopUps(state, today, horizon)) {
+    if (e.accountId !== accountId && e.toAccountId !== accountId) continue;
+    pending.push({ date: e.date, delta: effect(e.accountId, e.toAccountId, 'transfer', e.amount), event: e });
   }
 
   const days: ForecastDay[] = [];

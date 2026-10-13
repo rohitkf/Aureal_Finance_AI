@@ -53,7 +53,6 @@ const minimal = (): AppState => ({
       syncStatus: 'manual',
     },
   ],
-  virtualAccounts: [],
   categories: CATEGORIES,
   labels: [],
   accountGroups: [],

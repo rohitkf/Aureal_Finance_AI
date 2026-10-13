@@ -87,7 +87,6 @@ begin
   -- This is the delete half of a restore. In this order it must never raise.
   begin
     delete from public.net_worth_snapshots where id is not null;
-    delete from public.virtual_accounts where id is not null;
     delete from public.goals where id is not null;
     delete from public.budgets where id is not null;
     delete from public.recurring_skips where id is not null;

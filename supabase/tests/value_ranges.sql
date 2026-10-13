@@ -93,31 +93,6 @@ begin
   exception when check_violation then null;
   end;
 
-  -------------------------------------------------------- virtual accounts
-  begin
-    insert into public.virtual_accounts (user_id, parent_account_id, name, allocated)
-    values (v_user, v_acc, 'Bills', -50);
-    assert false, 'a negative allocation should be rejected';
-  exception when check_violation then null;
-  end;
-
-  begin
-    insert into public.virtual_accounts (user_id, parent_account_id, name, allocated, target)
-    values (v_user, v_acc, 'Bills', 50, 0);
-    assert false, 'a zero target should be rejected';
-  exception when check_violation then null;
-  end;
-
-  begin
-    insert into public.virtual_accounts (user_id, parent_account_id, name, description)
-    values (v_user, v_acc, 'Bills', repeat('x', 201));
-    assert false, 'an over-long description should be rejected';
-  exception when check_violation then null;
-  end;
-
-  insert into public.virtual_accounts (user_id, parent_account_id, name, allocated, target)
-  values (v_user, v_acc, 'Bills', 250, 500);
-
   ------------------------------------------------------------------- dates
   begin
     insert into public.transactions (user_id, account_id, occurred_on, amount, type)

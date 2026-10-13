@@ -116,8 +116,12 @@ Plus: global search (`⌘K` / `Ctrl+K`) including natural-language questions suc
   warning, blue is neutral information. Cards are not colour-coded for fun.
 - **Colour is never the only signal.** Every status has a text label beside its colour, so budget
   state, sync status and utilisation all read without colour perception (WCAG 1.4.1).
-- **Virtual accounts are allocations, not extra money.** The Accounts screen says so explicitly and
-  never presents an envelope as a separate balance.
+- **Virtual accounts, like Revolut Pockets and Monzo Pots.** A virtual account can be a *pocket* of a
+  bank account — part of its total, filled and emptied by Add money and Withdraw, with bills and
+  subscriptions paid from it, a regular deposit on payday, an "on track" check, and any shortfall
+  covered from the account it is in. Or it can stand on its own, for money kept somewhere the app
+  can't see (an investment platform), filled by a recurring transfer. Money only ever moves by
+  transfer, so it is counted once, and it stays out of Safe to Spend unless you switch it on.
 - **Simple on the surface, everything still there.** Each screen shows the common case; the
   rest is one tap away behind "How this works" or "More options", and opens by itself whenever
   something in it is set.
@@ -310,8 +314,8 @@ Supabase Postgres, with the schema, policies and triggers in `supabase/migration
 | --- | --- |
 | `profiles` | Display name, minimum balance, theme, locale |
 | `categories` | The user's own categories; a starter set is created on sign-up |
-| `accounts` | Current, savings, cash, credit and investment accounts |
-| `virtual_accounts` | Allocations of money inside a real account |
+| `accounts` | Every account — current, savings, cash, cards, loans, assets, and virtual accounts |
+| `account_groups` | The groups accounts sit in, Bluecoins' standard fifteen to start with |
 | `transactions` + `transaction_splits` | The ledger, with multi-category splits |
 | `recurring_payments` | Rules the forecast is built from |
 | `budgets`, `goals`, `net_worth_snapshots` | Planning and history |

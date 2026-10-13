@@ -14,7 +14,6 @@ import type {
   RecurringSkip,
   Settings,
   Transaction,
-  VirtualAccount,
 } from './types';
 import type {
   AccountRow,
@@ -28,7 +27,6 @@ import type {
   ProfileRow,
   RecurringRow,
   TransactionRow,
-  VirtualAccountRow,
 } from './database.types';
 
 /**
@@ -94,21 +92,10 @@ export const toAccount = (row: AccountRow): Account => ({
   aer: optionalNum(row.aer),
   note: row.note ?? undefined,
   groupId: row.group_id ?? undefined,
+  parentAccountId: row.parent_account_id ?? undefined,
   cashFlow: row.cash_flow ?? undefined,
   archived: row.archived || undefined,
   excluded: row.excluded || undefined,
-});
-
-export const toVirtualAccount = (row: VirtualAccountRow): VirtualAccount => ({
-  id: row.id,
-  parentAccountId: row.parent_account_id,
-  name: row.name,
-  description: row.description,
-  allocated: num(row.allocated),
-  target: optionalNum(row.target),
-  targetDate: row.target_date ?? undefined,
-  icon: row.icon,
-  locked: row.locked,
 });
 
 export const toRecurring = (row: RecurringRow): RecurringPayment => ({
@@ -294,6 +281,7 @@ export const accountToRow = (a: Omit<Account, 'id'>) => ({
   aer: a.aer ?? null,
   note: a.note ?? null,
   group_id: a.groupId ?? null,
+  parent_account_id: a.parentAccountId ?? null,
   cash_flow: a.cashFlow ?? null,
   archived: a.archived ?? false,
   excluded: a.excluded ?? false,
@@ -302,7 +290,6 @@ export const accountToRow = (a: Omit<Account, 'id'>) => ({
 /** The shape every screen is written against. */
 export const emptyAppState = (settings: Settings): AppState => ({
   accounts: [],
-  virtualAccounts: [],
   categories: [],
   labels: [],
   accountGroups: [],

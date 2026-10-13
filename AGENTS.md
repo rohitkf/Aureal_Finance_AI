@@ -65,11 +65,14 @@ available now
   + income still expected this month
   − commitments still due this month
   − the minimum balance you said to leave alone
-  − locked allocations in cash-flow accounts
 ```
 
+Money set aside in a virtual account is not taken off here: it was moved out
+of "available now" by the transfer that put it there, and a virtual account is
+out of cash flow unless someone switches it in.
+
 On screen it reads as that sum, in plain words — "in your accounts now",
-"still coming in", "bills still to pay", "safety cushion", "locked pots" —
+"still coming in", "bills still to pay", "safety cushion" —
 with the two lists behind it openable, a figure per day, and what is free
 before the expected income arrives (`beforeIncome`). The card is the
 explanation; do not move the working somewhere else.
@@ -86,12 +89,14 @@ Vocabulary that is easy to get wrong:
 | **`reconciled`** | It matched a statement. Counts the same again, and the row locks: amount, date and type cannot change until it is un-reconciled. |
 | **`void`** | Cancelled. The record stays, struck through, on the register; it moves no money and never appears on Reminders. |
 | **What counts** | `none`, `cleared`, `reconciled`. `finance.ts`'s `counts()` and the database's `apply_transaction_to_balances` must always agree on this, or the balance on screen drifts from the balance in the account. |
-| **A virtual account** | An allocation of money that already exists in a real account. It never adds to net worth. |
+| **A virtual account** | An ordinary account in the standard **Virtual Accounts** group (asset side, plain `asset` type) for money set aside, with a balance of its own made by *transfers* — so the money is in one place, not both. Out of cash flow by default. Two kinds, told apart by `parentAccountId`: |
+| **A pocket** | A virtual account *part of* a bank account (`parentAccountId`), as a Revolut Pocket or a Monzo Pot is part of a current account. Counted in that account's total (`accountTotal`), whose own balance is then its main balance; money moves in and out by transfers to and from it (`MoveMoneyDialog`); bills are paid from it by putting a recurring payment on it; and when it cannot cover one, the rest comes out of its account — a top-up event (`pocketTopUps`) that Safe to Spend, the forecast, account charts and the Time Machine all include. `pocketOutlook` says whether it is on track. One level deep, never in a card or loan, and deleted with its account — the database enforces all three (`check_account_parent`, `on delete cascade`). |
+| **A standalone virtual account** | One part of nothing: money kept somewhere the app cannot see, such as an investment platform. Filled by transfers from any account, often a recurring one. The old allocations table (`virtual_accounts`) was turned into pockets by `20261013120000_virtual_accounts_are_accounts.sql`, and `parseBackup` does the same to an old backup. |
 | **A commitment** | A recurring payment that has not yet fallen due this month. A transfer is not one: the money is still yours. |
 | **A transfer rule** | A standing order between two of your own accounts. `account_id` is the source, `to_account_id` the destination. |
 | **`interval`** | Every N of whatever `frequency` counts in. Monthly with 3 is quarterly, weekly with 2 is fortnightly. It multiplies the named cadence rather than replacing it, so stored rules keep meaning what they meant. Absent is 1. |
 | **`weekendMode`** | What a Saturday or Sunday does to one occurrence: `none`, `previous` (how a salary behaves), `next` (how most direct debits behave), `nearest`, `skip`. It never moves the schedule — only the day the payment shows on. |
-| **An account group** | Where every account lives — Bank, Cash, Credit Card, Mortgages, or one you named — under Assets or Liabilities, as in Bluecoins. Everyone gets the standard fourteen (`seed_account_groups`, mirrored by `STANDARD_GROUPS` and held to it by a test). The account form's "Account type" *is* the group. `sideOf()` decides the side; `groupOf()` finds an account's group, falling back to the standard home for its type on rows older than groups. |
+| **An account group** | Where every account lives — Bank, Cash, Credit Card, Mortgages, or one you named — under Assets or Liabilities, as in Bluecoins. Everyone gets the standard fifteen, Virtual Accounts included (`seed_account_groups` as last declared, mirrored by `STANDARD_GROUPS` and held to it by a test). The account form's "Account type" *is* the group. `sideOf()` decides the side; `groupOf()` finds an account's group, falling back to the standard home for its type on rows older than groups. |
 | **A group's `kind`** | The account `type` a group gives what is created in it: Bank makes `current`, Credit Card makes `credit`. Null on a group someone named: a plain `asset` or `liability` by side (`kindOf`). The database refuses a kind on the wrong side. An edited account keeps its own type while it stays in its group, so a savings account in Bank stays savings. |
 | **Cash flow** | Whether an account is money you can spend — Safe to Spend and the forecast start from these. Null means by type, so nothing moved for accounts nobody has switched. |
 | **`asset` / `liability`** | Account types for a thing you own that is not money (a house) and a thing you owe that is not a card (a loan). |

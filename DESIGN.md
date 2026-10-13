@@ -161,6 +161,12 @@ it.
 
 ---
 
+**Pockets** (virtual accounts part of a bank account, like Revolut Pockets or Monzo Pots) are
+listed *inside* their account on the Accounts page: indented beneath it behind an inset hairline,
+in a smaller, muted figure, because they are part of the account's figure rather than added to it.
+The account's own row shows everything it holds and says its main balance in the line beneath.
+
+
 ## 4. Typography
 
 One family: **Geist**, self-hosted variable woff2 (300–700), for the interface, the titles and

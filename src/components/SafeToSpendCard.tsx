@@ -137,9 +137,6 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
                 </>
               }
             />
-            {data.allocated > 0 && (
-              <Row label="Locked pots" value={`−${m(data.allocated)}`} note="Money you’ve set aside and locked" />
-            )}
             <div className="!my-1.5 mx-2 h-px bg-[rgb(var(--hairline)/var(--hairline-alpha-strong))]" />
             <Row label="Safe to spend" value={m(data.amount)} strong tone={negative ? 'danger' : 'neutral'} />
           </dl>

@@ -20,11 +20,10 @@ import type {
   RecurringPayment,
   Settings,
   Transaction,
-  VirtualAccount,
 } from './types';
 import { DEFAULT_ACCENTS } from './accents';
 import { DEFAULT_TINT } from './tints';
-import { BACKUP_TABLES, type Backup } from './backup';
+import { BACKUP_TABLES, rowsToRestore, type Backup } from './backup';
 import { batch } from '@/data/sample';
 import { describeError, errorMessage } from './errors';
 import { supabase } from './supabase';
@@ -48,7 +47,6 @@ import {
   toRecurringSkip,
   toSettings,
   toTransaction,
-  toVirtualAccount,
   transactionToRow,
   followPatchToRow,
 } from './mappers';
@@ -63,7 +61,6 @@ type Slice =
   | 'labels'
   | 'accountGroups'
   | 'accounts'
-  | 'virtualAccounts'
   | 'recurring'
   | 'transactions'
   | 'budgets'
@@ -119,8 +116,6 @@ export type Action =
       openedOn?: string;
     }
   | { type: 'delete-account'; id: string }
-  | { type: 'upsert-virtual'; virtual: VirtualAccount }
-  | { type: 'delete-virtual'; id: string }
   | { type: 'add-category'; category: Category }
   | { type: 'update-category'; category: Category }
   | { type: 'delete-category'; id: string }
@@ -297,18 +292,6 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             }),
         );
       }
-      if (wanted.has('virtualAccounts')) {
-        jobs.push(
-          supabase
-            .from('virtual_accounts')
-            .select('*')
-            .order('sort_order')
-            .then(({ data, error: e }) => {
-              if (e) throw e;
-              next.virtualAccounts = (data ?? []).map(toVirtualAccount);
-            }),
-        );
-      }
       if (wanted.has('recurring')) {
         jobs.push(
           supabase
@@ -395,7 +378,6 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       'labels',
       'accountGroups',
       'accounts',
-      'virtualAccounts',
       'recurring',
       'transactions',
       'budgets',
@@ -637,16 +619,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
               const rows = backup.data[table];
               if (!rows?.length) continue;
 
-              /**
-               * An account's balance is not restored — it is rebuilt.
-               *
-               * The database derives it from transactions through
-               * `apply_transaction_to_balances`, and those transactions are in
-               * this same backup. Writing the stored figure *and* replaying the
-               * transactions that produced it would count every penny twice.
-               */
-              const prepared =
-                table === 'accounts' ? rows.map((row) => ({ ...row, balance: 0 })) : rows;
+              // Balances rebuilt rather than written, and accounts before
+              // their pockets; see `rowsToRestore`.
+              const prepared = rowsToRestore(table, rows);
 
               // Rectangular, for the reason `batch` explains: PostgREST takes a
               // batch's column list from the union of its rows' keys and writes
@@ -915,6 +890,27 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             // after the account and inside the same action, so there is no
             // moment where one exists without the other.
             const opening = action.openingBalance ?? 0;
+            // A pocket's money comes out of the account it is part of, as when
+            // you add money to a Revolut Pocket or a Monzo Pot. An opening
+            // balance would count the same money twice: once still in that
+            // account, once here.
+            if (opening > 0 && a.parentAccountId) {
+              const transferCategory = stateRef.current.categories.find((c) => c.kind === 'transfer');
+              check(
+                await supabase.from('transactions').insert({
+                  id: newId(),
+                  account_id: a.parentAccountId,
+                  to_account_id: a.id,
+                  category_id: transferCategory?.id ?? null,
+                  occurred_on: action.openedOn ?? ISO(new Date()),
+                  merchant: `Into ${a.name}`,
+                  amount: opening,
+                  type: 'transfer',
+                  status: 'cleared',
+                }),
+              );
+              return ['accounts', 'transactions'];
+            }
             if (opening > 0) {
               check(
                 await supabase.from('transactions').insert({
@@ -945,34 +941,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         case 'delete-account':
           run('delete that account', async () => {
             check(await supabase.from('accounts').delete().eq('id', action.id));
-            return ['accounts', 'transactions', 'virtualAccounts'];
-          });
-          break;
-
-        case 'upsert-virtual':
-          run('save that allocation', async () => {
-            const v = action.virtual;
-            check(
-              await supabase.from('virtual_accounts').upsert({
-                id: v.id,
-                parent_account_id: v.parentAccountId,
-                name: v.name,
-                description: v.description,
-                allocated: v.allocated,
-                target: v.target ?? null,
-                target_date: v.targetDate ?? null,
-                icon: v.icon,
-                locked: v.locked ?? false,
-              }),
-            );
-            return ['virtualAccounts'];
-          });
-          break;
-
-        case 'delete-virtual':
-          run('remove that allocation', async () => {
-            check(await supabase.from('virtual_accounts').delete().eq('id', action.id));
-            return ['virtualAccounts'];
+            return ['accounts', 'transactions'];
           });
           break;
 
@@ -1062,7 +1031,6 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       'recurring_payments',
       'budgets',
       'goals',
-      'virtual_accounts',
       'net_worth_snapshots',
       'recurring_skips',
       'accounts',

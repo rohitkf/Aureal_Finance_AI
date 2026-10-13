@@ -96,7 +96,6 @@ beforeEach(() => {
   toast.mockClear();
   state = {
     accounts: ACCOUNTS,
-    virtualAccounts: [],
     categories: CATEGORIES,
     labels: [],
     accountGroups: [],
