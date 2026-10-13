@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import {
+  accountTotal,
   accountUtilisation,
   availableNow,
   creditUtilisation,
@@ -84,12 +85,21 @@ export const Accounts = () => {
    */
   const halves = useMemo(() => {
     const open = state.accounts.filter((a) => !a.archived && !a.excluded);
+    // A pocket is listed inside the account it is part of — in that account's
+    // group, under it — the way Revolut shows Pockets inside an account. One
+    // whose account is closed stands on its own in its own group.
+    const inside = (a: Account) => Boolean(a.parentAccountId && open.some((p) => p.id === a.parentAccountId));
     return (['asset', 'liability'] as const).map((side) => {
       const groups = sortGroups(state.accountGroups)
         .filter((g) => g.side === side)
         .map((group) => {
-          const accounts = open.filter((a) => groupOf(a, state.accountGroups)?.id === group.id);
-          return { group, accounts, subtotal: round2(accounts.reduce((sum, a) => sum + a.balance, 0)) };
+          const accounts = open
+            .filter((a) => !inside(a) && groupOf(a, state.accountGroups)?.id === group.id)
+            .map((account) => ({ account, pockets: open.filter((p) => p.parentAccountId === account.id) }));
+          const subtotal = round2(
+            accounts.reduce((sum, r) => sum + r.account.balance + r.pockets.reduce((s2, p) => s2 + p.balance, 0), 0),
+          );
+          return { group, accounts, subtotal };
         });
       return { side, groups, total: round2(groups.reduce((sum, g) => sum + g.subtotal, 0)) };
     });
@@ -257,8 +267,9 @@ export const Accounts = () => {
 
                       {accounts.length > 0 && (
                         <ul className="pb-1.5">
-                          {accounts.map((account) => (
-                            <li key={account.id} className="group/row relative flex items-center">
+                          {accounts.map(({ account, pockets }) => (
+                            <Fragment key={account.id}>
+                            <li className="group/row relative flex items-center">
                               <Link
                                 to={`/accounts/${account.id}`}
                                 className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl py-2.5 pl-2 pr-12 transition-colors duration-300 ease-fluid hover:bg-fill sm:pr-14"
@@ -276,6 +287,10 @@ export const Accounts = () => {
                                         ? `${percent(accountUtilisation(account), 0)} of ${money(account.creditLimit, { compact: true })}`
                                         : '',
                                       account.aer ? `${account.aer}% AER` : '',
+                                      // With pockets, the figure is everything
+                                      // the account holds; this is what is
+                                      // left to spend once they are set aside.
+                                      pockets.length ? `${money(account.balance, { masked: maskBalances })} main balance` : '',
                                       account.note ?? '',
                                     ]
                                       .filter(Boolean)
@@ -288,7 +303,7 @@ export const Accounts = () => {
                                     owesMoney(account) && account.balance > 0 ? 'text-danger' : 'text-text',
                                   )}
                                 >
-                                  {money(account.balance, { masked: maskBalances })}
+                                  {money(pockets.length ? accountTotal(account, state.accounts) : account.balance, { masked: maskBalances })}
                                 </span>
                               </Link>
                               {/* Beside the link, not inside it: a button in a
@@ -302,6 +317,34 @@ export const Accounts = () => {
                                 onClick={() => setEditingAccount(account)}
                               />
                             </li>
+                            {/* Its pockets, inside it: part of the figure above, not added to it. */}
+                            {pockets.map((pocket) => (
+                              <li key={pocket.id} className="group/row relative ml-4 flex items-center pl-2 shadow-[inset_2px_0_0_0_rgb(var(--hairline)/var(--hairline-alpha-strong))]">
+                                <Link
+                                  to={`/accounts/${pocket.id}`}
+                                  className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl py-2 pl-2 pr-12 transition-colors duration-300 ease-fluid hover:bg-fill sm:pr-14"
+                                >
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-[14px] text-text">{pocket.name}</span>
+                                    <span className="block truncate text-[12px] text-faint">
+                                      {[`Pocket of ${account.name}`, pocket.note ?? ''].filter(Boolean).join(' · ')}
+                                    </span>
+                                  </span>
+                                  <span className="tnum shrink-0 text-[14px] text-muted">
+                                    {money(pocket.balance, { masked: maskBalances })}
+                                  </span>
+                                </Link>
+                                <IconButton
+                                  type="button"
+                                  icon="edit"
+                                  label={`Edit ${pocket.name}`}
+                                  size={14}
+                                  className="absolute right-1 h-9 w-9 opacity-0 transition-opacity duration-300 focus-visible:opacity-100 group-hover/row:opacity-100 max-sm:opacity-100"
+                                  onClick={() => setEditingAccount(pocket)}
+                                />
+                              </li>
+                            ))}
+                            </Fragment>
                           ))}
                         </ul>
                       )}
@@ -421,7 +464,15 @@ export const Accounts = () => {
         }
         /* Said plainly because the database means it: transactions on this
            account are deleted with it, and that is most of what it was. */
-        consequence="Every transaction recorded against it goes too. Your net worth and every report are recalculated without them."
+        consequence={(() => {
+          // A pocket goes with its account, as a Pot closes with the account it
+          // is in: the transfers that filled it are this account's, and go too.
+          const pockets = deletingAccount ? state.accounts.filter((a) => a.parentAccountId === deletingAccount.id) : [];
+          const also = pockets.length
+            ? ` So ${pockets.length === 1 ? `does its pocket, ${pockets[0]!.name}` : `do its ${pockets.length} pockets`}, with what ${pockets.length === 1 ? 'it holds' : 'they hold'}.`
+            : '';
+          return `Every transaction recorded against it goes too.${also} Your net worth and every report are recalculated without them.`;
+        })()}
         preserved="Transfers from other accounts into this one are kept — they stop naming a destination, but the money that left the other account is still accounted for. Schedules and goals that pointed here survive, and ask you for a new account."
         confirmLabel="Delete account"
       />

@@ -1,18 +1,28 @@
--- Virtual accounts, the way Bluecoins has them: an account type, not a split.
+-- Virtual accounts: accounts of their own, filled by transfers — and, like a
+-- Revolut Pocket or a Monzo Pot, optionally part of a bank account.
 --
 -- Aureal's virtual accounts were allocations inside another account: a row
--- that said "£600 of Everyday is the emergency fund" while the money stayed
--- in Everyday. Bluecoins, which the accounts page follows, has none of that.
--- Its Virtual Accounts is an Account Type in the Assets group — "a bucket for
--- money that has no real account of its own" — and it says plainly that
--- "Bluecoins has no parent/child relationship between accounts". Money gets
--- there by a transfer, which "moves the money out of the source account, so
--- after the transfer it is in one place, not both."
+-- that said "£600 of Everyday is the emergency fund", an amount typed in by
+-- hand, while the money stayed in Everyday and nothing could be paid from it.
+-- Bluecoins, which the accounts page follows, makes Virtual Accounts an
+-- Account Type in the Assets group — "a bucket for money that has no real
+-- account of its own" — that money reaches by a transfer, which "moves the
+-- money out of the source account, so after the transfer it is in one place,
+-- not both."
 --
--- So Virtual Accounts joins the standard groups, a virtual account is an
--- ordinary account in it, and every allocation anybody made becomes one —
--- with a transfer from the account it was carved out of, so each figure that
--- added up before still adds up after:
+-- So Virtual Accounts joins the standard groups, and a virtual account is an
+-- ordinary account in it with a balance of its own, filled by transfers.
+--
+-- It can also be *part of* a bank account, the way a Revolut Pocket or a Monzo
+-- Pot is: "still part of your current account balance" (Monzo), with money
+-- added to it and withdrawn from it, bills paid from it, and the account's own
+-- balance being what is left once the pockets are set aside. `parent_account_id`
+-- says which account. A virtual account with none — an investment platform the
+-- app cannot connect to, a fund kept somewhere else — stands on its own.
+--
+-- Every allocation anybody made becomes one, part of the account it was carved
+-- out of, with a transfer from that account so each figure that added up
+-- before still adds up after:
 --
 --   * Net worth is unchanged: a transfer between two assets moves nothing.
 --   * The parent account now shows what is really free in it, and the new
@@ -24,6 +34,82 @@
 --   * A target becomes a goal on the new account, holding what was allocated.
 --     A target with no date has nowhere to go as a goal, which needs one, so
 --     it is written into the account's note instead.
+
+-- --------------------------------------------------- part of another account
+alter table public.accounts
+  add column parent_account_id uuid references public.accounts (id) on delete cascade;
+
+create index accounts_parent_account_id_idx on public.accounts (parent_account_id);
+
+comment on column public.accounts.parent_account_id is
+  'The bank account this virtual account is part of, as a Revolut Pocket or a '
+  'Monzo Pot is part of a current account. Null: it stands on its own. Deleting '
+  'the bank account deletes its pockets, as closing an account closes its pots.';
+
+-- Why a pocket goes with its account rather than being left standing alone:
+-- deleting an account deletes its transactions, among them every transfer
+-- that filled its pockets. Left behind, a pocket would keep the bills paid
+-- from it and lose the money paid into it — a balance of money that never
+-- existed.
+
+-- What the column can name, checked where it is written. A pocket is part of
+-- an account that holds money, belonging to the same person, and one level
+-- deep: a pocket inside a pocket would make "what is in this account" a walk
+-- with no end, and a card's balance is a debt that holds nothing to set aside.
+create or replace function public.check_account_parent()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_parent record;
+begin
+  -- An account that has pockets has to stay one that holds money.
+  if new.type in ('credit', 'liability')
+     and exists (select 1 from public.accounts where parent_account_id = new.id) then
+    raise exception 'An account with virtual accounts has to be one that holds money.'
+      using errcode = 'check_violation';
+  end if;
+
+  if new.parent_account_id is null then
+    return new;
+  end if;
+
+  if new.parent_account_id = new.id then
+    raise exception 'An account cannot be part of itself.' using errcode = 'check_violation';
+  end if;
+
+  select user_id, type, parent_account_id into v_parent
+    from public.accounts
+   where id = new.parent_account_id;
+
+  if not found or v_parent.user_id <> new.user_id then
+    raise exception 'A virtual account can only be part of one of your own accounts.'
+      using errcode = 'check_violation';
+  end if;
+
+  if v_parent.parent_account_id is not null then
+    raise exception 'A virtual account cannot be part of another virtual account.'
+      using errcode = 'check_violation';
+  end if;
+
+  if v_parent.type in ('credit', 'liability') then
+    raise exception 'Only an account that holds money can have virtual accounts.'
+      using errcode = 'check_violation';
+  end if;
+
+  if exists (select 1 from public.accounts where parent_account_id = new.id) then
+    raise exception 'An account with virtual accounts of its own cannot be part of another.'
+      using errcode = 'check_violation';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger accounts_parent_is_valid
+  before insert or update of parent_account_id, type on public.accounts
+  for each row execute function public.check_account_parent();
 
 -- ---------------------------------------------------------- the standard set
 -- Re-declared whole with the one new row: Virtual Accounts, between
@@ -96,10 +182,14 @@ begin
       v_note := concat_ws(' · ', v_note, 'Target ' || to_char(v.target, 'FM999999999990.00'));
     end if;
 
+    -- Part of the account it was carved out of — a pocket of it — unless that
+    -- was a card or a loan, which holds no money to set aside.
     insert into public.accounts
-      (user_id, name, type, institution, balance, group_id, cash_flow, note, sort_order, excluded, archived)
+      (user_id, name, type, institution, balance, group_id, parent_account_id, cash_flow, note,
+       sort_order, excluded, archived)
     values
       (v.user_id, v.name, 'asset', '', 0, v_group,
+       case when v.parent_type in ('credit', 'liability') then null else v.parent_account_id end,
        not coalesce(v.locked, false) and v_spendable,
        v_note, v.sort_order, coalesce(v.parent_excluded, false), coalesce(v.parent_archived, false))
     returning id into v_account;

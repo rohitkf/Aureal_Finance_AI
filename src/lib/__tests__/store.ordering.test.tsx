@@ -165,3 +165,34 @@ describe('an opening balance on something owed', () => {
     expect(opening).toMatchObject({ type: 'expense', amount: 6000, is_opening: true });
   });
 });
+
+describe('the first money in a pocket', () => {
+  it('is moved out of the account it is part of, not opened with', async () => {
+    act(() => {
+      dispatch({
+        type: 'upsert-account',
+        account: { ...ACCOUNT, id: 'subs', name: 'Subscriptions', type: 'asset', parentAccountId: 'everyday' },
+        openingBalance: 60,
+        openedOn: '2026-10-13',
+      });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await settle();
+    await settle();
+
+    expect(payloads.map((p) => p.table)).toEqual(['accounts', 'transactions']);
+    expect(payloads[0]!.row).toMatchObject({ id: 'subs', parent_account_id: 'everyday' });
+    // An opening balance would count the same £60 twice: still in Everyday,
+    // and here as well. A transfer moves it.
+    expect(payloads[1]!.row).toMatchObject({
+      account_id: 'everyday',
+      to_account_id: 'subs',
+      type: 'transfer',
+      amount: 60,
+      occurred_on: '2026-10-13',
+    });
+    expect(payloads[1]!.row).not.toHaveProperty('is_opening');
+  });
+});

@@ -86,6 +86,25 @@ export const buildBackup = async (): Promise<Backup> => {
   };
 };
 
+/**
+ * A table's rows as a restore writes them.
+ *
+ * An account's balance is not restored — it is rebuilt. The database derives
+ * it from transactions through `apply_transaction_to_balances`, and those
+ * transactions are in the same backup; writing the stored figure *and*
+ * replaying them would count every penny twice.
+ *
+ * And accounts go in before their pockets. The database checks the account a
+ * pocket is part of as the pocket is written, so in one batch a pocket ahead
+ * of its account is refused, and the whole restore with it.
+ */
+export const rowsToRestore = (table: BackupTable, rows: Row[]): Row[] =>
+  table === 'accounts'
+    ? [...rows]
+        .sort((a, b) => Number(Boolean(a.parent_account_id)) - Number(Boolean(b.parent_account_id)))
+        .map((row) => ({ ...row, balance: 0 }))
+    : rows;
+
 /** How much is in a backup, for the sentence shown before it is restored. */
 export const summarise = (backup: Backup): Array<{ table: BackupTable; count: number }> =>
   BACKUP_TABLES.map((table) => ({ table, count: backup.data[table]?.length ?? 0 })).filter(
@@ -209,8 +228,9 @@ export const downloadBackup = (backup: Backup): void => {
  * silently. So each one is rebuilt here exactly as the migration rebuilt
  * them in the database (`20261013120000_virtual_accounts_are_accounts.sql`):
  *
- * - an account in Virtual Accounts, out of cash flow if it was locked or its
- *   account was, so Safe to Spend comes out where it was;
+ * - an account in Virtual Accounts, part of the account it was carved from —
+ *   a pocket of it — and out of cash flow if it was locked or its account
+ *   was, so Safe to Spend comes out where it was;
  * - a transfer of what was allocated, out of the account it was carved from,
  *   so every total still adds up — unless that account was a card or a loan,
  *   whose balance is a debt and never held the money;
@@ -290,12 +310,13 @@ const upgradeVirtualAccounts = (data: Record<BackupTable, Row[]>, legacy: Row[],
           aer: null,
           note,
           group_id: group.id,
+          parent_account_id: owes ? null : parent.id,
           cash_flow: !v.locked && spendable,
           sort_order: Number(v.sort_order ?? 0),
           archived: parent.archived ?? false,
           excluded: parent.excluded ?? false,
         },
-        ['group_id', 'cash_flow', 'note'],
+        ['group_id', 'parent_account_id', 'cash_flow', 'note'],
       ),
     );
 

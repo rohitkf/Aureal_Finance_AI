@@ -1,10 +1,23 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { accountTrace, accountUtilisation, availableCredit, inAndOut, isSpendable, owesMoney } from '@/lib/finance';
+import {
+  accountTotal,
+  accountTrace,
+  accountUtilisation,
+  availableCredit,
+  canHoldPockets,
+  inAndOut,
+  isSpendable,
+  isVirtual,
+  owesMoney,
+  pocketsOf,
+} from '@/lib/finance';
+import { groupOf } from '@/lib/accountGroups';
 import { formatMediumDate, monthKey, nextMonthlyDate, ordinal } from '@/lib/date';
 import { money, percent } from '@/lib/format';
 import { useAppState, useSettings, useToday } from '@/lib/store';
 import { BalanceChart } from '@/components/charts/BalanceChart';
+import { AccountPockets, VirtualAccountPanel } from '@/components/Pockets';
 import { TransactionRow } from '@/components/TransactionRow';
 import { Badge } from '@/components/ui/Badge';
 import { ButtonLink } from '@/components/ui/Button';
@@ -64,6 +77,10 @@ export const AccountDetail = () => {
 
   const isCredit = account.type === 'credit';
   const util = accountUtilisation(account);
+  const virtual = isVirtual(account, groupOf(account, state.accountGroups)?.name);
+  const parent = account.parentAccountId ? state.accounts.find((a) => a.id === account.parentAccountId) : undefined;
+  /** With pockets, the headline is everything the account holds, as Revolut shows it. */
+  const pockets = pocketsOf(account.id, state.accounts);
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -78,12 +95,21 @@ export const AccountDetail = () => {
 
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-4">
-          <IconTile icon={isCredit ? 'card' : account.type === 'savings' ? 'savings' : 'bank'} tint="primary" size="lg" />
+          <IconTile icon={virtual ? 'layers' : isCredit ? 'card' : account.type === 'savings' ? 'savings' : 'bank'} tint="primary" size="lg" />
           <div>
             <h1 className="font-display text-[clamp(1.75rem,4vw,2.25rem)] font-normal leading-tight tracking-[-0.03em] text-text">{account.name}</h1>
-            <p className="tnum text-body-md text-muted">
-              {account.institution} · {account.maskedNumber}
-            </p>
+            {parent ? (
+              <p className="text-body-md text-muted">
+                Pocket of{' '}
+                <Link to={`/accounts/${parent.id}`} className="font-medium text-primary hover:underline">
+                  {parent.name}
+                </Link>
+              </p>
+            ) : (
+              <p className="tnum text-body-md text-muted">
+                {[account.institution, account.maskedNumber].filter(Boolean).join(' · ') || (virtual ? 'Virtual account' : '')}
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge tone={account.syncStatus === 'live' ? 'success' : 'neutral'}>
                 {account.syncStatus === 'live'
@@ -97,10 +123,17 @@ export const AccountDetail = () => {
         </div>
 
         <div className="text-left lg:text-right">
-          <Eyebrow>{owesMoney(account) ? 'Balance owed' : 'Current balance'}</Eyebrow>
+          <Eyebrow>{owesMoney(account) ? 'Balance owed' : pockets.length ? 'Total, with pockets' : 'Current balance'}</Eyebrow>
           <p className={`figure mt-1 whitespace-nowrap text-[clamp(2.5rem,7vw,3.75rem)] leading-none ${owesMoney(account) ? 'text-danger' : 'text-text'}`}>
-            <FigureText text={money(account.balance, { masked: maskBalances })} />
+            <FigureText text={money(pockets.length ? accountTotal(account, state.accounts) : account.balance, { masked: maskBalances })} />
           </p>
+          {pockets.length > 0 && (
+            <p className="tnum mt-2 text-body-sm text-muted">
+              {money(account.balance, { masked: maskBalances })} main balance ·{' '}
+              {money(accountTotal(account, state.accounts) - account.balance, { masked: maskBalances })} in{' '}
+              {pockets.length === 1 ? '1 pocket' : `${pockets.length} pockets`}
+            </p>
+          )}
         </div>
       </header>
 
@@ -127,6 +160,8 @@ export const AccountDetail = () => {
           ]}
         />
       )}
+
+      {virtual ? <VirtualAccountPanel account={account} /> : canHoldPockets(account) && <AccountPockets account={account} />}
 
       {isCredit && (
         <Card className="space-y-4">

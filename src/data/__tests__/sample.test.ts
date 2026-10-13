@@ -206,29 +206,44 @@ describe('seedSampleData', () => {
 });
 
 /*
- * Virtual accounts, as Bluecoins has them: accounts in the Virtual Accounts
- * group, filled by a transfer out of the account the money was in.
+ * Virtual accounts: accounts in the Virtual Accounts group, filled by a
+ * transfer out of the account the money was in — two of them pockets of a
+ * bank account, as Revolut and Monzo have them, and one standing alone.
  */
 describe('the sample virtual accounts', () => {
+  const rowsOf = (table: string) => inserts().filter((c) => c.table === table).flatMap((c) => c.rows!);
+
   it('are accounts in the Virtual Accounts group, out of cash flow', async () => {
     await seedSampleData();
-    const accounts = inserts().filter((c) => c.table === 'accounts').flatMap((c) => c.rows!);
-    const virtual = accounts.filter((a) => a.type === 'asset');
-    expect(virtual.map((a) => a.name)).toEqual(['Fixed Bills', 'Holiday']);
+    const virtual = rowsOf('accounts').filter((a) => a.type === 'asset');
+    expect(virtual.map((a) => a.name)).toEqual(['Subscriptions', 'Holiday', 'Investment portal']);
     for (const a of virtual) expect(a.cash_flow).toBe(false);
   });
 
-  it('are filled by transfers, so the money is in one place, not both', async () => {
+  it('has two pockets of a bank account and one that stands on its own', async () => {
     await seedSampleData();
-    const moves = inserts()
-      .filter((c) => c.table === 'transactions')
-      .flatMap((c) => c.rows!)
-      .filter((t) => t.type === 'transfer' && typeof t.to_account_id === 'string');
+    const virtual = rowsOf('accounts').filter((a) => a.type === 'asset');
+    expect(virtual.map((a) => a.parent_account_id === null)).toEqual([false, false, true]);
+  });
+
+  it('fills the pockets by transfers, so the money is in one place, not both', async () => {
+    await seedSampleData();
+    const moves = rowsOf('transactions').filter((t) => t.type === 'transfer' && typeof t.to_account_id === 'string');
     expect(moves.map((t) => [t.merchant, t.amount])).toEqual(
       expect.arrayContaining([
-        ['Set aside for bills', 1200],
+        ['Into Subscriptions', 45],
         ['Holiday fund', 420],
       ]),
     );
+  });
+
+  it('pays the subscriptions from their pocket and tops it up every month', async () => {
+    await seedSampleData();
+    const rules = rowsOf('recurring_payments');
+    const regular = rules.filter((r) => r.direction === 'transfer').map((r) => [r.name, r.amount]);
+    expect(regular).toEqual([
+      ['Into Subscriptions', 45],
+      ['Investment portal', 200],
+    ]);
   });
 });

@@ -2,7 +2,7 @@ import type { Account, AppState, TransactionType } from './types';
 import { addDays, addMonths, endOfMonth, startOfMonth } from './date';
 import { expandRecurrence } from './recurrence';
 import { round2 } from './format';
-import { counts, isSpendable, reported, skippedOccurrences } from './finance';
+import { counts, isSpendable, reported, skippedOccurrences, upcomingTopUps } from './finance';
 
 /**
  * Time Machine: the balance of the accounts you pick, walked through any window
@@ -255,6 +255,30 @@ export const timeMachine = (
         accountId: rule.accountId,
         toAccountId: rule.direction === 'transfer' ? rule.toAccountId : undefined,
         categoryId: rule.categoryId,
+        projected: true,
+        predicted: true,
+        overdue: false,
+      });
+    }
+  }
+
+  // A pocket that cannot cover a bill paid from it is topped up from the
+  // account it is part of, as the forecast and Safe to Spend have it; see
+  // `pocketTopUps`. Drawn as the transfer it is.
+  if (to >= today) {
+    for (const e of upcomingTopUps(state, today, to)) {
+      const touches = chosenIds.has(e.accountId) || (!!e.toAccountId && chosenIds.has(e.toAccountId));
+      if (!touches) continue;
+      pending.push({
+        id: e.id,
+        date: e.date,
+        dueDate: e.date,
+        label: e.label,
+        amount: e.amount,
+        type: 'transfer',
+        accountId: e.accountId,
+        toAccountId: e.toAccountId,
+        categoryId: e.categoryId,
         projected: true,
         predicted: true,
         overdue: false,

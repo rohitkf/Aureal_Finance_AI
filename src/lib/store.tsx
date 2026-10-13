@@ -23,7 +23,7 @@ import type {
 } from './types';
 import { DEFAULT_ACCENTS } from './accents';
 import { DEFAULT_TINT } from './tints';
-import { BACKUP_TABLES, type Backup } from './backup';
+import { BACKUP_TABLES, rowsToRestore, type Backup } from './backup';
 import { batch } from '@/data/sample';
 import { describeError, errorMessage } from './errors';
 import { supabase } from './supabase';
@@ -619,16 +619,9 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
               const rows = backup.data[table];
               if (!rows?.length) continue;
 
-              /**
-               * An account's balance is not restored — it is rebuilt.
-               *
-               * The database derives it from transactions through
-               * `apply_transaction_to_balances`, and those transactions are in
-               * this same backup. Writing the stored figure *and* replaying the
-               * transactions that produced it would count every penny twice.
-               */
-              const prepared =
-                table === 'accounts' ? rows.map((row) => ({ ...row, balance: 0 })) : rows;
+              // Balances rebuilt rather than written, and accounts before
+              // their pockets; see `rowsToRestore`.
+              const prepared = rowsToRestore(table, rows);
 
               // Rectangular, for the reason `batch` explains: PostgREST takes a
               // batch's column list from the union of its rows' keys and writes
@@ -897,6 +890,27 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             // after the account and inside the same action, so there is no
             // moment where one exists without the other.
             const opening = action.openingBalance ?? 0;
+            // A pocket's money comes out of the account it is part of, as when
+            // you add money to a Revolut Pocket or a Monzo Pot. An opening
+            // balance would count the same money twice: once still in that
+            // account, once here.
+            if (opening > 0 && a.parentAccountId) {
+              const transferCategory = stateRef.current.categories.find((c) => c.kind === 'transfer');
+              check(
+                await supabase.from('transactions').insert({
+                  id: newId(),
+                  account_id: a.parentAccountId,
+                  to_account_id: a.id,
+                  category_id: transferCategory?.id ?? null,
+                  occurred_on: action.openedOn ?? ISO(new Date()),
+                  merchant: `Into ${a.name}`,
+                  amount: opening,
+                  type: 'transfer',
+                  status: 'cleared',
+                }),
+              );
+              return ['accounts', 'transactions'];
+            }
             if (opening > 0) {
               check(
                 await supabase.from('transactions').insert({

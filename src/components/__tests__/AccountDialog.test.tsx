@@ -22,10 +22,12 @@ const dispatch = vi.fn();
 const { STANDARD_GROUPS } = await import('@/lib/accountGroups');
 const GROUPS = STANDARD_GROUPS.map((g) => ({ ...g, id: `g-${g.name}` }));
 const toast = vi.fn();
+/** The accounts the person already has, which a virtual account can be part of. */
+let ACCOUNTS: Array<Record<string, unknown>> = [];
 
 vi.mock('@/lib/store', () => ({
   useStore: () => ({ dispatch, today: '2026-09-18' }),
-  useAppState: () => ({ accountGroups: GROUPS }),
+  useAppState: () => ({ accountGroups: GROUPS, accounts: ACCOUNTS }),
   useToday: () => '2026-09-22',
   newId: () => 'generated-id',
 }));
@@ -49,6 +51,7 @@ const sent = () => dispatch.mock.calls.map((c) => c[0]);
 beforeEach(() => {
   dispatch.mockClear();
   toast.mockClear();
+  ACCOUNTS = [];
 });
 
 describe('a new account with an opening balance', () => {
@@ -478,5 +481,90 @@ describe('closing and excluding', () => {
     render(<AccountDialog open onClose={vi.fn()} />);
     expect(screen.queryByRole('checkbox', { name: /stop offering this account/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /leave it out of every figure/i })).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * A virtual account can be part of a bank account, as a Revolut Pocket or a
+ * Monzo Pot is part of a current account — or part of nothing, for money kept
+ * somewhere the app cannot see.
+ */
+describe('a virtual account', () => {
+  const MONEY = [
+    { id: 'everyday', name: 'Everyday', type: 'current', balance: 900 },
+    { id: 'rainy', name: 'Rainy Day', type: 'savings', balance: 5000 },
+    { id: 'amex', name: 'Amex', type: 'credit', balance: 300 },
+    { id: 'isa', name: 'ISA', type: 'investment', balance: 9000 },
+    { id: 'bills', name: 'Bills', type: 'asset', balance: 100, parentAccountId: 'everyday' },
+  ];
+
+  const chooseVirtual = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole('combobox', { name: /Account type/ }));
+    await user.click(screen.getByRole('option', { name: 'Virtual Accounts' }));
+  };
+
+  it('can be part of an account that holds money, and nothing else', async () => {
+    ACCOUNTS = MONEY;
+    const user = userEvent.setup();
+    open();
+    await chooseVirtual(user);
+    await user.click(screen.getByRole('combobox', { name: /Part of/ }));
+    // Not a card or an investment, which hold no money to set aside, and not
+    // another pocket: they go one level deep.
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Nothing — it stands on its own',
+      'Everyday',
+      'Rainy Day',
+    ]);
+  });
+
+  it('is not asked "part of" anything unless it is a virtual account', () => {
+    ACCOUNTS = MONEY;
+    open();
+    expect(screen.queryByRole('combobox', { name: /Part of/ })).not.toBeInTheDocument();
+  });
+
+  it('moves its first money out of the account it is part of, rather than opening with it', async () => {
+    ACCOUNTS = MONEY;
+    const user = userEvent.setup();
+    open();
+    await chooseVirtual(user);
+    await user.click(screen.getByRole('combobox', { name: /Part of/ }));
+    await user.click(screen.getByRole('option', { name: 'Everyday' }));
+    await user.type(screen.getByLabelText('Move in now from Everyday'), '60');
+    await user.type(screen.getByLabelText('Account name'), 'Subscriptions');
+    await user.click(screen.getByRole('button', { name: /Add account/ }));
+
+    // The store writes a transfer out of Everyday for a pocket's first money.
+    expect(sent()[0]).toMatchObject({
+      type: 'upsert-account',
+      openingBalance: 60,
+      account: { name: 'Subscriptions', type: 'asset', parentAccountId: 'everyday', cashFlow: false },
+    });
+  });
+
+  it('stands on its own when it is part of nothing — an investment platform, say', async () => {
+    ACCOUNTS = MONEY;
+    const user = userEvent.setup();
+    open();
+    await chooseVirtual(user);
+    await user.type(screen.getByLabelText('Balance today'), '1500');
+    await user.type(screen.getByLabelText('Account name'), 'Investment portal');
+    await user.click(screen.getByRole('button', { name: /Add account/ }));
+
+    expect(sent()[0].account.parentAccountId).toBeUndefined();
+    expect(sent()[0].openingBalance).toBe(1500);
+  });
+
+  it('cannot be made part of another account once it has pockets of its own', () => {
+    ACCOUNTS = MONEY;
+    render(
+      <AccountDialog
+        open
+        onClose={vi.fn()}
+        editing={{ id: 'everyday', name: 'Everyday', type: 'asset', institution: '', balance: 0, maskedNumber: '', syncStatus: 'manual', groupId: 'g-Virtual Accounts' }}
+      />,
+    );
+    expect(screen.queryByRole('combobox', { name: /Part of/ })).not.toBeInTheDocument();
   });
 });

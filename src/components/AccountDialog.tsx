@@ -52,16 +52,22 @@ interface AccountDialogProps {
    * back with it already chosen, rather than leaving you to find it.
    */
   onCreated?: (account: Account) => void;
+  /**
+   * A new account that starts as a pocket of this one — a virtual account part
+   * of it, as Revolut and Monzo open a new Pocket or Pot from inside an
+   * account.
+   */
+  pocketOf?: string;
 }
 
 /**
  * Add or edit an account by hand. Until bank connections exist this is the only
  * way accounts get into Aureal, so it is the first thing a new user needs.
  */
-export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: AccountDialogProps) => {
+export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, pocketOf }: AccountDialogProps) => {
   const { dispatch } = useStore();
   const today = useToday();
-  const { accountGroups } = useAppState();
+  const { accountGroups, accounts } = useAppState();
   const toast = useToast();
   const [groupId, setGroupId] = useState('');
   const [newGroupOpen, setNewGroupOpen] = useState(false);
@@ -90,6 +96,8 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
   const [openedOn, setOpenedOn] = useState(today);
   const [archived, setArchived] = useState(false);
   const [excluded, setExcluded] = useState(false);
+  /** The bank account a virtual account is part of; '' for one that stands alone. */
+  const [partOf, setPartOf] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -107,7 +115,9 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
     setGroupId(
       editing
         ? (groupOf(editing, accountGroups)?.id ?? '')
-        : (accountGroups.find((g) => g.name === 'Bank')?.id ?? sortGroups(accountGroups)[0]?.id ?? ''),
+        : (accountGroups.find((g) => g.name === (pocketOf ? 'Virtual Accounts' : 'Bank'))?.id ??
+            sortGroups(accountGroups)[0]?.id ??
+            ''),
     );
     setNote(editing?.note ?? '');
     setStatementDay(editing?.statementDay ? String(editing.statementDay) : '');
@@ -115,10 +125,11 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
     setOpenedOn(today);
     setArchived(Boolean(editing?.archived));
     setExcluded(Boolean(editing?.excluded));
+    setPartOf(editing?.parentAccountId ?? pocketOf ?? '');
     // Groups arriving after the dialog opened — a first load, a group just
     // made — must not reset what was typed, so they are not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editing, today]);
+  }, [open, editing, today, pocketOf]);
 
   const group = accountGroups.find((g) => g.id === groupId);
   /**
@@ -127,6 +138,22 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
    * the form says so — an opening balance here would count that money twice.
    */
   const virtual = group?.name.trim().toLowerCase() === 'virtual accounts';
+  /**
+   * What a virtual account can be part of, as a Revolut Pocket is part of a
+   * current account: something that holds money — not a card or a loan — and
+   * not itself a pocket, since they go one level deep. The database holds the
+   * same rules.
+   */
+  const parents = accounts.filter(
+    (a) =>
+      a.id !== editing?.id &&
+      !a.parentAccountId &&
+      !a.archived &&
+      (a.type === 'current' || a.type === 'savings' || a.type === 'cash'),
+  );
+  /** An account with pockets of its own cannot become one. */
+  const hasPockets = Boolean(editing && accounts.some((a) => a.parentAccountId === editing.id));
+  const parent = virtual && partOf ? accounts.find((a) => a.id === partOf) : undefined;
   /**
    * What the account is, which the form no longer asks.
    *
@@ -177,6 +204,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
       paymentDueDay: isCredit ? Number.parseInt(dueDay, 10) || undefined : undefined,
       aer: holdsMoney ? Number.parseFloat(aer) || undefined : undefined,
       groupId: groupId || undefined,
+      parentAccountId: parent?.id,
       // A new account starts in or out of the cash flow the way its group
       // does (Bank and Cash in); after that it is Cash Flow Setup's to change.
       cashFlow: editing ? editing.cashFlow : group ? cashFlowByDefault(group) : undefined,
@@ -242,14 +270,16 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
       <div className="space-y-8">
         {!editing && (
           <AmountField
-            label={owesMoney({ type }) ? 'Balance owed today' : 'Balance today'}
+            label={parent ? `Move in now from ${parent.name}` : owesMoney({ type }) ? 'Balance owed today' : 'Balance today'}
             value={balance}
             tone={owesMoney({ type }) ? 'expense' : 'income'}
             onChange={(e) => setBalance(sanitizeAmount(e.target.value))}
             hint={
-              virtual
-                ? 'Usually 0. Move money in with a transfer from the account it is in, so it is counted once, not twice.'
-                : 'Recorded as an opening balance you can edit later.'
+              parent
+                ? `Moved out of ${parent.name} by a transfer, so it is counted once. 0 to start it empty.`
+                : virtual
+                  ? 'What it holds today, recorded as an opening balance. Move money in later with a transfer.'
+                  : 'Recorded as an opening balance you can edit later.'
             }
           />
         )}
@@ -276,7 +306,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
             error={accountGroups.length === 0 ? 'You have no groups yet. Add one, or put the standard ones back in Account group setup.' : undefined}
             hint={
               virtual
-                ? 'Money set aside, with no real account of its own. Out of Safe to Spend unless you switch it on in Cash flow setup.'
+                ? 'Money set aside. Out of Safe to Spend unless you switch it on in Cash flow setup.'
                 : group
                   ? GROUP_HINT[type]
                   : undefined
@@ -294,6 +324,29 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
               </optgroup>
             ))}
           </SelectField>
+
+          {/* Like a Revolut Pocket or a Monzo Pot: a mini account inside a bank
+              account, or — part of nothing — money kept somewhere the app
+              cannot see. */}
+          {virtual && !hasPockets && (
+            <SelectField
+              label="Part of"
+              value={partOf}
+              onChange={setPartOf}
+              hint={
+                parent
+                  ? `A pocket of ${parent.name}: counted in its total, filled and emptied by transfers, and bills can be paid from it. If it runs short, the rest comes out of ${parent.name}.`
+                  : 'Stands on its own — an investment platform, say. Move money in with a transfer, or a recurring one.'
+              }
+            >
+              <option value="">Nothing — it stands on its own</option>
+              {parents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </SelectField>
+          )}
 
           <TextAreaField
             label="Note"

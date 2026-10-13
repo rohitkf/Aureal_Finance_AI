@@ -140,25 +140,38 @@ describe('seedSampleData, against the real schema', () => {
 
     await expect(seedSampleData()).resolves.toBeUndefined();
 
-    // Four real accounts and two virtual ones.
-    expect(count('accounts')).toBe(6);
-    expect(count('recurring_payments')).toBe(8);
+    // Four real accounts and three virtual ones: two pockets and one that stands alone.
+    expect(count('accounts')).toBe(7);
+    // Eight bills and incomes, a regular deposit into a pocket, and one into the portal.
+    expect(count('recurring_payments')).toBe(10);
     expect(count('goals')).toBe(2);
     expect(count('budgets')).toBe(6);
     expect(count('net_worth_snapshots')).toBe(6);
-    // 4 opening balances + 2 moves into virtual accounts + 18 everyday + 2 scheduled.
-    expect(count('transactions')).toBe(26);
+    // 4 opening balances + 2 moves into pockets + the portal's opening + 18 everyday + 2 scheduled.
+    expect(count('transactions')).toBe(27);
 
     // The two columns the batch used to leave out.
     expect(rows(`select name from recurring_payments where is_subscription order by name`)
       .map((r) => r.name)).toEqual(['Gym', 'Netflix', 'Spotify']);
-    // Virtual accounts, as Bluecoins has them: in their group, out of cash flow.
+    // Virtual accounts: in their group, out of cash flow, two of them pockets
+    // of a bank account and one standing on its own.
     expect(
-      rows(`select a.name, a.cash_flow from accounts a join account_groups g on g.id = a.group_id
+      rows(`select a.name, a.cash_flow, coalesce(p.name, '') as part_of
+              from accounts a join account_groups g on g.id = a.group_id
+              left join accounts p on p.id = a.parent_account_id
              where g.name = 'Virtual Accounts' order by a.name`),
     ).toEqual([
-      { name: 'Fixed Bills', cash_flow: 'f' },
-      { name: 'Holiday', cash_flow: 'f' },
+      { name: 'Holiday', cash_flow: 'f', part_of: 'Savings' },
+      { name: 'Investment portal', cash_flow: 'f', part_of: '' },
+      { name: 'Subscriptions', cash_flow: 'f', part_of: 'Main Current Account' },
+    ]);
+    // The subscriptions are paid from their pocket, which a monthly deposit fills.
+    expect(rows(`select r.name from recurring_payments r join accounts a on a.id = r.account_id
+                 where a.name = 'Subscriptions' order by r.name`).map((r) => r.name)).toEqual(['Gym', 'Netflix']);
+    expect(rows(`select r.name, r.amount from recurring_payments r join accounts a on a.id = r.to_account_id
+                 where a.name in ('Subscriptions', 'Investment portal') order by r.name`)).toEqual([
+      { name: 'Into Subscriptions', amount: '45.00' },
+      { name: 'Investment portal', amount: '200.00' },
     ]);
     expect(rows(`select g.name, a.name as account from goals g join accounts a on a.id = g.linked_account_id
                  where g.name = 'Holiday'`)).toEqual([{ name: 'Holiday', account: 'Holiday' }]);
@@ -168,12 +181,14 @@ describe('seedSampleData, against the real schema', () => {
       rows('select name, balance from accounts').map((r) => [r.name, r.balance]),
     );
     expect(balances).toEqual({
-      // Less what was moved into Fixed Bills, and Savings less the Holiday fund.
-      'Main Current Account': '664.80',
+      // Less what was moved into its Subscriptions pocket, and Savings less
+      // what is in its Holiday pocket: in one place, not both.
+      'Main Current Account': '1819.80',
       Savings: '1080.00',
       'Cash Wallet': '200.00',
-      'Fixed Bills': '1200.00',
+      Subscriptions: '45.00',
       Holiday: '420.00',
+      'Investment portal': '2500.00',
       // A credit balance is what is owed: the opening 2499.14 less the card's
       // share of the everyday spending.
       'Credit Card': '2734.14',

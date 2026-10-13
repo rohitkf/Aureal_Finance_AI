@@ -116,9 +116,12 @@ Plus: global search (`⌘K` / `Ctrl+K`) including natural-language questions suc
   warning, blue is neutral information. Cards are not colour-coded for fun.
 - **Colour is never the only signal.** Every status has a text label beside its colour, so budget
   state, sync status and utilisation all read without colour perception (WCAG 1.4.1).
-- **Virtual accounts work as in Bluecoins.** A virtual account is an account of its own in the
-  Virtual Accounts group, for money set aside. You fill it with a transfer from the account the money
-  is in, so it is counted once — and it stays out of Safe to Spend unless you switch it on.
+- **Virtual accounts, like Revolut Pockets and Monzo Pots.** A virtual account can be a *pocket* of a
+  bank account — part of its total, filled and emptied by Add money and Withdraw, with bills and
+  subscriptions paid from it, a regular deposit on payday, an "on track" check, and any shortfall
+  covered from the account it is in. Or it can stand on its own, for money kept somewhere the app
+  can't see (an investment platform), filled by a recurring transfer. Money only ever moves by
+  transfer, so it is counted once, and it stays out of Safe to Spend unless you switch it on.
 - **Simple on the surface, everything still there.** Each screen shows the common case; the
   rest is one tap away behind "How this works" or "More options", and opens by itself whenever
   something in it is set.

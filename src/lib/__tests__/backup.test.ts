@@ -13,6 +13,7 @@ import {
   BACKUP_VERSION,
   TABLE_LABELS,
   parseBackup,
+  rowsToRestore,
   summarise,
   type Backup,
 } from '../backup';
@@ -219,6 +220,8 @@ describe('a backup from when virtual accounts were allocations', () => {
       name: 'Fixed Bills',
       type: 'asset',
       group_id: group!.id,
+      // A pocket of the account it was carved out of, as it always meant.
+      parent_account_id: 'a-1',
       // Locked: it was held back from Safe to Spend, and still is.
       cash_flow: false,
     });
@@ -253,7 +256,7 @@ describe('a backup from when virtual accounts were allocations', () => {
     const extra = (rows: Array<Record<string, unknown>>, row: Record<string, unknown>) =>
       Object.keys(row).filter((key) => !(key in rows[0]!));
 
-    expect(extra(accounts, accounts.at(-1)!).sort()).toEqual(['note']);
+    expect(extra(accounts, accounts.at(-1)!).sort()).toEqual(['note', 'parent_account_id']);
     expect(extra(transactions, transactions.at(-1)!).sort()).toEqual(['category_id', 'merchant', 'notes', 'occurred_on']);
   });
 
@@ -287,7 +290,8 @@ describe('a backup from when virtual accounts were allocations', () => {
     const result = legacy([pot({ parent_account_id: 'a-card' })]);
     if (!result.ok) throw new Error(result.reason);
     expect(result.backup.data.transactions.filter((t) => t.type === 'transfer')).toHaveLength(0);
-    expect(result.backup.data.accounts.find((a) => a.id === 'v-1')).toBeDefined();
+    // And it is no pocket of a card, which holds no money to set aside.
+    expect(result.backup.data.accounts.find((a) => a.id === 'v-1')?.parent_account_id).toBeNull();
   });
 
   it('turns a target with a date into a goal on the new account, and one without into a note', () => {
@@ -318,5 +322,25 @@ describe('a backup from when virtual accounts were allocations', () => {
     expect(summarise(result.backup)).toEqual(
       expect.arrayContaining([{ table: 'accounts', count: 4 }, { table: 'transactions', count: 3 }]),
     );
+  });
+});
+
+describe('the rows a restore writes', () => {
+  it('rebuilds balances from transactions rather than writing them, which would count them twice', () => {
+    expect(rowsToRestore('accounts', [{ id: 'a', balance: 900 }])).toEqual([{ id: 'a', balance: 0 }]);
+  });
+
+  it('writes an account before its pockets, which the database checks as each is written', () => {
+    const rows = rowsToRestore('accounts', [
+      { id: 'pocket', parent_account_id: 'bank', balance: 60 },
+      { id: 'bank', parent_account_id: null, balance: 900 },
+      { id: 'portal', balance: 5000 },
+    ]);
+    expect(rows.map((r) => r.id)).toEqual(['bank', 'portal', 'pocket']);
+  });
+
+  it('leaves every other table as it came', () => {
+    const rows = [{ id: 't', amount: 5 }];
+    expect(rowsToRestore('transactions', rows)).toBe(rows);
   });
 });

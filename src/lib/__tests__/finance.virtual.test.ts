@@ -1,9 +1,8 @@
 /**
- * Virtual accounts, the way Bluecoins has them.
- *
- * Not a share of another account any more: an account of its own in the
- * Virtual Accounts group, filled by a transfer that moves the money out of the
- * account it was in — "in one place, not both". So nothing about them needs
+ * Virtual accounts: accounts of their own in the Virtual Accounts group,
+ * filled by a transfer that moves the money out of the account it was in —
+ * "in one place, not both" — and, like a Revolut Pocket or a Monzo Pot,
+ * optionally part of a bank account. So nothing about them needs
  * arithmetic of its own. What has to hold is what the old allocations
  * promised: money set aside is not offered back as spendable, and setting it
  * aside makes nobody richer or poorer.
@@ -11,7 +10,8 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ACCENTS } from '@/lib/accents';
 import { STANDARD_GROUPS, cashFlowByDefault } from '@/lib/accountGroups';
-import { availableNow, netWorth, safeToSpend } from '@/lib/finance';
+import { accountTotal, accountTrace, availableNow, buildForecast, netWorth, pocketOutlook, pocketsOf, safeToSpend } from '@/lib/finance';
+import { timeMachine } from '@/lib/timeMachine';
 import { emptyAppState } from '@/lib/mappers';
 import type { Account, AccountGroup, AppState, RecurringPayment, Settings } from '@/lib/types';
 
@@ -127,3 +127,105 @@ describe('a schedule that sets money aside every month', () => {
     expect(sts.amount).toBe(2000);
   });
 });
+
+/*
+ * Pockets: virtual accounts that are part of a bank account, as Revolut's
+ * Pockets and Monzo's Pots are part of a current account. Bills are paid from
+ * them, money is added on payday, and when one cannot cover a bill the rest
+ * comes out of the account it is part of.
+ */
+describe('a pocket of a bank account', () => {
+  const EVERYDAY: Account = { ...CURRENT, id: 'everyday', name: 'Everyday', balance: 1000 };
+  const SUBS: Account = { ...BILLS, id: 'subs', name: 'Subscriptions', balance: 20, parentAccountId: 'everyday' };
+  const STANDALONE: Account = { ...BILLS, id: 'portal', name: 'Investment portal', balance: 5000 };
+
+  const rule = (over: Partial<RecurringPayment>): RecurringPayment => ({
+    id: 'r',
+    name: 'Rule',
+    amount: 10,
+    direction: 'out',
+    categoryId: 'cat',
+    accountId: 'subs',
+    frequency: 'monthly',
+    anchorDay: 20,
+    startDate: '2026-01-01',
+    status: 'active',
+    ...over,
+  });
+  const netflix = rule({ id: 'netflix', name: 'Netflix', amount: 10.99, anchorDay: 20, isSubscription: true });
+  const spotify = rule({ id: 'spotify', name: 'Spotify', amount: 11.99, anchorDay: 24, isSubscription: true });
+  const payday = rule({ id: 'into-subs', name: 'Into Subscriptions', amount: 25, direction: 'transfer', accountId: 'everyday', toAccountId: 'subs', anchorDay: 28 });
+
+  it('is counted in its account’s total, and that account’s own balance is what is left', () => {
+    expect(pocketsOf('everyday', [EVERYDAY, SUBS, STANDALONE]).map((a) => a.name)).toEqual(['Subscriptions']);
+    expect(accountTotal(EVERYDAY, [EVERYDAY, SUBS, STANDALONE])).toBe(1020);
+    // A virtual account part of nothing belongs to no account's total.
+    expect(accountTotal(STANDALONE, [EVERYDAY, SUBS, STANDALONE])).toBe(5000);
+  });
+
+  it('pays its bills without touching Safe to Spend — that money was set aside already', () => {
+    const sts = safeToSpend(state([EVERYDAY, { ...SUBS, balance: 50 }], { recurring: [netflix, spotify] }), TODAY);
+    expect(sts.committed).toBe(0);
+    expect(sts.amount).toBe(1000);
+  });
+
+  it('when short, takes the rest from its account, as Monzo does with a Bills Pot', () => {
+    // 20 in the pot; Netflix (10.99) is covered, Spotify (11.99) is 2.98 short.
+    const sts = safeToSpend(state([EVERYDAY, SUBS], { recurring: [netflix, spotify] }), TODAY);
+    expect(sts.committed).toBe(2.98);
+    expect(sts.amount).toBe(997.02);
+    expect(sts.outgoing.map((e) => [e.label, e.date, e.amount, e.accountId])).toEqual([
+      ['Subscriptions short for Spotify', '2026-09-24', 2.98, 'everyday'],
+    ]);
+  });
+
+  it('counts a regular deposit into it as money leaving its account, and uses it to pay what comes after', () => {
+    // The deposit lands on the 28th, after both bills: it does not rescue them.
+    const before = safeToSpend(state([EVERYDAY, SUBS], { recurring: [netflix, spotify, payday] }), TODAY);
+    expect(before.committed).toBe(round(25 + 2.98));
+
+    // Paid on the 15th instead, before either bill: nothing is short.
+    const early = safeToSpend(state([EVERYDAY, SUBS], { recurring: [netflix, spotify, { ...payday, anchorDay: 15 }] }), '2026-09-14');
+    expect(early.committed).toBe(25);
+    expect(early.outgoing.map((e) => e.label)).toEqual(['Into Subscriptions']);
+  });
+
+  it('says whether it is on track, as Revolut does for a Pocket', () => {
+    const short = pocketOutlook(state([EVERYDAY, SUBS], { recurring: [netflix, spotify] }), SUBS, TODAY);
+    // 35 days from the 18th reaches October's Netflix (20th) but not its Spotify (24th).
+    expect(short.bills.map((b) => b.label)).toEqual(['Netflix', 'Spotify', 'Netflix']);
+    expect(short.shortOn).toEqual({ date: '2026-09-24', label: 'Spotify' });
+
+    const covered = pocketOutlook(
+      state([EVERYDAY, { ...SUBS, balance: 0 }], { recurring: [netflix, spotify, { ...payday, anchorDay: 15 }] }),
+      { ...SUBS, balance: 0 },
+      '2026-09-14',
+      20,
+    );
+    expect(covered.deposits.map((d) => d.label)).toEqual(['Into Subscriptions']);
+    expect(covered.shortBy).toBe(0);
+    expect(covered.shortOn).toBeUndefined();
+  });
+
+  it('never draws the pocket below nothing on its own chart: the top-up arrives the day the bill goes', () => {
+    const s = state([EVERYDAY, SUBS], { recurring: [netflix, spotify] });
+    const pocket = accountTrace(s, 'subs', TODAY, 0, 10);
+    expect(Math.min(...pocket.map((d) => d.closing))).toBe(0);
+    expect(pocket.find((d) => d.date === '2026-09-24')!.closing).toBe(0);
+    // And its account's chart shows the money leaving to cover it.
+    const account = accountTrace(s, 'everyday', TODAY, 0, 10);
+    expect(account.find((d) => d.date === '2026-09-24')!.closing).toBe(997.02);
+  });
+
+  it('draws the top-up on the forecast and in the Time Machine, so both agree with Safe to Spend', () => {
+    const s = state([EVERYDAY, SUBS], { recurring: [netflix, spotify] });
+    const day = buildForecast(s, TODAY, 10).days.find((d) => d.date === '2026-09-24')!;
+    expect(day.expenses).toBe(2.98);
+
+    const tm = timeMachine(s, TODAY, { from: TODAY, to: '2026-09-30' });
+    expect(tm.lines.map((l) => [l.label, l.effect, l.amount])).toEqual([['Subscriptions short for Spotify', 'out', 2.98]]);
+    expect(tm.end).toBe(997.02);
+  });
+});
+
+const round = (n: number) => Math.round(n * 100) / 100;

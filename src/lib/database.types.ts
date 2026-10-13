@@ -55,6 +55,7 @@ export interface AccountRow {
   aer: number | null;
   note: string | null;
   group_id: string | null;
+  parent_account_id?: string | null;
   cash_flow?: boolean | null;
   archived: boolean;
   excluded: boolean;
