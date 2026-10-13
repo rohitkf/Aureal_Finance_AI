@@ -21,13 +21,15 @@ const dispatch = vi.fn();
 // is in — so the tests give it them, with ids that read in a failure.
 const { STANDARD_GROUPS } = await import('@/lib/accountGroups');
 const GROUPS = STANDARD_GROUPS.map((g) => ({ ...g, id: `g-${g.name}` }));
+/** The groups this person has — all of them, unless a test takes one away. */
+let GROUP_LIST = GROUPS;
 const toast = vi.fn();
 /** The accounts the person already has, which a virtual account can be part of. */
 let ACCOUNTS: Array<Record<string, unknown>> = [];
 
 vi.mock('@/lib/store', () => ({
   useStore: () => ({ dispatch, today: '2026-09-18' }),
-  useAppState: () => ({ accountGroups: GROUPS, accounts: ACCOUNTS }),
+  useAppState: () => ({ accountGroups: GROUP_LIST, accounts: ACCOUNTS }),
   useToday: () => '2026-09-22',
   newId: () => 'generated-id',
 }));
@@ -52,6 +54,7 @@ beforeEach(() => {
   dispatch.mockClear();
   toast.mockClear();
   ACCOUNTS = [];
+  GROUP_LIST = GROUPS;
 });
 
 describe('a new account with an opening balance', () => {
@@ -298,6 +301,20 @@ describe('the one question about what an account is', () => {
     // Headings, not choices: the keyboard and a screen reader skip them.
     expect(within(list).queryByRole('option', { name: 'Assets' })).toBeNull();
     expect(within(list).getAllByRole('option').map((o) => o.textContent)).toContain('Mortgages');
+  });
+
+  it('says which side of the balance sheet each half is, and which side the choice is on', async () => {
+    const user = userEvent.setup();
+    open();
+    expect(screen.getByRole('combobox', { name: 'Account type' })).toHaveTextContent('Asset');
+
+    await user.click(screen.getByRole('combobox', { name: 'Account type' }));
+    expect(screen.getByText(/What you own/)).toBeInTheDocument();
+    expect(screen.getByText(/What you owe/)).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Mortgages' })).toHaveAccessibleDescription(/^Liabilities/);
+
+    await user.click(screen.getByRole('option', { name: 'Mortgages' }));
+    expect(screen.getByRole('combobox', { name: 'Account type' })).toHaveTextContent('Liability');
   });
 
   it('starts a new account in Bank, as a current account that counts as spendable', async () => {
@@ -566,5 +583,95 @@ describe('a virtual account', () => {
       />,
     );
     expect(screen.queryByRole('combobox', { name: /Part of/ })).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * "New pocket" on an account's page asked what kind of account it was, which
+ * bank, and when it was opened — all of it its account's, which you had just
+ * come from. And for a person with no Virtual Accounts group it fell back to
+ * the first group in the list, so a "pocket" was saved as a bank account.
+ */
+describe('a new pocket, opened from inside its account', () => {
+  const MONEY = [
+    { id: 'everyday', name: 'Everyday', type: 'current', institution: 'Monzo', balance: 900 },
+    { id: 'rainy', name: 'Rainy Day', type: 'savings', institution: 'Chase', balance: 5000 },
+  ];
+  const openPocket = () => render(<AccountDialog open onClose={vi.fn()} pocketOf="everyday" />);
+
+  it('asks only what a pocket needs', () => {
+    ACCOUNTS = MONEY;
+    openPocket();
+
+    expect(screen.getByRole('heading', { name: 'New pocket' })).toBeInTheDocument();
+    expect(screen.getByText(/inside Everyday, and still part of its total/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Pocket name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Move in now from Everyday')).toBeInTheDocument();
+    // Its account's answers, not its own questions.
+    expect(screen.queryByRole('combobox', { name: 'Account type' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /Part of/ })).toBeNull();
+    expect(screen.queryByLabelText(/Bank or provider/)).toBeNull();
+    expect(screen.queryByLabelText(/Opened on/)).toBeNull();
+  });
+
+  it('is saved in Virtual Accounts as part of that account, at its bank', async () => {
+    ACCOUNTS = MONEY;
+    const user = userEvent.setup();
+    openPocket();
+    await user.type(screen.getByLabelText('Move in now from Everyday'), '45');
+    await user.type(screen.getByLabelText('Pocket name'), 'Subscriptions');
+    await user.click(screen.getByRole('button', { name: /Create pocket/ }));
+
+    expect(sent()).toHaveLength(1);
+    expect(sent()[0]).toMatchObject({
+      type: 'upsert-account',
+      openingBalance: 45,
+      account: {
+        name: 'Subscriptions',
+        groupId: 'g-Virtual Accounts',
+        type: 'asset',
+        parentAccountId: 'everyday',
+        institution: 'Monzo',
+        cashFlow: false,
+      },
+    });
+  });
+
+  it('puts the Virtual Accounts group back first when there is none, and is never a bank account', async () => {
+    ACCOUNTS = MONEY;
+    GROUP_LIST = GROUPS.filter((g) => g.name !== 'Virtual Accounts');
+    const user = userEvent.setup();
+    openPocket();
+    await user.type(screen.getByLabelText('Pocket name'), 'Holiday');
+    await user.click(screen.getByRole('button', { name: /Create pocket/ }));
+
+    expect(sent().map((a) => a.type)).toEqual(['upsert-account-group', 'upsert-account']);
+    expect(sent()[0].group).toMatchObject({ name: 'Virtual Accounts', side: 'asset', kind: 'asset', sortOrder: 90 });
+    expect(sent()[1].account).toMatchObject({
+      groupId: sent()[0].group.id,
+      type: 'asset',
+      parentAccountId: 'everyday',
+      cashFlow: false,
+    });
+  });
+
+  it('is edited as a pocket, and can be moved to another account', async () => {
+    ACCOUNTS = MONEY;
+    const user = userEvent.setup();
+    render(
+      <AccountDialog
+        open
+        onClose={vi.fn()}
+        editing={{ id: 'subs', name: 'Subscriptions', type: 'asset', institution: 'Monzo', balance: 45, maskedNumber: '', syncStatus: 'manual', groupId: 'g-Virtual Accounts', parentAccountId: 'everyday' }}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Edit pocket' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Account type' })).toBeNull();
+    await user.click(screen.getByRole('combobox', { name: /Part of/ }));
+    await user.click(screen.getByRole('option', { name: 'Rainy Day' }));
+    await user.click(screen.getByRole('button', { name: /Save changes/ }));
+
+    expect(sent()[0].account).toMatchObject({ id: 'subs', parentAccountId: 'rainy', groupId: 'g-Virtual Accounts' });
   });
 });

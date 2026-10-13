@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { newId, useAppState, useStore, useToday } from '@/lib/store';
 import type { Account, AccountGroup } from '@/lib/types';
-import { cashFlowByDefault, groupOf, kindOf, sortGroups } from '@/lib/accountGroups';
+import { cashFlowByDefault, groupOf, kindOf, sortGroups, STANDARD_GROUPS } from '@/lib/accountGroups';
 import { owesMoney } from '@/lib/finance';
 import { Button } from './ui/Button';
 import { AmountField, CheckboxField, DateField, SelectField, TextAreaField, TextField } from './ui/Field';
@@ -36,6 +36,22 @@ const GROUP_HINT: Record<Account['type'], string> = {
   asset: 'Something you own. Adds to your net worth; switch it into Cash flow setup if it is money you spend from.',
   liability: 'Something you owe. Spending on it adds to the debt, and a payment brings it down.',
 };
+
+/**
+ * The two halves of the Account type list, each said three ways — a heading,
+ * a line under it, a colour — so a loan is never picked from under Assets by
+ * a thumb that slipped. The same two halves the Accounts page is split into.
+ */
+const SIDES = [
+  { side: 'asset', label: 'Assets', hint: 'What you own', tone: 'success', icon: 'plus', badge: 'Asset' },
+  { side: 'liability', label: 'Liabilities', hint: 'What you owe', tone: 'danger', icon: 'minus', badge: 'Liability' },
+] as const;
+
+/** The standard group a pocket lives in, as `seed_account_groups` makes it. */
+const VIRTUAL_GROUP = STANDARD_GROUPS.find((g) => g.name === 'Virtual Accounts')!;
+
+const isVirtualGroup = (group: AccountGroup | undefined) =>
+  group?.side === 'asset' && group.name.trim().toLowerCase() === VIRTUAL_GROUP.name.toLowerCase();
 
 interface AccountDialogProps {
   open: boolean;
@@ -110,14 +126,16 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
     setDueDay(editing?.paymentDueDay ? String(editing.paymentDueDay) : '');
     setAer(editing?.aer ? String(editing.aer) : '');
     // An existing account opens on the group it is listed in — its own, or
-    // for a row older than groups, the one the page shows it under. A new one
-    // opens on Bank, the group most accounts belong in.
+    // for a row older than groups, the one the page shows it under. A new
+    // pocket goes in Virtual Accounts, and only there: falling back to the
+    // first group made it an ordinary bank account. Anything else opens on
+    // Bank, the group most accounts belong in.
     setGroupId(
       editing
         ? (groupOf(editing, accountGroups)?.id ?? '')
-        : (accountGroups.find((g) => g.name === (pocketOf ? 'Virtual Accounts' : 'Bank'))?.id ??
-            sortGroups(accountGroups)[0]?.id ??
-            ''),
+        : pocketOf
+          ? (accountGroups.find(isVirtualGroup)?.id ?? '')
+          : (accountGroups.find((g) => g.name === 'Bank')?.id ?? sortGroups(accountGroups)[0]?.id ?? ''),
     );
     setNote(editing?.note ?? '');
     setStatementDay(editing?.statementDay ? String(editing.statementDay) : '');
@@ -133,11 +151,20 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
 
   const group = accountGroups.find((g) => g.id === groupId);
   /**
+   * A pocket: opened from inside its account, or one being edited.
+   *
+   * Its own short form, as in Revolut and Monzo — a name, what to move in, a
+   * note. The account it is part of is already known, and what kind of
+   * account it is, its bank and when it was opened are all its account's, so
+   * none of them is asked.
+   */
+  const asPocket = Boolean(pocketOf || editing?.parentAccountId);
+  /**
    * Bluecoins' Virtual Accounts: money set aside with no real account of its
    * own. It is filled by a transfer out of the account the money is in, so
    * the form says so — an opening balance here would count that money twice.
    */
-  const virtual = group?.name.trim().toLowerCase() === 'virtual accounts';
+  const virtual = asPocket || isVirtualGroup(group);
   /**
    * What a virtual account can be part of, as a Revolut Pocket is part of a
    * current account: something that holds money — not a card or a loan — and
@@ -154,6 +181,8 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
   /** An account with pockets of its own cannot become one. */
   const hasPockets = Boolean(editing && accounts.some((a) => a.parentAccountId === editing.id));
   const parent = virtual && partOf ? accounts.find((a) => a.id === partOf) : undefined;
+  /** A new pocket whose person has no Virtual Accounts group: one is made for it. */
+  const needsGroup = !editing && Boolean(pocketOf) && !group;
   /**
    * What the account is, which the form no longer asks.
    *
@@ -167,15 +196,31 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
       ? editing.type
       : group
         ? kindOf(group)
-        : (editing?.type ?? 'current');
+        : needsGroup
+          ? kindOf(VIRTUAL_GROUP)
+          : (editing?.type ?? 'current');
   const holdsMoney = type === 'current' || type === 'savings';
 
   const isCredit = type === 'credit';
   const parsedBalance = Number.parseFloat(balance) || 0;
-  const valid = name.trim().length > 0 && Boolean(group);
+  const valid = name.trim().length > 0 && (Boolean(group) || (needsGroup && Boolean(parent)));
 
   const save = () => {
     if (!valid) return;
+
+    // Put back the group a pocket lives in, first: writes leave in order, so
+    // it exists by the time the account naming it arrives.
+    const made: AccountGroup | null = needsGroup
+      ? {
+          id: newId(),
+          name: VIRTUAL_GROUP.name,
+          side: VIRTUAL_GROUP.side,
+          kind: VIRTUAL_GROUP.kind,
+          sortOrder: VIRTUAL_GROUP.sortOrder,
+        }
+      : null;
+    if (made) dispatch({ type: 'upsert-account-group', group: made });
+    const home = made ?? group;
 
     const account: Account = {
       /**
@@ -190,7 +235,8 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
       id: editing?.id ?? newId(),
       name: name.trim(),
       type,
-      institution: institution.trim(),
+      // A new pocket is at its account's bank, as a Pot is at Monzo.
+      institution: pocketOf && !editing && parent ? parent.institution : institution.trim(),
       // On a new account the opening balance is recorded as a transaction
       // below, because the database derives balances from transactions.
       balance: editing?.balance ?? 0,
@@ -203,11 +249,11 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
       apr: isCredit ? Number.parseFloat(apr) || undefined : undefined,
       paymentDueDay: isCredit ? Number.parseInt(dueDay, 10) || undefined : undefined,
       aer: holdsMoney ? Number.parseFloat(aer) || undefined : undefined,
-      groupId: groupId || undefined,
+      groupId: home?.id || undefined,
       parentAccountId: parent?.id,
       // A new account starts in or out of the cash flow the way its group
       // does (Bank and Cash in); after that it is Cash Flow Setup's to change.
-      cashFlow: editing ? editing.cashFlow : group ? cashFlowByDefault(group) : undefined,
+      cashFlow: editing ? editing.cashFlow : home ? cashFlowByDefault(home) : undefined,
       note: note.trim() || undefined,
       statementDay: isCredit ? Number.parseInt(statementDay, 10) || undefined : undefined,
       minimumPayment: isCredit ? Number.parseFloat(minimumPayment) || undefined : undefined,
@@ -229,8 +275,8 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
 
     toast({
       tone: 'success',
-      title: editing ? 'Account updated' : 'Account added',
-      description: account.name,
+      title: asPocket ? (editing ? 'Pocket updated' : 'Pocket created') : editing ? 'Account updated' : 'Account added',
+      description: parent && asPocket ? `${account.name}, in ${parent.name}` : account.name,
     });
     if (!editing) onCreated?.(account);
     onClose();
@@ -246,11 +292,13 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
     <Modal
       open={open}
       onClose={onClose}
-      title={editing ? 'Edit account' : 'Add an account'}
+      title={asPocket ? (editing ? 'Edit pocket' : 'New pocket') : editing ? 'Edit account' : 'Add an account'}
       description={
         editing
           ? 'Balances update from your transactions, so they can’t be edited directly.'
-          : 'Accounts are entered by hand for now. Bank connections are coming.'
+          : asPocket
+            ? `Money set aside inside ${parent?.name ?? 'this account'}, and still part of its total — for bills, subscriptions or a trip.`
+            : 'Accounts are entered by hand for now. Bank connections are coming.'
       }
       footer={
         <>
@@ -262,7 +310,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
           )}
           <Button onClick={onClose}>Cancel</Button>
           <Button variant="primary" icon="check" onClick={save} disabled={!valid}>
-            {editing ? 'Save changes' : 'Add account'}
+            {editing ? 'Save changes' : asPocket ? 'Create pocket' : 'Add account'}
           </Button>
         </>
       }
@@ -272,7 +320,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
           <AmountField
             label={parent ? `Move in now from ${parent.name}` : owesMoney({ type }) ? 'Balance owed today' : 'Balance today'}
             value={balance}
-            tone={owesMoney({ type }) ? 'expense' : 'income'}
+            tone={parent ? 'transfer' : owesMoney({ type }) ? 'expense' : 'income'}
             onChange={(e) => setBalance(sanitizeAmount(e.target.value))}
             hint={
               parent
@@ -286,8 +334,8 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
 
         <div className="grid gap-5 sm:grid-cols-2">
           <TextField
-            label="Account name"
-            placeholder={PLACEHOLDER[type]}
+            label={asPocket ? 'Pocket name' : 'Account name'}
+            placeholder={asPocket ? 'e.g. Subscriptions' : PLACEHOLDER[type]}
             value={name}
             onChange={(e) => setName(e.target.value)}
             autoFocus={Boolean(editing)}
@@ -296,7 +344,9 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
           {/* The one question about what this account is. It used to be two
               — a Type, and a group to "file it under" — that read as the same
               question with different answers. The group is the answer, and
-              the type follows from it (`kindOf`). */}
+              the type follows from it (`kindOf`). A pocket is not asked: it
+              is a virtual account by being one. */}
+          {!asPocket && (
           <SelectField
             label="Account type"
             value={groupId}
@@ -312,8 +362,8 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
                   : undefined
             }
           >
-            {(['asset', 'liability'] as const).map((side) => (
-              <optgroup key={side} label={side === 'asset' ? 'Assets' : 'Liabilities'}>
+            {SIDES.map(({ side, label, hint, tone, icon, badge }) => (
+              <optgroup key={side} label={label} data-hint={hint} data-tone={tone} data-icon={icon} data-badge={badge}>
                 {sortGroups(accountGroups)
                   .filter((g) => g.side === side)
                   .map((g) => (
@@ -324,11 +374,12 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
               </optgroup>
             ))}
           </SelectField>
+          )}
 
           {/* Like a Revolut Pocket or a Monzo Pot: a mini account inside a bank
               account, or — part of nothing — money kept somewhere the app
               cannot see. */}
-          {virtual && !hasPockets && (
+          {virtual && !hasPockets && !(pocketOf && !editing) && (
             <SelectField
               label="Part of"
               value={partOf}
@@ -350,15 +401,17 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
 
           <TextAreaField
             label="Note"
-            placeholder="Joint account with Sam"
+            placeholder={asPocket ? 'Netflix, Spotify and the gym' : 'Joint account with Sam'}
             value={note}
             maxLength={200}
             rows={2}
             onChange={(e) => setNote(e.target.value)}
-            hint="Optional. Shown under the account on the Accounts page."
+            hint={asPocket ? 'Optional. What it is for.' : 'Optional. Shown under the account on the Accounts page.'}
           />
 
-          {type !== 'cash' && (
+          {/* A pocket is at its account's bank, and opens the moment it is
+              made — its first money is a transfer dated today. */}
+          {type !== 'cash' && !parent && (
             <TextField
               label={owesMoney({ type }) ? 'Lender or provider' : 'Bank or provider'}
               placeholder={type === 'credit' ? 'e.g. Amex' : owesMoney({ type }) ? 'e.g. Nationwide' : 'e.g. Monzo'}
@@ -369,7 +422,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
 
           {/* Only on a new account: an existing one's opening balance is a
               transaction already, with a date you change by editing it. */}
-          {!editing && (
+          {!editing && !parent && (
             <DateField
               label="Opened on"
               value={openedOn}
