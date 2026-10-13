@@ -167,10 +167,10 @@ in a smaller, muted figure, because they are part of the account's figure rather
 The account's own row shows everything it holds and says its main balance in the line beneath.
 Opening an account that can hold pockets leads with its **Total worth** — main balance and every
 pocket added up — with the parts listed beneath it in a well (Main balance, each pocket, Total).
-A pocket is made from inside its account (**New pocket**) with a form of its own — a name, what
-to move in from that account, a note — and never asks what kind of account it is, which bank, or
-when it was opened: all of that is its account's. Its amount is drawn in the transfer colour,
-because it is money moved, not money arriving.
+A pocket is made from inside its account (**New pocket**) with a form of its own — what is in it
+today, a name, a note, and **Count in my balance** — and never asks what kind of account it is,
+which bank, or when it was opened: all of that is its account's. What it holds is its own: the
+account's main balance is left as it was, and the two add up to its total worth.
 
 
 ## 4. Typography

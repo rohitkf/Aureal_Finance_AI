@@ -890,27 +890,10 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             // after the account and inside the same action, so there is no
             // moment where one exists without the other.
             const opening = action.openingBalance ?? 0;
-            // A pocket's money comes out of the account it is part of, as when
-            // you add money to a Revolut Pocket or a Monzo Pot. An opening
-            // balance would count the same money twice: once still in that
-            // account, once here.
-            if (opening > 0 && a.parentAccountId) {
-              const transferCategory = stateRef.current.categories.find((c) => c.kind === 'transfer');
-              check(
-                await supabase.from('transactions').insert({
-                  id: newId(),
-                  account_id: a.parentAccountId,
-                  to_account_id: a.id,
-                  category_id: transferCategory?.id ?? null,
-                  occurred_on: action.openedOn ?? ISO(new Date()),
-                  merchant: `Into ${a.name}`,
-                  amount: opening,
-                  type: 'transfer',
-                  status: 'cleared',
-                }),
-              );
-              return ['accounts', 'transactions'];
-            }
+            // A pocket opens with what it holds, like any account. Its money is
+            // its own: the account it is part of keeps the main balance it was
+            // given, and its total worth is that plus every pocket
+            // (`accountTotal`). Money moved in later is a transfer.
             if (opening > 0) {
               check(
                 await supabase.from('transactions').insert({

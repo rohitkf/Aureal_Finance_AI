@@ -166,8 +166,14 @@ describe('an opening balance on something owed', () => {
   });
 });
 
+/*
+ * A pocket's money is its own. It used to be moved out of the account it is
+ * part of, so typing in what a Revolut Pocket holds took it off the main
+ * balance you had just typed in from the same app — the money counted once,
+ * but the main balance no longer matched the bank's.
+ */
 describe('the first money in a pocket', () => {
-  it('is moved out of the account it is part of, not opened with', async () => {
+  it('opens the pocket with it, leaving the main balance as it was', async () => {
     act(() => {
       dispatch({
         type: 'upsert-account',
@@ -184,15 +190,15 @@ describe('the first money in a pocket', () => {
 
     expect(payloads.map((p) => p.table)).toEqual(['accounts', 'transactions']);
     expect(payloads[0]!.row).toMatchObject({ id: 'subs', parent_account_id: 'everyday' });
-    // An opening balance would count the same £60 twice: still in Everyday,
-    // and here as well. A transfer moves it.
     expect(payloads[1]!.row).toMatchObject({
-      account_id: 'everyday',
-      to_account_id: 'subs',
-      type: 'transfer',
+      account_id: 'subs',
+      type: 'income',
       amount: 60,
+      is_opening: true,
       occurred_on: '2026-10-13',
     });
-    expect(payloads[1]!.row).not.toHaveProperty('is_opening');
+    // Nothing out of Everyday.
+    expect(payloads[1]!.row).not.toMatchObject({ account_id: 'everyday' });
+    expect(payloads[1]!.row.to_account_id ?? null).toBeNull();
   });
 });

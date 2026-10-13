@@ -67,9 +67,10 @@ available now
   − the minimum balance you said to leave alone
 ```
 
-Money set aside in a virtual account is not taken off here: it was moved out
-of "available now" by the transfer that put it there, and a virtual account is
-out of cash flow unless someone switches it in.
+A virtual account counts here only if its "Count in my balance" switch is on
+(`cash_flow`) — on by default for a pocket, off for one standing on its own.
+Money moved into one by a transfer leaves "available now" only if it ends
+somewhere that does not count.
 
 On screen it reads as that sum, in plain words — "in your accounts now",
 "still coming in", "bills still to pay", "safety cushion" —
@@ -89,8 +90,8 @@ Vocabulary that is easy to get wrong:
 | **`reconciled`** | It matched a statement. Counts the same again, and the row locks: amount, date and type cannot change until it is un-reconciled. |
 | **`void`** | Cancelled. The record stays, struck through, on the register; it moves no money and never appears on Reminders. |
 | **What counts** | `none`, `cleared`, `reconciled`. `finance.ts`'s `counts()` and the database's `apply_transaction_to_balances` must always agree on this, or the balance on screen drifts from the balance in the account. |
-| **A virtual account** | An ordinary account in the standard **Virtual Accounts** group (asset side, plain `asset` type) for money set aside, with a balance of its own made by *transfers* — so the money is in one place, not both. Out of cash flow by default. Two kinds, told apart by `parentAccountId`: |
-| **A pocket** | A virtual account *part of* a bank account (`parentAccountId`), as a Revolut Pocket or a Monzo Pot is part of a current account. Counted in that account's total (`accountTotal`), whose own balance is then its main balance; money moves in and out by transfers to and from it (`MoveMoneyDialog`); bills are paid from it by putting a recurring payment on it; and when it cannot cover one, the rest comes out of its account — a top-up event (`pocketTopUps`) that Safe to Spend, the forecast, account charts and the Time Machine all include. `pocketOutlook` says whether it is on track. One level deep, never in a card or loan, and deleted with its account — the database enforces all three (`check_account_parent`, `on delete cascade`). |
+| **A virtual account** | An ordinary account in the standard **Virtual Accounts** group (asset side, plain `asset` type) for money set aside, with a balance of its own: it opens with what it holds, as any account does, and money moved in or out later is a *transfer*, so it is in one place, not both. Whether it counts in your balance is its own switch ("Count in my balance", `cash_flow`): on by default for a pocket, off for a standalone one. Two kinds, told apart by `parentAccountId`: |
+| **A pocket** | A virtual account *part of* a bank account (`parentAccountId`), as a Revolut Pocket or a Monzo Pot is part of a current account. Kept separate from that account's main balance — creating one never takes money off it — and added to it in the account's **total worth** (`accountTotal`); money moves in and out later by transfers to and from it (`MoveMoneyDialog`); bills are paid from it by putting a recurring payment on it; and when it cannot cover one, the rest comes out of its account — a top-up event (`pocketTopUps`) that Safe to Spend, the forecast, account charts and the Time Machine all include. `pocketOutlook` says whether it is on track. One level deep, never in a card or loan, and deleted with its account — the database enforces all three (`check_account_parent`, `on delete cascade`). |
 | **A standalone virtual account** | One part of nothing: money kept somewhere the app cannot see, such as an investment platform. Filled by transfers from any account, often a recurring one. The old allocations table (`virtual_accounts`) was turned into pockets by `20261013120000_virtual_accounts_are_accounts.sql`, and `parseBackup` does the same to an old backup. |
 | **A commitment** | A recurring payment that has not yet fallen due this month. A transfer is not one: the money is still yours. |
 | **A transfer rule** | A standing order between two of your own accounts. `account_id` is the source, `to_account_id` the destination. |
