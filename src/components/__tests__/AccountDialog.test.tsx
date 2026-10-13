@@ -541,22 +541,23 @@ describe('a virtual account', () => {
     expect(screen.queryByRole('combobox', { name: /Part of/ })).not.toBeInTheDocument();
   });
 
-  it('moves its first money out of the account it is part of, rather than opening with it', async () => {
+  it('opens a pocket with its own balance, counted in your balance unless switched off', async () => {
     ACCOUNTS = MONEY;
     const user = userEvent.setup();
     open();
     await chooseVirtual(user);
     await user.click(screen.getByRole('combobox', { name: /Part of/ }));
     await user.click(screen.getByRole('option', { name: 'Everyday' }));
-    await user.type(screen.getByLabelText('Move in now from Everyday'), '60');
+    await user.type(screen.getByLabelText('In the pocket today'), '60');
     await user.type(screen.getByLabelText('Account name'), 'Subscriptions');
+    expect(screen.getByRole('switch', { name: /Count in my balance/ })).toHaveAttribute('aria-checked', 'true');
     await user.click(screen.getByRole('button', { name: /Add account/ }));
 
-    // The store writes a transfer out of Everyday for a pocket's first money.
+    // The store opens it with £60 of its own; Everyday is not touched.
     expect(sent()[0]).toMatchObject({
       type: 'upsert-account',
       openingBalance: 60,
-      account: { name: 'Subscriptions', type: 'asset', parentAccountId: 'everyday', cashFlow: false },
+      account: { name: 'Subscriptions', type: 'asset', parentAccountId: 'everyday', cashFlow: true },
     });
   });
 
@@ -571,6 +572,8 @@ describe('a virtual account', () => {
 
     expect(sent()[0].account.parentAccountId).toBeUndefined();
     expect(sent()[0].openingBalance).toBe(1500);
+    // Money kept elsewhere is out of your balance until you say otherwise.
+    expect(sent()[0].account.cashFlow).toBe(false);
   });
 
   it('cannot be made part of another account once it has pockets of its own', () => {
@@ -606,7 +609,7 @@ describe('a new pocket, opened from inside its account', () => {
     expect(screen.getByRole('heading', { name: 'New pocket' })).toBeInTheDocument();
     expect(screen.getByText(/inside Everyday, and still part of its total/)).toBeInTheDocument();
     expect(screen.getByLabelText('Pocket name')).toBeInTheDocument();
-    expect(screen.getByLabelText('Move in now from Everyday')).toBeInTheDocument();
+    expect(screen.getByLabelText('In the pocket today')).toBeInTheDocument();
     // Its account's answers, not its own questions.
     expect(screen.queryByRole('combobox', { name: 'Account type' })).toBeNull();
     expect(screen.queryByRole('combobox', { name: /Part of/ })).toBeNull();
@@ -618,7 +621,7 @@ describe('a new pocket, opened from inside its account', () => {
     ACCOUNTS = MONEY;
     const user = userEvent.setup();
     openPocket();
-    await user.type(screen.getByLabelText('Move in now from Everyday'), '45');
+    await user.type(screen.getByLabelText('In the pocket today'), '45');
     await user.type(screen.getByLabelText('Pocket name'), 'Subscriptions');
     await user.click(screen.getByRole('button', { name: /Create pocket/ }));
 
@@ -632,7 +635,7 @@ describe('a new pocket, opened from inside its account', () => {
         type: 'asset',
         parentAccountId: 'everyday',
         institution: 'Monzo',
-        cashFlow: false,
+        cashFlow: true,
       },
     });
   });
@@ -651,8 +654,37 @@ describe('a new pocket, opened from inside its account', () => {
       groupId: sent()[0].group.id,
       type: 'asset',
       parentAccountId: 'everyday',
-      cashFlow: false,
+      cashFlow: true,
     });
+  });
+
+  it('can be kept out of your balance, and stays separate from its account either way', async () => {
+    ACCOUNTS = MONEY;
+    const user = userEvent.setup();
+    openPocket();
+    expect(screen.getByText(/Everyday's main balance stays as it is/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Pocket name'), 'Holiday');
+    await user.click(screen.getByRole('switch', { name: /Count in my balance/ }));
+    expect(screen.getByText(/Still in your net worth and in Everyday's total worth/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Create pocket/ }));
+
+    expect(sent()[0].account).toMatchObject({ parentAccountId: 'everyday', cashFlow: false });
+  });
+
+  it('keeps an edited pocket counted or not as it was, until switched', async () => {
+    ACCOUNTS = MONEY;
+    const user = userEvent.setup();
+    render(
+      <AccountDialog
+        open
+        onClose={vi.fn()}
+        editing={{ id: 'subs', name: 'Subscriptions', type: 'asset', institution: 'Monzo', balance: 45, maskedNumber: '', syncStatus: 'manual', groupId: 'g-Virtual Accounts', parentAccountId: 'everyday', cashFlow: false }}
+      />,
+    );
+    expect(screen.getByRole('switch', { name: /Count in my balance/ })).toHaveAttribute('aria-checked', 'false');
+    await user.click(screen.getByRole('switch', { name: /Count in my balance/ }));
+    await user.click(screen.getByRole('button', { name: /Save changes/ }));
+    expect(sent()[0].account.cashFlow).toBe(true);
   });
 
   it('is edited as a pocket, and can be moved to another account', async () => {

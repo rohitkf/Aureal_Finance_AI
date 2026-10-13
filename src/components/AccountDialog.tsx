@@ -4,7 +4,7 @@ import type { Account, AccountGroup } from '@/lib/types';
 import { cashFlowByDefault, groupOf, kindOf, sortGroups, STANDARD_GROUPS } from '@/lib/accountGroups';
 import { owesMoney } from '@/lib/finance';
 import { Button } from './ui/Button';
-import { AmountField, CheckboxField, DateField, SelectField, TextAreaField, TextField } from './ui/Field';
+import { AmountField, CheckboxField, DateField, SelectField, TextAreaField, TextField, Toggle } from './ui/Field';
 import { DayOfMonthPicker } from './ui/DayOfMonthPicker';
 import { DigitsField } from './ui/DigitsField';
 import { MoneyDial } from './ui/MoneyDial';
@@ -114,6 +114,13 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
   const [excluded, setExcluded] = useState(false);
   /** The bank account a virtual account is part of; '' for one that stands alone. */
   const [partOf, setPartOf] = useState('');
+  /**
+   * Whether a virtual account counts in your balance — Total balance, Safe to
+   * Spend, the forecast. Null until chosen: then a pocket counts, as the money
+   * in a Revolut Pocket is still yours to spend, and one standing on its own
+   * (an investment platform) does not.
+   */
+  const [counted, setCounted] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -144,6 +151,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
     setArchived(Boolean(editing?.archived));
     setExcluded(Boolean(editing?.excluded));
     setPartOf(editing?.parentAccountId ?? pocketOf ?? '');
+    setCounted(editing ? Boolean(editing.cashFlow) : null);
     // Groups arriving after the dialog opened — a first load, a group just
     // made — must not reset what was typed, so they are not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,6 +208,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
           ? kindOf(VIRTUAL_GROUP)
           : (editing?.type ?? 'current');
   const holdsMoney = type === 'current' || type === 'savings';
+  const countsInBalance = counted ?? Boolean(parent);
 
   const isCredit = type === 'credit';
   const parsedBalance = Number.parseFloat(balance) || 0;
@@ -253,7 +262,13 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
       parentAccountId: parent?.id,
       // A new account starts in or out of the cash flow the way its group
       // does (Bank and Cash in); after that it is Cash Flow Setup's to change.
-      cashFlow: editing ? editing.cashFlow : home ? cashFlowByDefault(home) : undefined,
+      cashFlow: virtual
+        ? countsInBalance
+        : editing
+          ? editing.cashFlow
+          : home
+            ? cashFlowByDefault(home)
+            : undefined,
       note: note.trim() || undefined,
       statementDay: isCredit ? Number.parseInt(statementDay, 10) || undefined : undefined,
       minimumPayment: isCredit ? Number.parseFloat(minimumPayment) || undefined : undefined,
@@ -318,13 +333,13 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
       <div className="space-y-8">
         {!editing && (
           <AmountField
-            label={parent ? `Move in now from ${parent.name}` : owesMoney({ type }) ? 'Balance owed today' : 'Balance today'}
+            label={parent ? 'In the pocket today' : owesMoney({ type }) ? 'Balance owed today' : 'Balance today'}
             value={balance}
-            tone={parent ? 'transfer' : owesMoney({ type }) ? 'expense' : 'income'}
+            tone={owesMoney({ type }) ? 'expense' : 'income'}
             onChange={(e) => setBalance(sanitizeAmount(e.target.value))}
             hint={
               parent
-                ? `Moved out of ${parent.name} by a transfer, so it is counted once. 0 to start it empty.`
+                ? `What it holds now, as your bank shows it. ${parent.name}'s main balance stays as it is; its total worth is the two together.`
                 : virtual
                   ? 'What it holds today, recorded as an opening balance. Move money in later with a transfer.'
                   : 'Recorded as an opening balance you can edit later.'
@@ -409,8 +424,24 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
             hint={asPocket ? 'Optional. What it is for.' : 'Optional. Shown under the account on the Accounts page.'}
           />
 
-          {/* A pocket is at its account's bank, and opens the moment it is
-              made — its first money is a transfer dated today. */}
+          {/* Kept apart from its account's main balance either way; this says
+              whether it is also counted as money you have to spend. */}
+          {virtual && (
+            <div className="sm:col-span-2">
+              <Toggle
+                checked={countsInBalance}
+                onChange={setCounted}
+                label="Count in my balance"
+                description={
+                  countsInBalance
+                    ? 'Included in your total balance and Safe to Spend, beside your other accounts.'
+                    : `Kept out of your total balance and Safe to Spend. Still in your net worth${parent ? ` and in ${parent.name}'s total worth` : ''}.`
+                }
+              />
+            </div>
+          )}
+
+          {/* A pocket is at its account's bank, and opens the day it is made. */}
           {type !== 'cash' && !parent && (
             <TextField
               label={owesMoney({ type }) ? 'Lender or provider' : 'Bank or provider'}
