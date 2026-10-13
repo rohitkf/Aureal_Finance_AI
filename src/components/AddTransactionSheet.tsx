@@ -12,6 +12,7 @@ import {
 } from '@/lib/date';
 import { evaluateExpression, isPlainNumber, stripToExpression } from '@/lib/calc';
 import { money } from '@/lib/format';
+import { rememberedMerchants, suggestMerchants } from '@/lib/merchants';
 import { FREQUENCY_LABELS, WEEKEND_LABELS, cadencePhrase, previewOccurrences } from '@/lib/recurrence';
 import { newId, useAppState, useCategories, useStore, useToday } from '@/lib/store';
 import type {
@@ -40,8 +41,8 @@ import {
   DateField,
   SegmentedControl,
   SelectField,
+  SuggestField,
   TextAreaField,
-  TextField,
   TimeField,
 } from './ui/Field';
 import { Modal } from './ui/Modal';
@@ -157,6 +158,10 @@ interface AddTransactionSheetProps {
   onDelete?: () => void;
 }
 
+/** Stable empties, so a missing list does not rebuild the merchant memory every render. */
+const NONE_T: Transaction[] = [];
+const NONE_R: RecurringPayment[] = [];
+
 /**
  * Add-transaction flow. The amount is the visual focus and everything else has
  * a sensible default, so recording an expense takes a few seconds on a phone.
@@ -169,7 +174,7 @@ export const AddTransactionSheet = ({
   mode = 'update',
   onDelete,
 }: AddTransactionSheetProps) => {
-  const { accounts: allAccounts } = useAppState();
+  const { accounts: allAccounts, transactions = NONE_T, recurring = NONE_R } = useAppState();
   /**
    * Archived accounts are not offered here — that is the whole point of
    * archiving one. The account a transaction being *edited* already sits on
@@ -191,6 +196,12 @@ export const AddTransactionSheet = ({
   const [toAccountId, setToAccountId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [merchant, setMerchant] = useState('');
+  /**
+   * Whether a category has been chosen by hand on this form. Until it has,
+   * picking a merchant you have used before files it where you filed it last
+   * time; after, your choice stands.
+   */
+  const [categoryChosen, setCategoryChosen] = useState(false);
   const [date, setDate] = useState(today);
   const [time, setTime] = useState(nowTime);
   const [notes, setNotes] = useState('');
@@ -264,6 +275,7 @@ export const AddTransactionSheet = ({
     setType(editing?.type ?? initialType);
     setAmount(editing ? String(editing.amount) : '');
     setMerchant(editing?.merchant ?? '');
+    setCategoryChosen(Boolean(editing));
     setNotes(editing?.notes ?? '');
     setDate(editing?.date ?? today);
     setTime(editing?.time ?? nowTime());
@@ -591,7 +603,29 @@ export const AddTransactionSheet = ({
     onClose();
   };
 
+  const chooseCategory = (id: string) => {
+    setCategoryId(id);
+    setCategoryChosen(true);
+  };
+
+  /** Merchants used before for this kind of entry, most used first. */
+  const remembered = useMemo(() => rememberedMerchants(transactions, recurring, type), [transactions, recurring, type]);
+  const merchantSuggestions = useMemo(
+    () =>
+      suggestMerchants(remembered, merchant).map((m) => ({
+        value: m.name,
+        detail: allCategories.find((c) => c.id === m.categoryId)?.name,
+      })),
+    [remembered, merchant, allCategories],
+  );
+  const onMerchantPicked = (name: string) => {
+    const known = remembered.find((m) => m.name === name);
+    if (!known || categoryChosen) return;
+    if (categories.some((c) => c.id === known.categoryId)) setCategoryId(known.categoryId);
+  };
+
   const onCategoryCreated = (category: Category) => {
+    setCategoryChosen(true);
     setCategoryId(category.id);
     setNewCategoryOpen(false);
   };
@@ -721,7 +755,7 @@ export const AddTransactionSheet = ({
                 <SelectField
                   label="Category"
                   value={categoryId}
-                  onChange={(value) => setCategoryId(value)}
+                  onChange={chooseCategory}
                   action={{ label: 'New category…', onSelect: () => setNewCategoryOpen(true) }}
                 >
                   {categories.map((c) => (
@@ -744,7 +778,7 @@ export const AddTransactionSheet = ({
                     <button
                       key={category.id}
                       type="button"
-                      onClick={() => setCategoryId(category.id)}
+                      onClick={() => chooseCategory(category.id)}
                       aria-pressed={active}
                       className={`flex items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-4 text-[13.5px] transition-all duration-300 ease-fluid active:scale-[0.96] ${
                         active
@@ -763,11 +797,15 @@ export const AddTransactionSheet = ({
           )}
 
           <div className="grid gap-5 sm:grid-cols-2">
-            <TextField
+            {/* Offers merchants used before; taking one brings its category
+                along unless one has been chosen here already. */}
+            <SuggestField
               label={type === 'income' ? 'Source' : 'Merchant'}
               placeholder={type === 'income' ? 'e.g. Employer' : 'e.g. Tesco'}
               value={merchant}
-              onChange={(e) => setMerchant(e.target.value)}
+              onChange={setMerchant}
+              suggestions={merchantSuggestions}
+              onPick={(s) => onMerchantPicked(s.value)}
             />
             <div className="flex flex-col gap-2">
               <DateField

@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useId,
+  useState,
   type InputHTMLAttributes,
   type ReactNode,
   type TextareaHTMLAttributes,
@@ -92,6 +93,165 @@ export const TextField = forwardRef<HTMLInputElement, InputProps>(
   ),
 );
 TextField.displayName = 'TextField';
+
+/** One thing a `SuggestField` can offer. */
+export interface Suggestion {
+  value: string;
+  /** A quieter word beside it — the category it was filed under, say. */
+  detail?: string;
+  /** Drawn before `detail`; anything small, like a category's icon. */
+  adornment?: ReactNode;
+}
+
+type SuggestFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & {
+  label: string;
+  hint?: string;
+  error?: string;
+  value: string;
+  onChange: (value: string) => void;
+  /** What to offer for what has been typed so far; the caller does the matching. */
+  suggestions: Suggestion[];
+  /** One was picked — the field already holds its value. */
+  onPick?: (suggestion: Suggestion) => void;
+  containerClassName?: string;
+};
+
+/**
+ * A text field that offers what you typed before.
+ *
+ * Free text first: whatever is typed is the value, and the suggestions are
+ * only ever a shortcut to one. They sit in a short list right under the field
+ * rather than floating over the form — on a phone, a popup over a sheet is
+ * one more thing to scroll inside — and go away the moment the field is left
+ * or a suggestion is taken.
+ *
+ * The combobox pattern: the input keeps the focus, the list is a `listbox`,
+ * and the arrow keys move `aria-activedescendant` through it. Enter takes the
+ * highlighted one, Escape puts the list away.
+ */
+export const SuggestField = ({
+  label,
+  hint,
+  error,
+  value,
+  onChange,
+  suggestions,
+  onPick,
+  containerClassName,
+  className,
+  onFocus,
+  onBlur,
+  onKeyDown,
+  ...rest
+}: SuggestFieldProps) => {
+  const listId = useId();
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const shown = open ? suggestions : [];
+
+  const pick = (s: Suggestion) => {
+    onChange(s.value);
+    onPick?.(s);
+    setOpen(false);
+    setActive(-1);
+  };
+
+  return (
+    <Field label={label} hint={hint} error={error} className={containerClassName}>
+      {({ id, describedBy, invalid }) => (
+        <div className="flex flex-col gap-1.5">
+          <input
+            id={id}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={shown.length > 0}
+            aria-controls={shown.length > 0 ? listId : undefined}
+            aria-activedescendant={shown.length > 0 && active >= 0 ? `${listId}-${active}` : undefined}
+            aria-describedby={describedBy}
+            aria-invalid={invalid || undefined}
+            autoComplete="off"
+            value={value}
+            onChange={(e) => {
+              onChange(e.target.value);
+              setOpen(true);
+              setActive(-1);
+            }}
+            onFocus={(e) => {
+              setOpen(true);
+              onFocus?.(e);
+            }}
+            onBlur={(e) => {
+              setOpen(false);
+              setActive(-1);
+              onBlur?.(e);
+            }}
+            onKeyDown={(e) => {
+              if (shown.length > 0) {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setActive((i) => Math.min(shown.length - 1, i + 1));
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setActive((i) => Math.max(-1, i - 1));
+                } else if (e.key === 'Enter' && active >= 0) {
+                  e.preventDefault();
+                  pick(shown[active]!);
+                } else if (e.key === 'Escape') {
+                  // Puts the list away without closing the sheet it sits in.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setOpen(false);
+                }
+              }
+              onKeyDown?.(e);
+            }}
+            className={cn(CONTROL, 'h-12', invalid && INVALID, className)}
+            {...rest}
+          />
+          {shown.length > 0 && (
+            <ul
+              id={listId}
+              role="listbox"
+              aria-label={`Earlier ${label.toLowerCase()}s`}
+              className="well overflow-hidden p-1"
+            >
+              {shown.map((s, i) => (
+                <li
+                  key={s.value}
+                  id={`${listId}-${i}`}
+                  role="option"
+                  aria-selected={i === active}
+                  // Down rather than click, and its default stopped, so the
+                  // input never blurs — and so never hides the list — before
+                  // the pick lands. The list is short and never scrolls, so a
+                  // finger loses nothing by it.
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    pick(s);
+                  }}
+                  onPointerEnter={(e) => e.pointerType === 'mouse' && setActive(i)}
+                  className={cn(
+                    'flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-[14px]',
+                    'transition-colors duration-200 ease-fluid',
+                    i === active ? 'bg-[rgb(var(--hairline)/0.08)] text-text' : 'text-text',
+                  )}
+                >
+                  <span className="truncate">{s.value}</span>
+                  {(s.detail || s.adornment) && (
+                    <span className="flex shrink-0 items-center gap-1.5 text-[12.5px] text-faint">
+                      {s.adornment}
+                      {s.detail}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </Field>
+  );
+};
 
 interface SelectFieldProps {
   label: string;

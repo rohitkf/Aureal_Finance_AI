@@ -267,6 +267,7 @@ type="date">` is a wheel on iOS, a dialog on Android and a small grey box in des
 | Instead of | Use | Notes |
 | --- | --- | --- |
 | `<select>` | `SelectField` → `Select` | Listbox pattern. `onChange` hands over the **value**, not a DOM event. `<optgroup>` makes sections; `data-hint`, `data-tone` (`success`, `danger`, `neutral`), `data-icon` and `data-badge` on it make one you can tell apart at a glance — a sticky heading with a coloured icon and a caption, its options indented under the name, and the badge repeated on the closed field beside the choice. The account form's Assets (+, green, "What you own") and Liabilities (−, red, "What you owe") are the model |
+| `<input list>` / a browser's own autofill | `SuggestField` | Free text that offers what was typed before, in a short list under the field (not a popup over the sheet). The caller does the matching. The transaction form's Merchant uses it (`lib/merchants.ts`): most used first, prefix then word then contains; picking one brings its last category unless one was chosen by hand |
 | `<input type="date">` | `DateField` → `DatePicker` | Speaks the same `YYYY-MM-DD` strings as the rest of the app, so no `Date` drifts across a timezone. Weeks start Monday |
 | `<input type="checkbox">` | `CheckboxField` | `role="checkbox"` button, so the tick and the focus ring are the app's |
 | A free-text number with a fixed range | A picker that cannot express an invalid value | `DayOfMonthPicker` is the model |
