@@ -85,7 +85,7 @@ export const TimePicker = ({ value, onChange, id, describedBy, invalid, disabled
         <div
           role="dialog"
           aria-label="Choose a time"
-          className="absolute z-50 mt-1.5 w-full rounded-2xl bg-[rgb(var(--surface-base))] p-3 shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),0_24px_48px_-16px_rgb(var(--ambient)/0.7)]"
+          className="absolute right-0 z-50 mt-1.5 w-full min-w-[15rem] rounded-2xl bg-[rgb(var(--surface-base))] p-3 shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),0_24px_48px_-16px_rgb(var(--ambient)/0.7)]"
         >
           <div className="mb-2 flex justify-between gap-2">
             <button
