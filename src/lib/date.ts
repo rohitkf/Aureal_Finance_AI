@@ -11,6 +11,20 @@ export const ISO = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
+/**
+ * The time a transaction is shown at: its own, or — for one with none, like
+ * an opening balance — when it was entered, as long as that was the day it is
+ * dated. A line backdated to last week was not entered at that hour of that
+ * day, so it shows none.
+ */
+export const timeOf = (t: { date: string; time?: string; createdAt?: string }): string | undefined => {
+  if (t.time) return t.time;
+  if (!t.createdAt) return undefined;
+  const at = new Date(t.createdAt);
+  if (Number.isNaN(at.getTime()) || ISO(at) !== t.date) return undefined;
+  return `${`${at.getHours()}`.padStart(2, '0')}:${`${at.getMinutes()}`.padStart(2, '0')}`;
+};
+
 export const parseISO = (iso: string): Date => {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d);

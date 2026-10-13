@@ -123,6 +123,7 @@ export const toTransaction = (row: TransactionRow): Transaction => ({
   id: row.id,
   date: row.occurred_on,
   time: shortTime(row.occurred_at),
+  createdAt: row.created_at ?? undefined,
   merchant: row.merchant,
   amount: num(row.amount),
   type: row.type,

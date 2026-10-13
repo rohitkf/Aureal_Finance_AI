@@ -1,5 +1,5 @@
 import type { Account, AppState, Transaction, TransactionStatus } from './types';
-import { addMonths } from './date';
+import { addMonths, timeOf } from './date';
 import { expandRecurrence } from './recurrence';
 import { round2 } from './format';
 import { owesMoney, skippedOccurrences } from './finance';
@@ -16,8 +16,10 @@ export interface LedgerRow {
   /** Stable across renders. A projection's id encodes the rule and its date. */
   id: string;
   date: string;
-  /** Ordering within a day, where a transaction recorded one. */
+  /** Ordering within a day, and shown on the line: see `timeOf`. */
   time?: string;
+  /** When the transaction behind it was entered, to order lines with no time. */
+  createdAt?: string;
   name: string;
   /** Always positive; `direction` carries the sign. */
   amount: number;
@@ -91,6 +93,11 @@ const byDateThenTime = (a: LedgerRow, b: LedgerRow): number => {
   const at = a.time ?? '';
   const bt = b.time ?? '';
   if (at !== bt) return at < bt ? -1 : 1;
+  // Neither says a time, or both say the same: the one entered first came
+  // first. The id alone is random, which shuffled a day's untimed lines.
+  const ac = a.createdAt ?? '';
+  const bc = b.createdAt ?? '';
+  if (ac !== bc) return ac < bc ? -1 : 1;
   return a.id < b.id ? -1 : 1;
 };
 
@@ -116,7 +123,8 @@ export const ledgerRows = (state: AppState, today: string, from: string, to: str
     rows.push({
       id: t.id,
       date: t.date,
-      time: t.time,
+      time: timeOf(t),
+      createdAt: t.createdAt,
       name: t.merchant,
       amount: t.amount,
       // A transfer is drawn once, against the account it leaves, the way a

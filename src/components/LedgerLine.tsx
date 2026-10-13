@@ -1,6 +1,6 @@
 import { cn } from '@/lib/cn';
 import { ACCENT_BAR, ACCENT_TEXT, kindOfRow } from '@/lib/accents';
-import { daysBetween, formatDayHeader, formatMediumDate, relativeDueLabel } from '@/lib/date';
+import { daysBetween, formatDayHeader, formatMediumDate, formatTime, relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
 import type { AccentName, LedgerKind } from '@/lib/accents';
 import type { LedgerRow } from '@/lib/ledger';
@@ -64,6 +64,7 @@ export const LedgerLine = ({
    * them and matches neither.
    */
   const context = [
+    row.time ? formatTime(row.time) : null,
     categoryName,
     // A transfer says where it went. "Everyday · transfer" left the one thing
     // worth knowing about it out.

@@ -50,6 +50,8 @@ const NOT_TYPED = new Set([
   'lastSyncedAt',
   'recurringId',
   'recurringDate',
+  /** The database's `created_at`: when it was entered, never typed. */
+  'createdAt',
   'splitGroupId',
   'isOpening',
   'labelIds',

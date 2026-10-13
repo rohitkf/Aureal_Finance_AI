@@ -327,3 +327,47 @@ describe('a loan', () => {
     expect(rows(earlier).find((r) => r.id === 'first')!.balanceAfter).toBe(2980);
   });
 });
+
+/*
+ * Lines on one day used to fall back on their random ids when none had a
+ * time — an opening balance, a pocket, an adjustment — so a day read in no
+ * order at all. The order they were entered decides now, and the time each
+ * was entered stands in as its time on the day it was entered.
+ */
+describe('ordering within a day', () => {
+  it('puts lines without a time in the order they were entered', () => {
+    const s = state({
+      transactions: [
+        txn({ id: 'z-first', createdAt: `${TODAY}T08:00:00` }),
+        txn({ id: 'a-third', createdAt: `${TODAY}T18:30:00` }),
+        txn({ id: 'm-second', createdAt: `${TODAY}T12:15:00` }),
+      ],
+    });
+    expect(rows(s).map((r) => r.id)).toEqual(['z-first', 'm-second', 'a-third']);
+  });
+
+  it('shows the time it was entered when it has none of its own, on that day only', () => {
+    const s = state({
+      transactions: [
+        txn({ id: 'own', time: '09:05', createdAt: `${TODAY}T20:00:00` }),
+        txn({ id: 'entered', createdAt: `${TODAY}T14:32:10` }),
+        txn({ id: 'backdated', date: '2026-09-10', createdAt: `${TODAY}T14:32:10` }),
+      ],
+    });
+    const time = (id: string) => rows(s).find((r) => r.id === id)?.time;
+    expect(time('own')).toBe('09:05');
+    expect(time('entered')).toBe('14:32');
+    expect(time('backdated')).toBeUndefined();
+  });
+
+  it('orders a timed line among untimed ones by that time', () => {
+    const s = state({
+      transactions: [
+        txn({ id: 'lunch', time: '13:00', createdAt: `${TODAY}T21:00:00` }),
+        txn({ id: 'morning', createdAt: `${TODAY}T09:00:00` }),
+        txn({ id: 'evening', createdAt: `${TODAY}T19:00:00` }),
+      ],
+    });
+    expect(rows(s).map((r) => r.id)).toEqual(['morning', 'lunch', 'evening']);
+  });
+});
