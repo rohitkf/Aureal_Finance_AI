@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/cn';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 
 /**
  * The app's own dropdown.
@@ -55,27 +55,81 @@ interface SelectProps {
   action?: { label: string; onSelect: () => void };
 }
 
+/** The colours a section can be marked in — the status colours, said in words too. */
+export type SectionTone = 'neutral' | 'success' | 'danger';
+
+/**
+ * A section of the list: an `<optgroup>`, read.
+ *
+ * `label` alone draws a quiet heading. The rest turn it into a section you can
+ * tell apart at a glance — Assets from Liabilities is the case that needed it:
+ *
+ *   <optgroup label="Assets" data-hint="What you own" data-tone="success"
+ *             data-icon="plus" data-badge="Asset">
+ *
+ * `data-badge` is also shown on the closed field beside whatever is chosen
+ * from the section, so which side it is on stays visible after the list shuts.
+ */
+interface Section {
+  label: string;
+  hint?: string;
+  tone?: SectionTone;
+  icon?: IconName;
+  badge?: string;
+}
+
 interface Opt {
   value: string;
   label: string;
   /** A second, quieter column — a balance, a count. Never the thing chosen. */
   hint?: string;
   /** The `<optgroup>` it sat in, drawn as a heading above the first of its run. */
-  group?: string;
+  group?: Section;
 }
+
+/** Each tone as whole class names — Tailwind only sees what is written out. */
+const SECTION_TILE: Record<SectionTone, string> = {
+  neutral: 'bg-[rgb(var(--hairline)/0.08)] text-muted',
+  success: 'bg-success/15 text-success',
+  danger: 'bg-danger/15 text-danger',
+};
+
+const SECTION_BADGE: Record<SectionTone, string> = {
+  neutral: 'bg-[rgb(var(--hairline)/0.06)] text-muted',
+  success: 'bg-success/10 text-success',
+  danger: 'bg-danger/10 text-danger',
+};
 
 /**
  * Reads `<option value="x" data-hint="…">Label</option>` children into a flat
  * list. An `<optgroup label="…">` around some of them marks them with that
- * label, so a long list can be read in sections — Assets, then Liabilities —
+ * section, so a long list can be read in sections — Assets, then Liabilities —
  * without the keyboard having to step over the headings.
  */
-const readOptions = (children: ReactNode, group?: string): Opt[] =>
+const readOptions = (children: ReactNode, group?: Section): Opt[] =>
   Children.toArray(children).flatMap((child) => {
     if (!isValidElement(child)) return [];
     if (child.type === 'optgroup') {
-      const props = child.props as { label?: string; children?: ReactNode };
-      return readOptions(props.children, props.label);
+      const props = child.props as {
+        label?: string;
+        children?: ReactNode;
+        'data-hint'?: string;
+        'data-tone'?: SectionTone;
+        'data-icon'?: IconName;
+        'data-badge'?: string;
+      };
+      return readOptions(
+        props.children,
+        props.label
+          ? {
+              label: props.label,
+              hint: props['data-hint'],
+              tone: props['data-tone'],
+              icon: props['data-icon'],
+              badge: props['data-badge'],
+            }
+          : undefined,
+      );
     }
     const props = child.props as { value?: string | number; children?: ReactNode; 'data-hint'?: string };
     if (props.value === undefined) return [];
@@ -311,11 +365,25 @@ export const Select = ({
         )}
       >
         <span className={cn('truncate', !selected && 'text-faint')}>{selected?.label ?? placeholder}</span>
-        <Icon
-          name="chevron-down"
-          size={15}
-          className={cn('shrink-0 text-faint transition-transform duration-400 ease-fluid', open && 'rotate-180')}
-        />
+        <span className="flex shrink-0 items-center gap-2.5">
+          {/* Which section it came from, once the list is shut: Bank is an
+              Asset, Loans a Liability — said in words, not by colour alone. */}
+          {selected?.group?.badge && (
+            <span
+              className={cn(
+                'rounded-full px-2 py-1 text-[11px] font-medium leading-none tracking-[-0.005em]',
+                SECTION_BADGE[selected.group.tone ?? 'neutral'],
+              )}
+            >
+              {selected.group.badge}
+            </span>
+          )}
+          <Icon
+            name="chevron-down"
+            size={15}
+            className={cn('text-faint transition-transform duration-400 ease-fluid', open && 'rotate-180')}
+          />
+        </span>
       </button>
 
       {open && rect && createPortal(
@@ -334,24 +402,76 @@ export const Select = ({
         >
           {options.map((option, index) => {
             const isSelected = option.value === value;
-            const heading = option.group && option.group !== options[index - 1]?.group ? option.group : null;
+            const section = option.group;
+            const heading = section && section.label !== options[index - 1]?.group?.label ? section : null;
+            /** Where this option's section heading is — the first of its run. */
+            let sectionStart = -1;
+            for (let i = index; section && i >= 0 && options[i]?.group?.label === section.label; i -= 1) sectionStart = i;
+            /**
+             * A section that says what it is — an icon, a line under the name,
+             * a colour — rather than a bare heading. Its options sit indented
+             * under its name, so where one section stops and the next starts
+             * is a shape, not a small grey word to spot.
+             */
+            const rich = Boolean(section && (section.icon || section.hint || section.tone));
             return (
               <Fragment key={option.value}>
               {heading && (
                 // Not an option, so it has no index and the arrow keys pass
                 // over it; presentation, so a screen reader is not told the
-                // list holds one more choice than it does.
-                <li
-                  role="presentation"
-                  className="px-3 pb-1 pt-3 text-[12.5px] font-semibold text-faint first:pt-1.5"
-                >
-                  {heading}
-                </li>
+                // list holds one more choice than it does. Each option points
+                // at it as its description instead, so the section is still
+                // heard.
+                rich ? (
+                  <li
+                    role="presentation"
+                    id={`${listId}-section-${index}`}
+                    // Sticky, so on a short list on a phone the section you
+                    // are scrolling through is always named at the top; the
+                    // next one slides up over it. A pixel down, so the list's
+                    // own hairline edge still shows above it.
+                    className={cn(
+                      'sticky top-px z-[1] flex items-center gap-2.5 bg-[rgb(var(--surface-base))] px-3 pb-2 pt-3',
+                      index > 0 && 'mt-1.5 shadow-[inset_0_1px_0_0_rgb(var(--hairline)/var(--hairline-alpha-strong))]',
+                    )}
+                  >
+                    {heading.icon && (
+                      <span
+                        aria-hidden
+                        className={cn(
+                          'flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
+                          SECTION_TILE[heading.tone ?? 'neutral'],
+                        )}
+                      >
+                        <Icon name={heading.icon} size={13} />
+                      </span>
+                    )}
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-semibold tracking-[-0.01em] text-text">
+                        {heading.label}
+                      </span>
+                      {/* Collapses between the two lines; keeps them two words
+                          apart when a screen reader reads the heading out. */}{' '}
+                      {heading.hint && (
+                        <span className="block truncate text-[12px] leading-snug text-faint">{heading.hint}</span>
+                      )}
+                    </span>
+                  </li>
+                ) : (
+                  <li
+                    role="presentation"
+                    id={`${listId}-section-${index}`}
+                    className="px-3 pb-1 pt-3 text-[12.5px] font-semibold text-faint first:pt-1.5"
+                  >
+                    {heading.label}
+                  </li>
+                )
               )}
               <li
                 id={`${listId}-${index}`}
                 role="option"
                 aria-selected={isSelected}
+                aria-describedby={sectionStart >= 0 ? `${listId}-section-${sectionStart}` : undefined}
                 data-index={index}
                 /*
                   A mouse commits on pointer-down, because preventing the
@@ -383,6 +503,9 @@ export const Select = ({
                 className={cn(
                   'flex cursor-pointer items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-[13.5px]',
                   'transition-colors duration-200 ease-fluid',
+                  // Under its section's name, past the icon. And kept clear of
+                  // the sticky heading when the keys scroll it into view.
+                  rich && (section?.icon ? 'scroll-mt-16 pl-[46px]' : 'scroll-mt-14'),
                   index === active ? 'bg-[rgb(var(--hairline)/0.08)] text-text' : 'text-muted',
                   isSelected && 'text-primary',
                 )}

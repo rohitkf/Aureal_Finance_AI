@@ -289,3 +289,71 @@ describe('a list inside something that scrolls', () => {
     expect(screen.getByRole('listbox')).toBeInTheDocument();
   });
 });
+
+/*
+ * Sections you can tell apart. The account form's list runs Assets then
+ * Liabilities, and the two read alike as a quiet grey word above each run —
+ * so a section can say what it is three ways, and the closed field keeps
+ * saying which one its choice came from.
+ */
+describe('a list in sections', () => {
+  const Sectioned = () => {
+    const [value, setValue] = useState('bank');
+    return (
+      <SelectField label="Account type" value={value} onChange={setValue}>
+        <optgroup label="Assets" data-hint="What you own" data-tone="success" data-icon="plus" data-badge="Asset">
+          <option value="bank">Bank</option>
+          <option value="cash">Cash</option>
+        </optgroup>
+        <optgroup label="Liabilities" data-hint="What you owe" data-tone="danger" data-icon="minus" data-badge="Liability">
+          <option value="loans">Loans</option>
+        </optgroup>
+      </SelectField>
+    );
+  };
+  const field = () => screen.getByRole('combobox', { name: 'Account type' });
+
+  it('heads each section with its name and what it means, and never as a choice', async () => {
+    const user = userEvent.setup();
+    render(<Sectioned />);
+    await user.click(field());
+
+    expect(screen.getByText('What you own')).toBeInTheDocument();
+    expect(screen.getByText('What you owe')).toBeInTheDocument();
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Bank', 'Cash', 'Loans']);
+  });
+
+  it('tells a screen reader which section an option is in', async () => {
+    const user = userEvent.setup();
+    render(<Sectioned />);
+    await user.click(field());
+
+    expect(screen.getByRole('option', { name: 'Cash' })).toHaveAccessibleDescription('Assets What you own');
+    expect(screen.getByRole('option', { name: 'Loans' })).toHaveAccessibleDescription('Liabilities What you owe');
+  });
+
+  it('says on the closed field which side the choice is on', async () => {
+    const user = userEvent.setup();
+    render(<Sectioned />);
+    expect(field()).toHaveTextContent('BankAsset');
+
+    await user.click(field());
+    await user.click(screen.getByRole('option', { name: 'Loans' }));
+    expect(field()).toHaveTextContent('LoansLiability');
+  });
+
+  it('draws a plain optgroup as it always was: a heading, no badge', async () => {
+    const user = userEvent.setup();
+    const Plain = () => (
+      <SelectField label="Plain" value="a" onChange={() => {}}>
+        <optgroup label="Letters">
+          <option value="a">A</option>
+        </optgroup>
+      </SelectField>
+    );
+    render(<Plain />);
+    expect(screen.getByRole('combobox', { name: 'Plain' })).toHaveTextContent(/^A$/);
+    await user.click(screen.getByRole('combobox', { name: 'Plain' }));
+    expect(screen.getByText('Letters')).toBeInTheDocument();
+  });
+});

@@ -165,6 +165,10 @@ it.
 listed *inside* their account on the Accounts page: indented beneath it behind an inset hairline,
 in a smaller, muted figure, because they are part of the account's figure rather than added to it.
 The account's own row shows everything it holds and says its main balance in the line beneath.
+A pocket is made from inside its account (**New pocket**) with a form of its own — a name, what
+to move in from that account, a note — and never asks what kind of account it is, which bank, or
+when it was opened: all of that is its account's. Its amount is drawn in the transfer colour,
+because it is money moved, not money arriving.
 
 
 ## 4. Typography
@@ -257,7 +261,7 @@ type="date">` is a wheel on iOS, a dialog on Android and a small grey box in des
 
 | Instead of | Use | Notes |
 | --- | --- | --- |
-| `<select>` | `SelectField` → `Select` | Listbox pattern. `onChange` hands over the **value**, not a DOM event |
+| `<select>` | `SelectField` → `Select` | Listbox pattern. `onChange` hands over the **value**, not a DOM event. `<optgroup>` makes sections; `data-hint`, `data-tone` (`success`, `danger`, `neutral`), `data-icon` and `data-badge` on it make one you can tell apart at a glance — a sticky heading with a coloured icon and a caption, its options indented under the name, and the badge repeated on the closed field beside the choice. The account form's Assets (+, green, "What you own") and Liabilities (−, red, "What you owe") are the model |
 | `<input type="date">` | `DateField` → `DatePicker` | Speaks the same `YYYY-MM-DD` strings as the rest of the app, so no `Date` drifts across a timezone. Weeks start Monday |
 | `<input type="checkbox">` | `CheckboxField` | `role="checkbox"` button, so the tick and the focus ring are the app's |
 | A free-text number with a fixed range | A picker that cannot express an invalid value | `DayOfMonthPicker` is the model |
