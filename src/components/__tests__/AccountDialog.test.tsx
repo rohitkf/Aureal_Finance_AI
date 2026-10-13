@@ -113,9 +113,70 @@ describe('editing an existing account', () => {
     expect(sent()[0].openingBalance).toBeUndefined();
   });
 
-  it('does not offer to set a balance at all', () => {
+  it('offers the balance it has now, and saving it unchanged records nothing', async () => {
+    const user = userEvent.setup();
     render(<AccountDialog open onClose={vi.fn()} editing={EXISTING} />);
-    expect(screen.queryByLabelText('Balance today')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Balance today')).toHaveValue('1234');
+    await user.click(screen.getByRole('button', { name: /Save changes/ }));
+    expect(sent().map((a) => a.type)).toEqual(['upsert-account']);
+  });
+});
+
+/*
+ * Payments that never got logged. Setting the balance to what the bank says
+ * records the difference as a Balance adjustment dated today — counted as
+ * spending or income — because every balance is derived from transactions.
+ */
+describe('setting an existing balance by hand', () => {
+  const setBalance = async (user: ReturnType<typeof userEvent.setup>, value: string) => {
+    const field = screen.getByLabelText(/Balance (owed )?today/);
+    await user.clear(field);
+    await user.type(field, value);
+  };
+
+  it('records a lower balance as spending of the difference', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={EXISTING} />);
+    await setBalance(user, '1187.60');
+    expect(screen.getByText(/−£12\.40 will be recorded as a Balance adjustment today, and counted as spending/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Save changes/ }));
+
+    expect(sent().map((a) => a.type)).toEqual(['upsert-account', 'add-transaction']);
+    expect(sent()[0].account.balance).toBe(1200);
+    expect(sent()[1].transaction).toMatchObject({
+      merchant: 'Balance adjustment',
+      amount: 12.4,
+      type: 'expense',
+      accountId: 'acc-1',
+      date: '2026-09-22',
+      status: 'cleared',
+    });
+    expect(sent()[1].transaction.isOpening).toBeUndefined();
+  });
+
+  it('records a higher balance as income of the difference', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={EXISTING} />);
+    await setBalance(user, '1250');
+    await user.click(screen.getByRole('button', { name: /Save changes/ }));
+    expect(sent()[1].transaction).toMatchObject({ amount: 50, type: 'income' });
+  });
+
+  it('can take an account overdrawn', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={EXISTING} />);
+    await setBalance(user, '-30');
+    await user.click(screen.getByRole('button', { name: /Save changes/ }));
+    expect(sent()[1].transaction).toMatchObject({ amount: 1230, type: 'expense' });
+  });
+
+  it('on a card, owing more is spending and owing less is income', async () => {
+    const user = userEvent.setup();
+    const card = { ...EXISTING, id: 'card', type: 'credit' as const, balance: 300, groupId: 'g-Credit Card' };
+    render(<AccountDialog open onClose={vi.fn()} editing={card} />);
+    await setBalance(user, '345');
+    await user.click(screen.getByRole('button', { name: /Save changes/ }));
+    expect(sent()[1].transaction).toMatchObject({ accountId: 'card', amount: 45, type: 'expense' });
   });
 });
 
