@@ -9,6 +9,7 @@ import {
   lastWorkingDayOfMonth,
   nowTime,
   parseISO,
+  timeOf,
 } from '@/lib/date';
 import { evaluateExpression, isPlainNumber, stripToExpression } from '@/lib/calc';
 import { money } from '@/lib/format';
@@ -278,7 +279,10 @@ export const AddTransactionSheet = ({
     setCategoryChosen(Boolean(editing));
     setNotes(editing?.notes ?? '');
     setDate(editing?.date ?? today);
-    setTime(editing?.time ?? nowTime());
+    // A new one is timed now. An edited one keeps its own time, or the one
+    // it was entered at that day; one with neither stays without, rather
+    // than being stamped with this moment on save.
+    setTime(editing ? (timeOf(editing) ?? '') : nowTime());
     /**
      * A new transaction dated today or earlier has happened; one dated ahead
      * has not.
@@ -503,7 +507,7 @@ export const AddTransactionSheet = ({
     const transaction: Transaction = {
       id: editing?.id ?? newId(),
       date,
-      time: isValidTime(time) ? time : nowTime(),
+      time: isValidTime(time) ? time : editing ? editing.time : nowTime(),
       merchant:
         merchant.trim() ||
         (type === 'transfer'
@@ -808,17 +812,27 @@ export const AddTransactionSheet = ({
               onPick={(s) => onMerchantPicked(s.value)}
             />
             <div className="flex flex-col gap-2">
-              <DateField
-                label="Date"
-                value={date}
-                onChange={(iso) => {
-                  // Chosen directly, so it is taken as meant — no snapping to a
-                  // working day. Some things really do land at a weekend.
-                  setDateMode('custom');
-                  setDate(iso);
-                }}
-                hint={date > today ? 'A future date, so this will appear in your forecast.' : undefined}
-              />
+              {/* When, not only which day — beside it, not folded away. Two
+                  coffees on the same afternoon read in the order they
+                  happened, and a statement that runs a balance down the page
+                  needs that order to be real. A new one starts at the moment
+                  it is entered. */}
+              <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] items-start gap-3">
+                <DateField
+                  label="Date"
+                  value={date}
+                  onChange={(iso) => {
+                    // Chosen directly, so it is taken as meant — no snapping to a
+                    // working day. Some things really do land at a weekend.
+                    setDateMode('custom');
+                    setDate(iso);
+                  }}
+                />
+                <TimeField label="Time" value={time} onChange={setTime} />
+              </div>
+              {date > today && (
+                <p className="pl-1 text-[12.5px] leading-snug text-faint">A future date, so this will appear in your forecast.</p>
+              )}
               <div className="flex flex-wrap gap-2">
                 <Chip active={dateMode === 'today'} onClick={() => setDateFromMode('today')}>
                   Today
@@ -883,7 +897,7 @@ export const AddTransactionSheet = ({
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-medium text-text">More options</span>
                 <span className="block truncate text-[12.5px] text-muted">
-                  Time, repeats, split, labels and notes
+                  Repeats, split, labels and notes
                 </span>
               </span>
               <Icon
@@ -896,11 +910,6 @@ export const AddTransactionSheet = ({
 
           {showMore && (
             <div id="transaction-more" className="animate-fade-in space-y-5">
-          {/* When, not only which day. Two coffees on the same afternoon
-              read in the order they happened, and a statement that runs a
-              balance down the page needs that order to be real. */}
-          <TimeField label="Time" value={time} onChange={setTime} />
-
           {/* On a new transaction this is the only status question worth
               asking, and the date answers it: today or earlier has happened,
               ahead has not. Tick it for a bill due today that has not gone
