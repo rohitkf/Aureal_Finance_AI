@@ -81,6 +81,8 @@ export const AccountDetail = () => {
   const parent = account.parentAccountId ? state.accounts.find((a) => a.id === account.parentAccountId) : undefined;
   /** With pockets, the headline is everything the account holds, as Revolut shows it. */
   const pockets = pocketsOf(account.id, state.accounts);
+  /** The main balance and every pocket in it — the balance itself when there are none. */
+  const total = pockets.length ? accountTotal(account, state.accounts) : account.balance;
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -123,16 +125,41 @@ export const AccountDetail = () => {
         </div>
 
         <div className="text-left lg:text-right">
-          <Eyebrow>{owesMoney(account) ? 'Balance owed' : pockets.length ? 'Total, with pockets' : 'Current balance'}</Eyebrow>
+          {/* What the account is worth all told: its main balance and every
+              pocket inside it, as Revolut and Monzo show an account's total
+              above the pockets that make it up. */}
+          <Eyebrow>{owesMoney(account) ? 'Balance owed' : canHoldPockets(account) ? 'Total worth' : 'Current balance'}</Eyebrow>
           <p className={`figure mt-1 whitespace-nowrap text-[clamp(2.5rem,7vw,3.75rem)] leading-none ${owesMoney(account) ? 'text-danger' : 'text-text'}`}>
-            <FigureText text={money(pockets.length ? accountTotal(account, state.accounts) : account.balance, { masked: maskBalances })} />
+            <FigureText text={money(total, { masked: maskBalances })} />
           </p>
-          {pockets.length > 0 && (
-            <p className="tnum mt-2 text-body-sm text-muted">
-              {money(account.balance, { masked: maskBalances })} main balance ·{' '}
-              {money(accountTotal(account, state.accounts) - account.balance, { masked: maskBalances })} in{' '}
-              {pockets.length === 1 ? '1 pocket' : `${pockets.length} pockets`}
-            </p>
+          {canHoldPockets(account) && (
+            pockets.length > 0 ? (
+              <dl
+                aria-label={`What makes up ${account.name}'s total`}
+                className="well mt-3 min-w-[15rem] space-y-1.5 p-3.5 text-left text-body-sm lg:ml-auto"
+              >
+                <div className="flex items-baseline justify-between gap-6">
+                  <dt className="text-muted">Main balance</dt>
+                  <dd className="tnum text-text">{money(account.balance, { masked: maskBalances })}</dd>
+                </div>
+                {pockets.map((pocket) => (
+                  <div key={pocket.id} className="flex items-baseline justify-between gap-6">
+                    <dt className="min-w-0 truncate">
+                      <Link to={`/accounts/${pocket.id}`} className="text-muted hover:text-primary hover:underline">
+                        {pocket.name}
+                      </Link>
+                    </dt>
+                    <dd className="tnum text-text">{money(pocket.balance, { masked: maskBalances })}</dd>
+                  </div>
+                ))}
+                <div className="flex items-baseline justify-between gap-6 pt-1.5 shadow-[inset_0_1px_0_0_rgb(var(--hairline)/var(--hairline-alpha))]">
+                  <dt className="font-medium text-text">Total</dt>
+                  <dd className="tnum font-medium text-text">{money(total, { masked: maskBalances })}</dd>
+                </div>
+              </dl>
+            ) : (
+              <p className="mt-2 text-body-sm text-muted">All of it in the main balance — no pockets yet.</p>
+            )
           )}
         </div>
       </header>
