@@ -121,7 +121,10 @@ Other things that are true and not guessable:
 - **Balances are never written by the app.** A Postgres trigger maintains
   `accounts.balance` from the rows in `transactions`. Setting a balance
   directly is always wrong; record a transaction instead. An opening balance
-  is a transaction — see `AccountDialog.tsx`.
+  is a transaction — see `AccountDialog.tsx`. So is setting an existing
+  account's balance by hand: the form records the difference as a **Balance
+  adjustment** dated today, an ordinary income or expense (owing more on a
+  card is an expense) that counts in spending and income like any other.
 - **`amount` is always positive.** `type` carries the direction. A check
   constraint enforces it.
 - **A recurrence never drifts.** A monthly rule anchored to the 31st pays on

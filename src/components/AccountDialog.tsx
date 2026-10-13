@@ -3,6 +3,7 @@ import { newId, useAppState, useStore, useToday } from '@/lib/store';
 import type { Account, AccountGroup } from '@/lib/types';
 import { cashFlowByDefault, groupOf, kindOf, sortGroups, STANDARD_GROUPS } from '@/lib/accountGroups';
 import { owesMoney } from '@/lib/finance';
+import { money, round2 } from '@/lib/format';
 import { Button } from './ui/Button';
 import { AmountField, CheckboxField, DateField, SelectField, TextAreaField, TextField, Toggle } from './ui/Field';
 import { DayOfMonthPicker } from './ui/DayOfMonthPicker';
@@ -212,6 +213,13 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
 
   const isCredit = type === 'credit';
   const parsedBalance = Number.parseFloat(balance) || 0;
+  /**
+   * Setting an existing account's balance by hand — for the payments that
+   * never got logged. The database derives every balance from transactions,
+   * so the difference is recorded as one: a Balance adjustment, dated today,
+   * that counts as spending or income like anything else.
+   */
+  const adjustment = editing && balance.trim() !== '' && balance !== '-' ? round2(parsedBalance - editing.balance) : 0;
   const valid = name.trim().length > 0 && (Boolean(group) || (needsGroup && Boolean(parent)));
 
   const save = () => {
@@ -288,6 +296,26 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
       openedOn: editing ? undefined : openedOn,
     });
 
+    if (editing && adjustment !== 0) {
+      // On something you owe the balance is the debt, so owing more is money
+      // out; anywhere else more is money in.
+      const up = adjustment > 0;
+      dispatch({
+        type: 'add-transaction',
+        transaction: {
+          id: newId(),
+          date: today,
+          merchant: 'Balance adjustment',
+          amount: Math.abs(adjustment),
+          type: up === owesMoney(editing) ? 'expense' : 'income',
+          accountId: editing.id,
+          categoryId: '',
+          status: 'cleared',
+          notes: `Balance set to ${money(parsedBalance)} by hand; this is the difference.`,
+        },
+      });
+    }
+
     toast({
       tone: 'success',
       title: asPocket ? (editing ? 'Pocket updated' : 'Pocket created') : editing ? 'Account updated' : 'Account added',
@@ -310,7 +338,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
       title={asPocket ? (editing ? 'Edit pocket' : 'New pocket') : editing ? 'Edit account' : 'Add an account'}
       description={
         editing
-          ? 'Balances update from your transactions, so they can’t be edited directly.'
+          ? 'Set the balance to match your bank and the difference is recorded for you.'
           : asPocket
             ? `Money set aside inside ${parent?.name ?? 'this account'}, and still part of its total — for bills, subscriptions or a trip.`
             : 'Accounts are entered by hand for now. Bank connections are coming.'
@@ -331,7 +359,26 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
       }
     >
       <div className="space-y-8">
-        {!editing && (
+        {editing ? (
+          <AmountField
+            label={owesMoney(editing) ? 'Balance owed today' : 'Balance today'}
+            value={balance}
+            tone={(adjustment < 0) === !owesMoney(editing) ? 'expense' : 'income'}
+            onChange={(e) => {
+              // An overdrawn account is below zero, so a leading minus is kept
+              // here; what is owed on a card is already a positive figure.
+              const minus = !owesMoney(editing) && e.target.value.trim().startsWith('-');
+              setBalance((minus ? '-' : '') + sanitizeAmount(e.target.value));
+            }}
+            hint={
+              adjustment === 0
+                ? 'Change it to match your bank. The difference is recorded as a Balance adjustment.'
+                : `${adjustment > 0 ? '+' : '−'}${money(Math.abs(adjustment))} will be recorded as a Balance adjustment today, and counted as ${
+                    (adjustment > 0) === !owesMoney(editing) ? 'income' : 'spending'
+                  }.`
+            }
+          />
+        ) : (
           <AmountField
             label={parent ? 'In the pocket today' : owesMoney({ type }) ? 'Balance owed today' : 'Balance today'}
             value={balance}
