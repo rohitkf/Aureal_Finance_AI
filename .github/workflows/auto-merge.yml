@@ -17,6 +17,14 @@
 #   - every check run on the head commit has finished and none failed
 #   - nobody has requested changes
 # Put a `do-not-merge` label on a pull request to hold it back by hand.
+#
+# A push to develop runs CI twice: once for the push and once for the pull
+# request it updates. This used to act on the pull request's run alone, so
+# when that one finished first it found the push's checks still running,
+# declined — and the push's run, finishing later, was ignored. The pull
+# request sat green and unmerged. Now either run can merge: whichever finishes
+# last finds every check done. The two are queued rather than run side by side,
+# and a merge the other run already made is not an error.
 
 name: Auto-merge
 
@@ -24,6 +32,12 @@ on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+
+# One at a time, so the push's run and the pull request's run never both
+# decide at once.
+concurrency:
+  group: auto-merge
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -34,7 +48,9 @@ jobs:
   merge:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'pull_request'
+      (github.event.workflow_run.event == 'pull_request' ||
+       (github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'develop'))
     runs-on: ubuntu-latest
     steps:
       - name: Merge the pull request if everything is green
@@ -109,10 +125,21 @@ jobs:
                 continue
               }
 
-              await github.rest.pulls.merge({
-                owner, repo, pull_number: pr.number,
-                merge_method: 'merge',
-                commit_title: `${pr.title} (#${pr.number})`,
-              })
-              say('merged')
+              try {
+                await github.rest.pulls.merge({
+                  owner, repo, pull_number: pr.number,
+                  merge_method: 'merge',
+                  commit_title: `${pr.title} (#${pr.number})`,
+                  // Only the commit that was checked: a push landing in
+                  // between is refused rather than merged untested.
+                  sha: pr.head.sha,
+                })
+                say('merged')
+              } catch (error) {
+                const { data: now } = await github.rest.pulls.get({
+                  owner, repo, pull_number: pr.number,
+                })
+                if (now.merged) { say('already merged by the other CI run'); continue }
+                throw error
+              }
             }
