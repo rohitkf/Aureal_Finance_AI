@@ -331,6 +331,13 @@ export const Settings = () => {
             </p>
           </div>
         </div>
+        {/* The same switch as on the dashboard's Total balance card. */}
+        <Toggle
+          checked={state.settings.includeVirtual ?? true}
+          onChange={(on) => dispatch({ type: 'update-settings', settings: { includeVirtual: on } })}
+          label="Include pockets & virtual accounts"
+          description="Count their money in your total balance and Safe to Spend. Each one can still be left out on its own page. Your net worth includes them either way."
+        />
       </Card>
 
       {/* ---------------- Currency & region ---------------- */}

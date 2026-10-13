@@ -16,6 +16,7 @@ export interface ProfileRow {
   theme: 'light' | 'dark' | 'system';
   row_accents: Record<string, string> | null;
   due_horizon_days: number;
+  include_virtual?: boolean;
   /** The app's accent colour. One of `TINTS`; the column refuses anything else. */
   tint?: string | null;
   created_at: string;

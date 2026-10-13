@@ -130,6 +130,7 @@ const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   accents: DEFAULT_ACCENTS,
   dueHorizonDays: 2,
+  includeVirtual: true,
   tint: DEFAULT_TINT,
 };
 
@@ -981,6 +982,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             // `resolveAccents` merges it over the defaults on the way back in.
             if (s.accents !== undefined) patch.row_accents = s.accents;
             if (s.dueHorizonDays !== undefined) patch.due_horizon_days = s.dueHorizonDays;
+            if (s.includeVirtual !== undefined) patch.include_virtual = s.includeVirtual;
             if (s.tint !== undefined) patch.tint = s.tint;
             // Reflect it immediately — these are preferences, not money.
             setState((prev) => ({ ...prev, settings: { ...prev.settings, ...s } }));

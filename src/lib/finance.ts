@@ -88,10 +88,16 @@ export const isCounted = (a: Pick<Account, 'excluded'>): boolean => !a.excluded;
  */
 export const reported = (state: AppState): AppState => {
   const out = new Set(state.accounts.filter((a) => !isCounted(a)).map((a) => a.id));
-  if (out.size === 0) return state;
+  // Pockets and virtual accounts switched out of the balance all at once (the
+  // dashboard's switch, `includeVirtual`): still here, still in net worth, but
+  // no longer money to spend in any figure that starts from cash flow.
+  const virtualOne = (a: Account) => isVirtualIn(a, state.accountGroups);
+  const gated = state.settings.includeVirtual === false && state.accounts.some(virtualOne);
+  if (out.size === 0 && !gated) return state;
+  const accounts = state.accounts.filter((a) => !out.has(a.id));
   return {
     ...state,
-    accounts: state.accounts.filter((a) => !out.has(a.id)),
+    accounts: gated ? accounts.map((a) => (virtualOne(a) ? { ...a, cashFlow: false } : a)) : accounts,
     // A transfer *into* an excluded account still left the account it came
     // from, so only the account a row belongs to decides.
     transactions: state.transactions.filter((t) => !out.has(t.accountId)),
@@ -436,6 +442,10 @@ export const canHoldPockets = (account: Account): boolean =>
 /** A virtual account: part of a bank account, or one standing in the Virtual Accounts group. */
 export const isVirtual = (account: Account, groupName?: string): boolean =>
   Boolean(account.parentAccountId) || groupName?.trim().toLowerCase() === 'virtual accounts';
+
+/** A pocket, or an account in the Virtual Accounts group, judged with the groups at hand. */
+export const isVirtualIn = (account: Account, groups: AccountGroup[]): boolean =>
+  isVirtual(account, groups.find((g) => g.id === account.groupId)?.name);
 
 /**
  * Everything an account holds, its pockets included.
