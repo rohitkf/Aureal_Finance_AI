@@ -163,6 +163,12 @@ export interface Transaction {
   date: string;
   /** 24h time, used for ordering inside a day. */
   time?: string;
+  /**
+   * When it was entered — the database's `created_at`. Never typed: it orders
+   * lines with no time of their own, newest first, and stands in as their
+   * time on the day they were entered. See `timeOf`.
+   */
+  createdAt?: string;
   merchant: string;
   /** Always positive; `type` carries the direction. */
   amount: number;

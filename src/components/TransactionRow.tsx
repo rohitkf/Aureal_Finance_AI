@@ -1,7 +1,7 @@
 import { cn } from '@/lib/cn';
 import { ACCENT_BAR, ACCENT_TEXT, kindOf } from '@/lib/accents';
 import { StatusMark } from './StatusMark';
-import { relativeDueLabel } from '@/lib/date';
+import { formatTime, relativeDueLabel, timeOf } from '@/lib/date';
 import { money } from '@/lib/format';
 import { useAppState, useCategoryLookup, useLabelLookup, useSettings, useToday } from '@/lib/store';
 import { LabelChip } from './LabelPicker';
@@ -101,10 +101,10 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
                 {overdue ? `Overdue · ${relativeDueLabel(transaction.date, today)}` : relativeDueLabel(transaction.date, today)}
               </span>
             </>
-          ) : transaction.time ? (
+          ) : timeOf(transaction) ? (
             <>
               <span aria-hidden="true">·</span>
-              <span className="shrink-0 tabular-nums text-faint">{transaction.time}</span>
+              <span className="shrink-0 tabular-nums text-faint">{formatTime(timeOf(transaction)!)}</span>
             </>
           ) : null}
         </div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
-import { formatFullDate, formatMediumDate, formatTime, monthKey, relativeDayLabel } from '@/lib/date';
+import { formatFullDate, formatMediumDate, formatTime, monthKey, relativeDayLabel, timeOf } from '@/lib/date';
 import { downloadCsv } from '@/lib/csv';
 import { inAndOut, isMovement } from '@/lib/finance';
 import { Register } from '@/components/Register';
@@ -149,7 +149,14 @@ export const Transactions = () => {
           (t.labelIds ?? []).some((id) => (lookupLabel(id)?.name ?? '').toLowerCase().includes(q))
         );
       })
-      .sort((a, b) => (a.date === b.date ? (b.time ?? '').localeCompare(a.time ?? '') : b.date.localeCompare(a.date)));
+      // Newest first: by day, then time within it, then — for lines without
+      // one — the order they were entered.
+      .sort(
+        (a, b) =>
+          b.date.localeCompare(a.date) ||
+          (timeOf(b) ?? '').localeCompare(timeOf(a) ?? '') ||
+          (b.createdAt ?? '').localeCompare(a.createdAt ?? ''),
+      );
   }, [
     state.transactions,
     query,
@@ -686,7 +693,7 @@ const TransactionDetail = ({
       </div>
 
       <dl className="space-y-0.5">
-        <Row label="Date" value={transaction.time ? `${formatFullDate(transaction.date)}, ${formatTime(transaction.time)}` : formatFullDate(transaction.date)} />
+        <Row label="Date" value={timeOf(transaction) ? `${formatFullDate(transaction.date)}, ${formatTime(timeOf(transaction)!)}` : formatFullDate(transaction.date)} />
         <Row label="Type" value={transaction.isOpening ? 'Opening balance' : TYPE_WORD[transaction.type]} />
         <Row label="Category" value={category.name} />
         <Row label="Account" value={account?.name ?? '—'} />
