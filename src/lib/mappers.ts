@@ -188,6 +188,7 @@ export const toSettings = (row: ProfileRow): Settings => ({
   theme: row.theme,
   accents: resolveAccents(row.row_accents),
   dueHorizonDays: row.due_horizon_days ?? 2,
+  includeVirtual: row.include_virtual ?? true,
   // Absent on a database the migration has not reached yet; lime, as the
   // column's own default, until it has.
   tint: isTint(row.tint) ? row.tint : DEFAULT_TINT,

@@ -171,6 +171,9 @@ A pocket is made from inside its account (**New pocket**) with a form of its own
 today, a name, a note, and **Count in my balance** — and never asks what kind of account it is,
 which bank, or when it was opened: all of that is its account's. What it holds is its own: the
 account's main balance is left as it was, and the two add up to its total worth.
+The dashboard's Total balance card carries **Include pockets & virtual accounts** (also in
+Settings → Safe to Spend), shown once there is one, saying how much is in them: off leaves them all
+out of the total and Safe to Spend, on lets each one's own switch decide.
 
 
 ## 4. Typography

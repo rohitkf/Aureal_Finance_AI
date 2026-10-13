@@ -83,7 +83,7 @@ interface AccountDialogProps {
 export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, pocketOf }: AccountDialogProps) => {
   const { dispatch } = useStore();
   const today = useToday();
-  const { accountGroups, accounts } = useAppState();
+  const { accountGroups, accounts, settings } = useAppState();
   const toast = useToast();
   const [groupId, setGroupId] = useState('');
   const [newGroupOpen, setNewGroupOpen] = useState(false);
@@ -433,7 +433,9 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
                 onChange={setCounted}
                 label="Count in my balance"
                 description={
-                  countsInBalance
+                  settings?.includeVirtual === false
+                    ? 'Pockets and virtual accounts are switched off on the dashboard, so none count for now. This applies once they are back on.'
+                    : countsInBalance
                     ? 'Included in your total balance and Safe to Spend, beside your other accounts.'
                     : `Kept out of your total balance and Safe to Spend. Still in your net worth${parent ? ` and in ${parent.name}'s total worth` : ''}.`
                 }

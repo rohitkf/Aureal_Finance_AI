@@ -209,7 +209,14 @@ describe('toSettings', () => {
       dueHorizonDays: 2,
       // Absent before the tint migration: lime, as the column defaults to.
       tint: 'lime',
+      // Absent before pockets could be left out: they count, as the column defaults to.
+      includeVirtual: true,
     });
+  });
+
+  it('reads whether pockets and virtual accounts count in the balance', () => {
+    const s = toSettings({ display_name: 'Rohit', locale: 'en-GB', include_virtual: false } as unknown as ProfileRow);
+    expect(s.includeVirtual).toBe(false);
   });
 
   it('reads the tint the profile chose', () => {

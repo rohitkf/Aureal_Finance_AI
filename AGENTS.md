@@ -67,8 +67,11 @@ available now
   − the minimum balance you said to leave alone
 ```
 
-A virtual account counts here only if its "Count in my balance" switch is on
-(`cash_flow`) — on by default for a pocket, off for one standing on its own.
+A virtual account counts here only if pockets and virtual accounts are included
+(`profiles.include_virtual`, the switch on the dashboard's Total balance card and
+in Settings — off leaves every one out, in `reported`) and its own "Count in my
+balance" switch is on (`cash_flow`) — on by default for a pocket, off for one
+standing on its own. Net worth and an account's total worth include them always.
 Money moved into one by a transfer leaves "available now" only if it ends
 somewhere that does not count.
 

@@ -4,7 +4,9 @@ import {
   balanceHistory,
   buildForecast,
   budgetProgress,
+  isCounted,
   isSpendable,
+  isVirtualIn,
   monthIncome,
   monthSpend,
   reported,
@@ -12,7 +14,7 @@ import {
 } from '@/lib/finance';
 import { formatDay, formatMonthYear, greeting, monthKey, relativeDueLabel } from '@/lib/date';
 import { money, round2 } from '@/lib/format';
-import { useAppState, useCategoryLookup, useLoading, useSettings, useToday } from '@/lib/store';
+import { useAppState, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { BalanceChart } from '@/components/charts/BalanceChart';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { CategoryIcon } from '@/components/CategoryIcon';
@@ -22,7 +24,7 @@ import { ArrowLink, ButtonLink } from '@/components/ui/Button';
 import { Card, CardHeader, Eyebrow, Label, PageHeader, StatGroup } from '@/components/ui/Card';
 import { FigureText } from '@/components/ui/Figure';
 import { Reveal } from '@/components/ui/Reveal';
-import { SegmentedControl } from '@/components/ui/Field';
+import { SegmentedControl, Toggle } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
 import { Progress } from '@/components/ui/Progress';
 import { EmptyState, SkeletonCard, SkeletonChart, SkeletonRows } from '@/components/ui/States';
@@ -50,7 +52,8 @@ const FILTERS: Array<{ value: AccountType | 'all'; label: string }> = [
 export const Dashboard = () => {
   const state = useAppState();
   const today = useToday();
-  const { maskBalances } = useSettings();
+  const { maskBalances, includeVirtual = true } = useSettings();
+  const { dispatch } = useStore();
   const loading = useLoading();
   const lookupCategory = useCategoryLookup();
   const accountName = (id: string) => state.accounts.find((a) => a.id === id)?.name ?? 'Closed account';
@@ -70,6 +73,14 @@ export const Dashboard = () => {
   const filteredAccounts =
     filter === 'all' ? counted.filter(isSpendable) : counted.filter((a) => a.type === filter);
   const filteredTotal = round2(filteredAccounts.reduce((s, a) => s + a.balance, 0));
+
+  /**
+   * Pockets and virtual accounts: their money is their own, always in net
+   * worth. Whether it is also counted here and in Safe to Spend is one switch
+   * on this card for all of them; on, each one's own switch decides.
+   */
+  const virtualAccounts = state.accounts.filter((a) => isCounted(a) && isVirtualIn(a, state.accountGroups));
+  const inVirtual = round2(virtualAccounts.reduce((s, a) => s + a.balance, 0));
 
   const monthToDateIncome = monthIncome(state, month);
   const trend = useMemo(() => balanceHistory(state, today, 30), [state, today]);
@@ -173,6 +184,21 @@ export const Dashboard = () => {
                       ? `Across the ${filteredAccounts.length === 1 ? 'account' : `${filteredAccounts.length} accounts`} in your cash flow`
                       : `Across ${filteredAccounts.length} account${filteredAccounts.length === 1 ? '' : 's'}`}
                   </p>
+
+                  {filter === 'all' && virtualAccounts.length > 0 && (
+                    <div className="-mx-2 mt-3">
+                      <Toggle
+                        checked={includeVirtual}
+                        onChange={(on) => dispatch({ type: 'update-settings', settings: { includeVirtual: on } })}
+                        label="Include pockets & virtual accounts"
+                        description={
+                          includeVirtual
+                            ? `Counted here and in Safe to Spend, except any you switched off on its own page. ${money(inVirtual, { masked: maskBalances })} in ${virtualAccounts.length === 1 ? '1 of them' : `${virtualAccounts.length} of them`}.`
+                            : `Left out of this figure and Safe to Spend. ${money(inVirtual, { masked: maskBalances })} in ${virtualAccounts.length === 1 ? '1 of them' : `${virtualAccounts.length} of them`}, still in your net worth.`
+                        }
+                      />
+                    </div>
+                  )}
 
                   {/* The filter changes this figure and nothing else, so it
                       lives on this card rather than over the whole page. */}

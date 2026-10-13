@@ -319,6 +319,13 @@ export interface Settings {
    * March. 0 turns the labels off.
    */
   dueHorizonDays: number;
+  /**
+   * Whether pockets and virtual accounts count in the total balance and Safe
+   * to Spend. Off: none of them do. On (or absent): each one's own "Count in
+   * my balance" switch (`Account.cashFlow`) decides. Net worth and an
+   * account's total worth include them either way. See `reported`.
+   */
+  includeVirtual?: boolean;
   /** The app's accent colour — every button, selection and glow is drawn in it. */
   tint: Tint;
 }

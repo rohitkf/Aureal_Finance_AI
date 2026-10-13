@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ACCENTS } from '@/lib/accents';
 import { STANDARD_GROUPS, cashFlowByDefault } from '@/lib/accountGroups';
-import { accountTotal, accountTrace, availableNow, buildForecast, netWorth, pocketOutlook, pocketsOf, safeToSpend } from '@/lib/finance';
+import { accountTotal, accountTrace, availableNow, buildForecast, netWorth, pocketOutlook, pocketsOf, reported, safeToSpend } from '@/lib/finance';
 import { timeMachine } from '@/lib/timeMachine';
 import { emptyAppState } from '@/lib/mappers';
 import type { Account, AccountGroup, AppState, RecurringPayment, Settings } from '@/lib/types';
@@ -229,3 +229,56 @@ describe('a pocket of a bank account', () => {
 });
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+/*
+ * The person's own example: the main account shows £100, its Travel pocket
+ * £20. Net worth is £120 whatever is chosen. The total balance and Safe to
+ * Spend are £120 with pockets included and £100 without — one switch for all
+ * of them, and each pocket's own switch while that one is on.
+ */
+describe('choosing whether pockets count in your balance', () => {
+  const MAIN: Account = { ...CURRENT, id: 'main', name: 'Main', balance: 100 };
+  const TRAVEL: Account = { ...BILLS, id: 'travel', name: 'Travel', balance: 20, parentAccountId: 'main', cashFlow: true };
+  const stateWith = (includeVirtual: boolean | undefined, travel: Account = TRAVEL): AppState => ({
+    ...emptyAppState({ ...SETTINGS, includeVirtual }),
+    accountGroups: GROUPS,
+    accounts: [MAIN, travel],
+  });
+  const totalBalance = (s: AppState) => availableNow(reported(s).accounts);
+
+  it('keeps the pocket apart from the main balance, and both in net worth', () => {
+    const s = stateWith(true);
+    expect(MAIN.balance).toBe(100);
+    expect(accountTotal(MAIN, s.accounts)).toBe(120);
+    expect(netWorth(s.accounts, GROUPS)).toBe(120);
+  });
+
+  it('counts £120 with pockets included', () => {
+    const s = stateWith(true);
+    expect(totalBalance(s)).toBe(120);
+    expect(safeToSpend(s, TODAY).amount).toBe(120);
+  });
+
+  it('counts £100 with them left out, and net worth stays £120', () => {
+    const s = stateWith(false);
+    expect(totalBalance(s)).toBe(100);
+    expect(safeToSpend(s, TODAY).amount).toBe(100);
+    expect(netWorth(reported(s).accounts, GROUPS)).toBe(120);
+  });
+
+  it('counts them when nobody has chosen, as the column defaults to', () => {
+    expect(totalBalance(stateWith(undefined))).toBe(120);
+  });
+
+  it('lets one pocket be left out on its own while the rest count', () => {
+    const s = stateWith(true, { ...TRAVEL, cashFlow: false });
+    expect(totalBalance(s)).toBe(100);
+  });
+
+  it('covers a standalone virtual account too', () => {
+    const portal: Account = { ...BILLS, id: 'portal', name: 'Investment portal', balance: 300, cashFlow: true };
+    const s = { ...stateWith(true), accounts: [MAIN, TRAVEL, portal] };
+    expect(totalBalance(s)).toBe(420);
+    expect(totalBalance({ ...s, settings: { ...s.settings, includeVirtual: false } })).toBe(100);
+  });
+});

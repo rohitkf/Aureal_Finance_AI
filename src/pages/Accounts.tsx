@@ -10,6 +10,7 @@ import {
   isCounted,
   netWorth,
   owesMoney,
+  reported,
   sideOf,
   totalCreditLimit,
   totalDebt,
@@ -117,10 +118,10 @@ export const Accounts = () => {
 
   // The headline is spendable cash, so its count must be of the same accounts.
   // An investment sits in the list below but is not money you can spend today.
-  const spendable = state.accounts.filter((a) => isCounted(a) && isSpendable(a));
+  const spendable = reported(state).accounts.filter((a) => isCounted(a) && isSpendable(a));
   // Everything the "Total owed" figure adds up, so the count and the sum agree.
   const owing = state.accounts.filter((a) => isCounted(a) && sideOf(a, state.accountGroups) === 'liability');
-  const liquid = availableNow(state.accounts);
+  const liquid = availableNow(reported(state).accounts);
   const debt = totalDebt(state.accounts, state.accountGroups);
 
   if (loading) {
