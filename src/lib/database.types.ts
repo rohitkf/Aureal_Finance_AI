@@ -63,21 +63,6 @@ export interface AccountRow {
   updated_at: string;
 }
 
-export interface VirtualAccountRow {
-  id: string;
-  user_id: string;
-  parent_account_id: string;
-  name: string;
-  description: string;
-  allocated: number;
-  target: number | null;
-  target_date: string | null;
-  icon: string;
-  locked: boolean;
-  sort_order: number;
-  created_at: string;
-}
-
 export interface RecurringRow {
   id: string;
   user_id: string;

@@ -22,7 +22,6 @@ let tint = 'lime';
 const state = () =>
   ({
     accounts: [],
-    virtualAccounts: [],
     categories: [],
     labels: [],
     transactions: [],

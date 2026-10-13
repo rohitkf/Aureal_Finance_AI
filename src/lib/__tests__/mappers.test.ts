@@ -242,7 +242,6 @@ describe('emptyAppState', () => {
     expect(state.recurring).toEqual([]);
     expect(state.budgets).toEqual([]);
     expect(state.goals).toEqual([]);
-    expect(state.virtualAccounts).toEqual([]);
     expect(state.netWorthHistory).toEqual([]);
     expect(state.settings).toBe(settings);
   });

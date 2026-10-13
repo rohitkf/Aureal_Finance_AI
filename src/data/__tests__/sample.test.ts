@@ -155,7 +155,6 @@ describe('seedSampleData', () => {
   // rather than inferred. See 20260917055955_init_core_schema.sql.
   it.each([
     ['recurring_payments', 'is_subscription'],
-    ['virtual_accounts', 'locked'],
   ])('gives every %s row a real %s', async (table, column) => {
     await seedSampleData();
     const rows = inserts().filter((c) => c.table === table).flatMap((c) => c.rows!);
@@ -181,13 +180,12 @@ describe('seedSampleData', () => {
       await expect(seedSampleData()).rejects.toThrow('boom in net_worth_snapshots');
 
       const deletes = calls.filter((c) => c.op === 'delete');
-      // Accounts go last: transactions and virtual accounts hang off them.
+      // Accounts go last: transactions and goals hang off them.
       expect(deletes.map((d) => d.table)).toEqual([
         'transactions',
         'recurring_payments',
         'budgets',
         'goals',
-        'virtual_accounts',
         'accounts',
       ]);
       // Everything it inserted before the failure is accounted for, exactly once.
@@ -204,5 +202,33 @@ describe('seedSampleData', () => {
       await expect(seedSampleData()).rejects.toThrow('boom in accounts');
       expect(calls.filter((c) => c.op === 'delete')).toEqual([]);
     });
+  });
+});
+
+/*
+ * Virtual accounts, as Bluecoins has them: accounts in the Virtual Accounts
+ * group, filled by a transfer out of the account the money was in.
+ */
+describe('the sample virtual accounts', () => {
+  it('are accounts in the Virtual Accounts group, out of cash flow', async () => {
+    await seedSampleData();
+    const accounts = inserts().filter((c) => c.table === 'accounts').flatMap((c) => c.rows!);
+    const virtual = accounts.filter((a) => a.type === 'asset');
+    expect(virtual.map((a) => a.name)).toEqual(['Fixed Bills', 'Holiday']);
+    for (const a of virtual) expect(a.cash_flow).toBe(false);
+  });
+
+  it('are filled by transfers, so the money is in one place, not both', async () => {
+    await seedSampleData();
+    const moves = inserts()
+      .filter((c) => c.table === 'transactions')
+      .flatMap((c) => c.rows!)
+      .filter((t) => t.type === 'transfer' && typeof t.to_account_id === 'string');
+    expect(moves.map((t) => [t.merchant, t.amount])).toEqual(
+      expect.arrayContaining([
+        ['Set aside for bills', 1200],
+        ['Holiday fund', 420],
+      ]),
+    );
   });
 });

@@ -116,8 +116,9 @@ Plus: global search (`⌘K` / `Ctrl+K`) including natural-language questions suc
   warning, blue is neutral information. Cards are not colour-coded for fun.
 - **Colour is never the only signal.** Every status has a text label beside its colour, so budget
   state, sync status and utilisation all read without colour perception (WCAG 1.4.1).
-- **Virtual accounts are allocations, not extra money.** The Accounts screen says so explicitly and
-  never presents an envelope as a separate balance.
+- **Virtual accounts work as in Bluecoins.** A virtual account is an account of its own in the
+  Virtual Accounts group, for money set aside. You fill it with a transfer from the account the money
+  is in, so it is counted once — and it stays out of Safe to Spend unless you switch it on.
 - **Simple on the surface, everything still there.** Each screen shows the common case; the
   rest is one tap away behind "How this works" or "More options", and opens by itself whenever
   something in it is set.
@@ -310,8 +311,8 @@ Supabase Postgres, with the schema, policies and triggers in `supabase/migration
 | --- | --- |
 | `profiles` | Display name, minimum balance, theme, locale |
 | `categories` | The user's own categories; a starter set is created on sign-up |
-| `accounts` | Current, savings, cash, credit and investment accounts |
-| `virtual_accounts` | Allocations of money inside a real account |
+| `accounts` | Every account — current, savings, cash, cards, loans, assets, and virtual accounts |
+| `account_groups` | The groups accounts sit in, Bluecoins' standard fifteen to start with |
 | `transactions` + `transaction_splits` | The ledger, with multi-category splits |
 | `recurring_payments` | Rules the forecast is built from |
 | `budgets`, `goals`, `net_worth_snapshots` | Planning and history |

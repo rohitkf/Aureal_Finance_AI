@@ -96,22 +96,6 @@ export interface Account {
 }
 
 /**
- * A virtual account is an *allocation* of money that already exists inside a
- * real account. It never adds to net worth — the UI must always say so.
- */
-export interface VirtualAccount {
-  id: string;
-  parentAccountId: string;
-  name: string;
-  description: string;
-  allocated: number;
-  target?: number;
-  targetDate?: string;
-  icon: string;
-  locked?: boolean;
-}
-
-/**
  * A tag that cuts across categories.
  *
  * A category answers "what kind of spending is this" and there is exactly one.
@@ -336,7 +320,6 @@ export interface RecurringSkip {
 
 export interface AppState {
   accounts: Account[];
-  virtualAccounts: VirtualAccount[];
   categories: Category[];
   labels: Label[];
   accountGroups: AccountGroup[];

@@ -10,7 +10,6 @@ import type {
   ForecastEvent,
   NetWorthPoint,
   Transaction,
-  VirtualAccount,
 } from './types';
 import { addDays, addMonths, daysBetween, endOfMonth, monthKey } from './date';
 import { expandRecurrence, monthlyEquivalent } from './recurrence';
@@ -97,7 +96,6 @@ export const reported = (state: AppState): AppState => {
     // from, so only the account a row belongs to decides.
     transactions: state.transactions.filter((t) => !out.has(t.accountId)),
     recurring: state.recurring.filter((r) => !out.has(r.accountId)),
-    virtualAccounts: state.virtualAccounts.filter((v) => !out.has(v.parentAccountId)),
   };
 };
 
@@ -605,8 +603,6 @@ export interface SafeToSpend {
   /** The part of `committed` whose date has already passed. */
   overdue: number;
   reserve: number;
-  /** Locked virtual-account allocations: in the balance, but spoken for. */
-  allocated: number;
   through: string;
   /** Days from today to `through`, both counted: today is still a day to spend in. */
   daysLeft: number;
@@ -625,31 +621,6 @@ export interface SafeToSpend {
    */
   beforeIncome: number;
 }
-
-/**
- * Money sitting in a real account that the person has set aside and locked.
- *
- * A virtual account is a label on money that is already there, so it stays in
- * `availableNow` — that is the whole point of it, and why this screen is
- * emphatic that allocations are not additional funds. But a locked one is
- * money its owner has said is spoken for, and the Accounts screen has been
- * telling them it is "held back from Safe to Spend". It was not. Offering it
- * back to them is the one thing this number must never do.
- *
- * Unlocked allocations are deliberately not counted: they are a plan for the
- * money rather than a commitment, and the screen says so.
- */
-export const lockedAllocations = (virtualAccounts: VirtualAccount[], accounts: Account[]): number => {
-  // Only money that was in "available" to begin with can be held back from it.
-  // An allocation inside an investment account was never counted as
-  // spendable, so subtracting it as well took it off twice.
-  const spendable = new Set(accounts.filter((a) => isCounted(a) && isSpendable(a)).map((a) => a.id));
-  return round2(
-    virtualAccounts
-      .filter((v) => v.locked && spendable.has(v.parentAccountId))
-      .reduce((sum, v) => sum + v.allocated, 0),
-  );
-};
 
 /**
  * What the user can spend between now and the end of the month while still
@@ -671,8 +642,10 @@ export const safeToSpend = (state: AppState, today: string): SafeToSpend => {
   const overdue = round2(outgoing.filter((e) => e.overdue).reduce((s, e) => s + e.amount, 0));
   const available = availableNow(state.accounts);
   const reserve = state.settings.minimumBalance;
-  const allocated = lockedAllocations(state.virtualAccounts, state.accounts);
-  const amount = round2(available + expectedIncome - committed - reserve - allocated);
+  // Money set aside in a virtual account is not in `available` to begin
+  // with: it was moved out by a transfer, and its account is out of cash
+  // flow unless somebody switched it in. Nothing to take off a second time.
+  const amount = round2(available + expectedIncome - committed - reserve);
   const daysLeft = daysBetween(today, through) + 1;
 
   return {
@@ -682,7 +655,6 @@ export const safeToSpend = (state: AppState, today: string): SafeToSpend => {
     committed,
     overdue,
     reserve,
-    allocated,
     through,
     daysLeft,
     perDay: round2(Math.max(0, amount) / daysLeft),

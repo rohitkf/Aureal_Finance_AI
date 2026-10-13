@@ -38,7 +38,6 @@ export const BACKUP_TABLES = [
   'recurring_skips',
   'budgets',
   'goals',
-  'virtual_accounts',
   'net_worth_snapshots',
 ] as const;
 
@@ -106,7 +105,6 @@ export const TABLE_LABELS: Record<BackupTable, string> = {
   recurring_skips: 'skipped occurrences',
   budgets: 'budgets',
   goals: 'goals',
-  virtual_accounts: 'virtual accounts',
   net_worth_snapshots: 'net-worth snapshots',
 };
 
@@ -170,12 +168,16 @@ export const parseBackup = (text: string): ParseResult => {
     data[table] = rows as Row[];
   }
 
+  const exportedAt = typeof candidate.exportedAt === 'string' ? candidate.exportedAt : '';
+  const legacy = (candidate.data as Record<string, unknown>).virtual_accounts;
+  if (Array.isArray(legacy) && legacy.length) upgradeVirtualAccounts(data, legacy as Row[], exportedAt);
+
   return {
     ok: true,
     backup: {
       format: BACKUP_FORMAT,
       version: candidate.version,
-      exportedAt: typeof candidate.exportedAt === 'string' ? candidate.exportedAt : '',
+      exportedAt,
       settings:
         typeof candidate.settings === 'object' && candidate.settings !== null
           ? (candidate.settings as Row)
@@ -194,4 +196,154 @@ export const downloadBackup = (backup: Backup): void => {
   link.download = `aureal-backup-${backup.exportedAt.slice(0, 10)}.json`;
   link.click();
   URL.revokeObjectURL(url);
+};
+
+/**
+ * A backup taken while virtual accounts were allocations, brought up to date.
+ *
+ * Virtual accounts used to be rows in their own table: a share of another
+ * account's balance, with the money left where it was. They are now what
+ * Bluecoins makes them — ordinary accounts in the Virtual Accounts group,
+ * filled by a transfer out of the account the money was in — and the table
+ * is gone. A backup from before that would otherwise restore without them,
+ * silently. So each one is rebuilt here exactly as the migration rebuilt
+ * them in the database (`20261013120000_virtual_accounts_are_accounts.sql`):
+ *
+ * - an account in Virtual Accounts, out of cash flow if it was locked or its
+ *   account was, so Safe to Spend comes out where it was;
+ * - a transfer of what was allocated, out of the account it was carved from,
+ *   so every total still adds up — unless that account was a card or a loan,
+ *   whose balance is a debt and never held the money;
+ * - and a goal on the new account when it had a target and a date.
+ *
+ * Each new row has exactly the columns the backup's own rows of that table
+ * have. A restore inserts a table as one batch, and a column any row has is
+ * written for every row — as NULL where a row lacks it (see `batch`). So a
+ * new row with a column an older backup's rows predate would null that
+ * column on all of them, and a NOT NULL one would sink the restore. The only
+ * columns added are ones that may be NULL.
+ */
+const upgradeVirtualAccounts = (data: Record<BackupTable, Row[]>, legacy: Row[], exportedAt: string): void => {
+  const id = (): string => crypto.randomUUID();
+  const day = /^\d{4}-\d{2}-\d{2}/.test(exportedAt) ? exportedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+
+  /** `row`, cut to the columns `rows` have, plus `nullable` ones that matter. */
+  const fit = (rows: Row[], row: Row, nullable: string[] = []): Row => {
+    if (!rows.length) return row;
+    const keys = new Set([...Object.keys(rows[0]!), ...nullable]);
+    return Object.fromEntries([...keys].map((key) => [key, key in row ? row[key] : null]));
+  };
+
+  let group = data.account_groups.find(
+    (g) => String(g.name).trim().toLowerCase() === 'virtual accounts' && g.side === 'asset',
+  );
+  if (!group) {
+    group = fit(
+      data.account_groups,
+      { id: id(), name: 'Virtual Accounts', side: 'asset', kind: 'asset', sort_order: 90 },
+      ['id', 'name', 'side'],
+    );
+    data.account_groups.push(group);
+  }
+
+  const transferCategory = data.categories
+    .filter((c) => c.kind === 'transfer' && !c.archived)
+    .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))[0];
+
+  for (const v of legacy) {
+    const parent = data.accounts.find((a) => a.id === v.parent_account_id);
+    if (!parent) continue;
+
+    const allocated = Number(v.allocated ?? 0);
+    const target = v.target === null || v.target === undefined ? null : Number(v.target);
+    const targetDate = typeof v.target_date === 'string' ? v.target_date : null;
+    const owes = parent.type === 'credit' || parent.type === 'liability';
+    const spendable =
+      typeof parent.cash_flow === 'boolean'
+        ? parent.cash_flow
+        : parent.type === 'current' || parent.type === 'savings' || parent.type === 'cash';
+    const description = typeof v.description === 'string' ? v.description.trim() : '';
+    const note =
+      [description, target !== null && !targetDate ? `Target ${target.toFixed(2)}` : '']
+        .filter(Boolean)
+        .join(' · ') || null;
+
+    const accountId = typeof v.id === 'string' ? v.id : id();
+    data.accounts.push(
+      fit(
+        [parent],
+        {
+          ...parent,
+          id: accountId,
+          name: v.name,
+          type: 'asset',
+          institution: '',
+          balance: 0,
+          masked_number: '',
+          sync_status: 'manual',
+          last_synced_at: null,
+          credit_limit: null,
+          apr: null,
+          statement_day: null,
+          payment_due_day: null,
+          minimum_payment: null,
+          aer: null,
+          note,
+          group_id: group.id,
+          cash_flow: !v.locked && spendable,
+          sort_order: Number(v.sort_order ?? 0),
+          archived: parent.archived ?? false,
+          excluded: parent.excluded ?? false,
+        },
+        ['group_id', 'cash_flow', 'note'],
+      ),
+    );
+
+    if (allocated > 0 && !owes) {
+      data.transactions.push(
+        fit(
+          data.transactions,
+          {
+            id: id(),
+            account_id: parent.id,
+            to_account_id: accountId,
+            category_id: transferCategory?.id ?? null,
+            occurred_on: day,
+            occurred_at: null,
+            merchant: `Moved to ${String(v.name)}`,
+            amount: allocated,
+            type: 'transfer',
+            status: 'cleared',
+            notes: 'Was an allocation inside this account. Virtual accounts are now accounts of their own.',
+            recurring_id: null,
+            recurring_date: null,
+            receipt_name: null,
+            tax_deductible: false,
+            split_group_id: null,
+            is_opening: false,
+          },
+          ['id', 'account_id', 'to_account_id', 'category_id', 'occurred_on', 'merchant', 'amount', 'type', 'notes'],
+        ),
+      );
+    }
+
+    if (target !== null && targetDate) {
+      data.goals.push(
+        fit(
+          data.goals,
+          {
+            id: id(),
+            name: v.name,
+            target,
+            saved: Math.min(allocated, target),
+            target_date: targetDate,
+            monthly_contribution: 0,
+            icon: typeof v.icon === 'string' && v.icon ? v.icon : 'target',
+            linked_account_id: accountId,
+          },
+          ['id', 'name', 'target', 'saved', 'target_date', 'icon', 'linked_account_id'],
+        ),
+      );
+    }
+  }
 };

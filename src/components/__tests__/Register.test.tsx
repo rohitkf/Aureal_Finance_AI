@@ -82,7 +82,6 @@ beforeEach(() => {
   onSkip.mockClear();
   state = {
     accounts: ACCOUNTS,
-    virtualAccounts: [],
     categories: [],
     labels: [],
     accountGroups: [],

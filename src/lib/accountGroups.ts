@@ -34,6 +34,10 @@ export const STANDARD_GROUPS: ReadonlyArray<{
   { name: 'Other Assets', side: 'asset', kind: 'asset', sortOrder: 60 },
   { name: 'Properties', side: 'asset', kind: 'asset', sortOrder: 70 },
   { name: 'Receivables', side: 'asset', kind: 'asset', sortOrder: 80 },
+  // Bluecoins' Virtual Accounts: money set aside with no real account of its
+  // own. An ordinary account, filled by a transfer out of the account the
+  // money was in; a plain asset, so out of cash flow until switched in.
+  { name: 'Virtual Accounts', side: 'asset', kind: 'asset', sortOrder: 90 },
   { name: 'Credit Card', side: 'liability', kind: 'credit', sortOrder: 110 },
   { name: 'Foreign Liabilities', side: 'liability', kind: 'liability', sortOrder: 120 },
   { name: 'Loans', side: 'liability', kind: 'liability', sortOrder: 130 },

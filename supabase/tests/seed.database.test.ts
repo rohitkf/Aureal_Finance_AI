@@ -11,8 +11,8 @@
  *
  * That combination is what the browser does, and it is the only way a not-null
  * column with a default can fail an insert. It is also exactly how the seed
- * broke: five recurring payments left `is_subscription` out, and three virtual
- * accounts left `locked` out.
+ * broke: five recurring payments left `is_subscription` out, and three of what
+ * were then virtual-account allocations left `locked` out.
  *
  * Needs a database, so it is not part of `npm test`. Run it with
  * `npm run test:db` against a server holding the migrations.
@@ -140,29 +140,40 @@ describe('seedSampleData, against the real schema', () => {
 
     await expect(seedSampleData()).resolves.toBeUndefined();
 
-    expect(count('accounts')).toBe(4);
+    // Four real accounts and two virtual ones.
+    expect(count('accounts')).toBe(6);
     expect(count('recurring_payments')).toBe(8);
-    expect(count('virtual_accounts')).toBe(3);
     expect(count('goals')).toBe(2);
     expect(count('budgets')).toBe(6);
     expect(count('net_worth_snapshots')).toBe(6);
-    // 4 opening balances + 18 everyday + 2 scheduled.
-    expect(count('transactions')).toBe(24);
+    // 4 opening balances + 2 moves into virtual accounts + 18 everyday + 2 scheduled.
+    expect(count('transactions')).toBe(26);
 
     // The two columns the batch used to leave out.
     expect(rows(`select name from recurring_payments where is_subscription order by name`)
       .map((r) => r.name)).toEqual(['Gym', 'Netflix', 'Spotify']);
-    expect(rows(`select name from virtual_accounts where locked`).map((r) => r.name))
-      .toEqual(['Fixed Bills']);
+    // Virtual accounts, as Bluecoins has them: in their group, out of cash flow.
+    expect(
+      rows(`select a.name, a.cash_flow from accounts a join account_groups g on g.id = a.group_id
+             where g.name = 'Virtual Accounts' order by a.name`),
+    ).toEqual([
+      { name: 'Fixed Bills', cash_flow: 'f' },
+      { name: 'Holiday', cash_flow: 'f' },
+    ]);
+    expect(rows(`select g.name, a.name as account from goals g join accounts a on a.id = g.linked_account_id
+                 where g.name = 'Holiday'`)).toEqual([{ name: 'Holiday', account: 'Holiday' }]);
 
     // Balances are the trigger's, derived from the transactions just written.
     const balances = Object.fromEntries(
       rows('select name, balance from accounts').map((r) => [r.name, r.balance]),
     );
     expect(balances).toEqual({
-      'Main Current Account': '1864.80',
-      Savings: '1500.00',
+      // Less what was moved into Fixed Bills, and Savings less the Holiday fund.
+      'Main Current Account': '664.80',
+      Savings: '1080.00',
       'Cash Wallet': '200.00',
+      'Fixed Bills': '1200.00',
+      Holiday: '420.00',
       // A credit balance is what is owed: the opening 2499.14 less the card's
       // share of the everyday spending.
       'Credit Card': '2734.14',

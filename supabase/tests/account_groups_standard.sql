@@ -16,8 +16,16 @@ begin
   insert into auth.users (id, email) values (v_user, 'standard@test.local');
 
   select count(*) into v_n from public.account_groups where user_id = v_user;
-  if v_n <> 14 then
-    raise exception 'a new person should get the 14 standard groups, got %', v_n;
+  if v_n <> 15 then
+    raise exception 'a new person should get the 15 standard groups, got %', v_n;
+  end if;
+
+  -- Virtual Accounts, as in Bluecoins: an asset group whose accounts are
+  -- plain assets, filled by transfers.
+  select kind into v_kind from public.account_groups
+   where user_id = v_user and name = 'Virtual Accounts' and side = 'asset';
+  if v_kind is distinct from 'asset' then
+    raise exception 'Virtual Accounts should be an asset group making plain assets, got %', v_kind;
   end if;
 
   select count(*) into v_n from public.account_groups where user_id = v_user and side = 'liability';
@@ -38,7 +46,7 @@ begin
   -- Seeding again — a second migration, a retried sign-up — adds nothing.
   perform public.seed_account_groups(v_user);
   select count(*) into v_n from public.account_groups where user_id = v_user;
-  if v_n <> 14 then
+  if v_n <> 15 then
     raise exception 'seeding twice should not duplicate groups, got %', v_n;
   end if;
 

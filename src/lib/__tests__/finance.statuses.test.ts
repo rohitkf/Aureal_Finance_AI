@@ -51,7 +51,6 @@ const txn = (status: TransactionStatus, over: Partial<Transaction> = {}): Transa
 
 const stateWith = (transactions: Transaction[]): AppState => ({
   accounts: [ACCOUNT],
-  virtualAccounts: [],
   categories: [],
   labels: [],
   accountGroups: [],

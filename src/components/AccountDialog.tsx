@@ -122,6 +122,12 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
 
   const group = accountGroups.find((g) => g.id === groupId);
   /**
+   * Bluecoins' Virtual Accounts: money set aside with no real account of its
+   * own. It is filled by a transfer out of the account the money is in, so
+   * the form says so — an opening balance here would count that money twice.
+   */
+  const virtual = group?.name.trim().toLowerCase() === 'virtual accounts';
+  /**
    * What the account is, which the form no longer asks.
    *
    * The group decides: Bank makes a current account, Credit Card a credit
@@ -240,7 +246,11 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
             value={balance}
             tone={owesMoney({ type }) ? 'expense' : 'income'}
             onChange={(e) => setBalance(sanitizeAmount(e.target.value))}
-            hint="Recorded as an opening balance you can edit later."
+            hint={
+              virtual
+                ? 'Usually 0. Move money in with a transfer from the account it is in, so it is counted once, not twice.'
+                : 'Recorded as an opening balance you can edit later.'
+            }
           />
         )}
 
@@ -264,7 +274,13 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete }: A
             placeholder="Choose a group"
             action={{ label: 'New group…', onSelect: () => setNewGroupOpen(true) }}
             error={accountGroups.length === 0 ? 'You have no groups yet. Add one, or put the standard ones back in Account group setup.' : undefined}
-            hint={group ? GROUP_HINT[type] : undefined}
+            hint={
+              virtual
+                ? 'Money set aside, with no real account of its own. Out of Safe to Spend unless you switch it on in Cash flow setup.'
+                : group
+                  ? GROUP_HINT[type]
+                  : undefined
+            }
           >
             {(['asset', 'liability'] as const).map((side) => (
               <optgroup key={side} label={side === 'asset' ? 'Assets' : 'Liabilities'}>

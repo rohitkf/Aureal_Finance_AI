@@ -35,7 +35,6 @@ const SEEDED_TABLES = [
   'recurring_payments',
   'budgets',
   'goals',
-  'virtual_accounts',
   'net_worth_snapshots',
   'accounts',
 ] as const;
@@ -195,6 +194,66 @@ const writeSampleData = async (add: Add): Promise<void> => {
   }));
 
   await add('transactions', opening);
+
+  // --- virtual accounts, as Bluecoins has them -----------------------------
+  // Accounts of their own in the Virtual Accounts group, filled by a transfer
+  // out of the account the money was in — so it is in one place, not both.
+  // Plain assets, so out of cash flow: set aside, not spendable.
+  const { data: groupRows, error: groupErr } = await supabase.from('account_groups').select('id, name, side');
+  failOn(groupErr);
+  const virtualGroup = groupRows?.find((g) => g.name === 'Virtual Accounts' && g.side === 'asset')?.id ?? null;
+
+  const virtual = await add(
+    'accounts',
+    [
+      {
+        name: 'Fixed Bills',
+        type: 'asset',
+        institution: '',
+        balance: 0,
+        group_id: virtualGroup,
+        cash_flow: false,
+        note: 'Rent, council tax, energy & utilities',
+        sort_order: 50,
+      },
+      {
+        name: 'Holiday',
+        type: 'asset',
+        institution: '',
+        balance: 0,
+        group_id: virtualGroup,
+        cash_flow: false,
+        note: 'Lisbon in the spring',
+        sort_order: 60,
+      },
+    ],
+    { returning: 'id, name' },
+  );
+  const fixedBills = virtual.find((a) => a.name === 'Fixed Bills')!.id;
+  const holiday = virtual.find((a) => a.name === 'Holiday')!.id;
+
+  await add('transactions', [
+    {
+      account_id: current,
+      to_account_id: fixedBills,
+      category_id: cat('Internal Transfer'),
+      merchant: 'Set aside for bills',
+      amount: 1200,
+      type: 'transfer',
+      occurred_on: day(-20),
+      status: 'cleared',
+    },
+    {
+      account_id: savings,
+      to_account_id: holiday,
+      category_id: cat('Internal Transfer'),
+      merchant: 'Holiday fund',
+      amount: 420,
+      type: 'transfer',
+      occurred_on: day(-45),
+      status: 'cleared',
+    },
+  ]);
 
   // --- recurring commitments ---------------------------------------------
   const recurring = await add(
@@ -388,43 +447,9 @@ const writeSampleData = async (add: Add): Promise<void> => {
       target_date: addMonths(ISO(today), 9),
       monthly_contribution: 120,
       icon: 'plane',
+      linked_account_id: holiday,
     },
   ]);
-
-  await add(
-    'virtual_accounts',
-    [
-      {
-        parent_account_id: current,
-        name: 'Fixed Bills',
-        description: 'Rent, council tax, energy & utilities',
-        allocated: 1200,
-        target: 1200,
-        icon: 'receipt',
-        locked: true,
-        sort_order: 10,
-      },
-      {
-        parent_account_id: current,
-        name: 'Emergency Fund',
-        description: 'Three months of baseline living costs',
-        allocated: 600,
-        target: 2000,
-        icon: 'shield',
-        sort_order: 20,
-      },
-      {
-        parent_account_id: current,
-        name: 'Flexible Spending',
-        description: 'Discretionary day-to-day money',
-        allocated: 500,
-        icon: 'bag',
-        sort_order: 30,
-      },
-    ],
-    // Only Fixed Bills is held back, and `locked` is not nullable either.
-    { defaults: { locked: false } },
-  );
 
   // --- a little net worth history ----------------------------------------
   await add(

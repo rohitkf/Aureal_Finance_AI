@@ -1,7 +1,7 @@
 /**
  * Groups decide what an account is, and Cash Flow Setup decides what counts.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   STANDARD_GROUPS,
@@ -128,7 +128,15 @@ describe('the standard groups', () => {
    * group put back from the app behaves differently from the one it replaced.
    */
   it('match the ones the database gives a new person', () => {
-    const sql = readFileSync('supabase/migrations/20261003120000_every_account_in_a_group.sql', 'utf8');
+    // Whichever migration declared `seed_account_groups` last is the one the
+    // database runs.
+    const latest = readdirSync('supabase/migrations')
+      .filter((f) => f.endsWith('.sql'))
+      .sort()
+      .map((f) => readFileSync(`supabase/migrations/${f}`, 'utf8'))
+      .filter((text) => text.includes('create or replace function public.seed_account_groups'))
+      .at(-1)!;
+    const sql = latest;
     const seeded = [...sql.matchAll(/\(p_user, '([^']+)',\s*'(asset|liability)',\s*'(\w+)',\s*(\d+)\)/g)].map((m) => ({
       name: m[1],
       side: m[2],

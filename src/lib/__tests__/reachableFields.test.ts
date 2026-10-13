@@ -24,7 +24,6 @@ const EDITORS: Record<string, string> = {
   Transaction: 'src/components/AddTransactionSheet.tsx',
   RecurringPayment: 'src/pages/Recurring.tsx',
   Goal: 'src/pages/Goals.tsx',
-  VirtualAccount: 'src/components/VirtualAccountDialog.tsx',
   Category: 'src/components/NewCategoryDialog.tsx',
   Label: 'src/components/LabelDialog.tsx',
   AccountGroup: 'src/components/AccountGroupDialog.tsx',
