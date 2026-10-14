@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Card, PageHeader, StatGroup } from '@/components/ui/Card';
 import { IconTile } from '@/components/ui/List';
-import { Icon, type IconName } from '@/components/ui/Icon';
+import { Icon } from '@/components/ui/Icon';
 import { EmptyState, SkeletonCard } from '@/components/ui/States';
 import { AccountDialog } from '@/components/AccountDialog';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
@@ -31,18 +31,11 @@ import { useStore } from '@/lib/store';
 import type { Account } from '@/lib/types';
 import { groupOf, sortGroups } from '@/lib/accountGroups';
 import { CURRENCIES } from '@/lib/intl';
+import { ACCOUNT_ICON } from '@/components/accountIcon';
 import { AccountGroupsDialog } from '@/components/AccountGroupsDialog';
 import { CashFlowDialog } from '@/components/CashFlowDialog';
 
-const TYPE_ICON: Record<Account['type'], IconName> = {
-  current: 'bank',
-  savings: 'savings',
-  cash: 'wallet',
-  credit: 'card',
-  investment: 'trending-up',
-  asset: 'home',
-  liability: 'scale',
-};
+const TYPE_ICON = ACCOUNT_ICON;
 
 export const Accounts = () => {
   const state = useAppState();

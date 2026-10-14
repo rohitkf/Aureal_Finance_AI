@@ -12,12 +12,13 @@ export interface NavItem {
   label: string;
   icon: IconName;
   tint?: NavTint;
-  /** One line on what is behind the link, for the More sheet. */
+  /** One line on what is behind the link, for the More screen. */
   blurb?: string;
 }
 
+/** The desktop bar: the five destinations people open most, by name. */
 export const PRIMARY_NAV: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: 'dashboard', tint: 'primary' },
+  { to: '/', label: 'Home', icon: 'home', tint: 'primary' },
   { to: '/accounts', label: 'Accounts', icon: 'bank', tint: 'primary' },
   { to: '/transactions', label: 'Transactions', icon: 'receipt', tint: 'primary' },
   { to: '/budget', label: 'Budget', icon: 'pie', tint: 'success' },
@@ -31,16 +32,22 @@ export const PLANNING_NAV: NavItem[] = [
   { to: '/reports', label: 'Reports', icon: 'analytics', tint: 'warning', blurb: 'Trends and net worth' },
 ];
 
-/** The phone's tab bar: four destinations, then More for everything else. */
+/**
+ * The phone's tab bar: two tabs either side of the + in the middle. Home and
+ * Transactions on the left, Accounts and More on the right; the + between
+ * them is not a destination, so it is not here.
+ */
 export const MOBILE_NAV: NavItem[] = [
-  { to: '/', label: 'Home', icon: 'dashboard' },
+  { to: '/', label: 'Home', icon: 'home' },
   { to: '/transactions', label: 'Transactions', icon: 'receipt' },
-  { to: '/budget', label: 'Budget', icon: 'pie' },
-  { to: '/time-machine', label: 'Time Machine', icon: 'clock' },
+  { to: '/accounts', label: 'Accounts', icon: 'bank' },
+  { to: '/more', label: 'More', icon: 'layers' },
 ];
 
+/** Everything behind More: the screens with no tab of their own. */
 export const MORE_NAV: NavItem[] = [
-  { to: '/accounts', label: 'Accounts', icon: 'bank', tint: 'primary', blurb: 'Balances, groups and pots' },
+  { to: '/budget', label: 'Budget', icon: 'pie', tint: 'success', blurb: 'Monthly limits by category' },
+  { to: '/time-machine', label: 'Time Machine', icon: 'clock', tint: 'secondary', blurb: 'Your balance, day by day' },
   ...PLANNING_NAV,
   { to: '/settings', label: 'Settings', icon: 'settings', tint: 'neutral', blurb: 'Profile, safety cushion, data' },
 ];

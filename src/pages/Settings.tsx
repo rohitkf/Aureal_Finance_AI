@@ -213,7 +213,7 @@ export const Settings = () => {
       <Card className="scroll-mt-24 space-y-6" id="appearance">
         <CardHeader
           title="Appearance"
-          description="Light and dark are designed separately, and the accent colour runs through both."
+          description="Dark by default, light if you prefer it. The accent colour runs through both, from the buttons to the glow behind the page."
         />
 
         {/* The tint. Every button, selection, chart line and the Safe to

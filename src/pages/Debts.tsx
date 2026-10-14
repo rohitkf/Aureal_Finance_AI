@@ -125,9 +125,9 @@ export const Debts = () => {
               const monthlyInterest = (card.balance * (card.apr ?? 0)) / 100 / 12;
 
               return (
-                // On paper, like a card in a wallet — and as the reference sets
-                // its light cards among the dark ones.
-                <Card key={card.id} className="paper space-y-4">
+                // In ember, like the card in a wallet — as the reference
+                // draws its cards in the gradient.
+                <Card key={card.id} tone="ember" className="space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <IconTile icon="card" tint="primary" size="lg" />

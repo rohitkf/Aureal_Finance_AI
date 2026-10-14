@@ -5,7 +5,9 @@ import { Icon, type IconName } from './Icon';
 export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'secondary';
 
 const TONES: Record<BadgeTone, string> = {
-  neutral: 'bg-[rgb(var(--hairline)/0.05)] text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]',
+  // The well's wash, not the hairline's: pressed into its surface, so on the
+  // ember it goes darker and its text reads better, not lighter and worse.
+  neutral: 'bg-[rgb(var(--well)/var(--well-alpha))] text-muted shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha))]',
   primary: 'bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgb(var(--primary)/0.22)]',
   success: 'bg-success/10 text-success shadow-[inset_0_0_0_1px_rgb(var(--success)/0.22)]',
   warning: 'bg-warning/15 text-warning shadow-[inset_0_0_0_1px_rgb(var(--warning)/0.26)]',

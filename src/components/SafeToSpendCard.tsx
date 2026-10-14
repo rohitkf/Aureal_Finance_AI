@@ -23,10 +23,9 @@ import { Icon } from './ui/Icon';
  * says what the figure is per day, which is how a month's money is spent, and
  * what is free before payday, which is the figure that matters this afternoon.
  *
- * It is the one card drawn in the tint — the reference's lime "Pay from" card —
- * because it is the one figure the whole app exists to produce. `.tinted`
- * re-points the text tokens at ink that reads on the fill, so everything
- * inside is written as it would be anywhere else.
+ * It sits beside the ember hero as its answer: a plain card, the figure in
+ * the tint, so the one number the whole app exists to produce is the one
+ * thing on the screen written in the brand's colour.
  */
 export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; className?: string }) => {
   const { maskBalances } = useSettings();
@@ -38,7 +37,7 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
   const nextIncome = data.incoming[0];
 
   return (
-    <section className={cn('tinted relative flex flex-col overflow-hidden rounded-[2rem] p-5 sm:p-7', className)} aria-labelledby="sts-heading">
+    <section className={cn('plate relative flex flex-col overflow-hidden rounded-[2rem] p-5 sm:p-7', className)} aria-labelledby="sts-heading">
       <div className="relative flex h-full flex-col">
 
         <div className="relative">
@@ -55,7 +54,7 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
           <p
             className={cn(
               'figure mt-5 text-[clamp(3rem,8vw,4.25rem)] leading-[0.95]',
-              negative ? 'text-danger' : 'text-text',
+              negative ? 'text-danger' : 'text-primary',
             )}
           >
             <FigureText text={m(data.amount)} />

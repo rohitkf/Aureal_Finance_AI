@@ -95,7 +95,9 @@ export const AccountDetail = () => {
         <span className="sr-only">/ {account.name}</span>
       </nav>
 
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      {/* The account in ember: who it is on the left, what it holds on the
+          right, as the reference leads an account with its card. */}
+      <Card tone="ember" as="header" className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex items-start gap-4">
           <IconTile icon={virtual ? 'layers' : isCredit ? 'card' : account.type === 'savings' ? 'savings' : 'bank'} tint="primary" size="lg" />
           <div>
@@ -129,7 +131,7 @@ export const AccountDetail = () => {
               pocket inside it, as Revolut and Monzo show an account's total
               above the pockets that make it up. */}
           <Eyebrow>{owesMoney(account) ? 'Balance owed' : canHoldPockets(account) ? 'Total worth' : 'Current balance'}</Eyebrow>
-          <p className={`figure mt-1 whitespace-nowrap text-[clamp(2.5rem,7vw,3.75rem)] leading-none ${owesMoney(account) ? 'text-danger' : 'text-text'}`}>
+          <p className="figure mt-1 whitespace-nowrap text-[clamp(2.75rem,8vw,4.25rem)] leading-none text-text">
             <FigureText text={money(total, { masked: maskBalances })} />
           </p>
           {canHoldPockets(account) && (
@@ -162,7 +164,7 @@ export const AccountDetail = () => {
             )
           )}
         </div>
-      </header>
+      </Card>
 
       {isCredit ? (
         <StatGroup

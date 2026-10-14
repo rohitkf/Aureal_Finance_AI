@@ -109,12 +109,13 @@ describe('your name, when Settings draws before the profile loads', () => {
 });
 
 describe('the accent colour', () => {
-  it('offers all seven tints, with the chosen one marked', () => {
+  it('offers all eight tints, ember first, with the chosen one marked', () => {
     tint = 'sky';
     render(page());
     const group = screen.getByRole('radiogroup', { name: 'Accent colour' });
     const options = within(group).getAllByRole('radio');
     expect(options.map((o) => o.getAttribute('aria-label'))).toEqual([
+      'Ember',
       'Lime',
       'Sky',
       'Violet',

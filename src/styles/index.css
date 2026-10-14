@@ -34,12 +34,13 @@
 /* ------------------------------------------------------------------ *
  * Design tokens — the Aureal brand system. DESIGN.md is the reference.
  *
- * Charcoal and paper with one bright tint. Surfaces are solid and flat;
- * what lifts a card is its tone against the ground, not a shadow or a
- * blur. The tint is the person's own: one of seven, chosen in Settings,
- * carried on <html data-tint>, and every accent in the app — buttons, the
- * selected chip, the Safe to Spend card, the glow behind the page — is
- * drawn from it.
+ * Near-black and warm off-white, with one ember tint. The page is a warm
+ * charcoal; what leads a screen is a card made of the tint as a gradient —
+ * from almost black at its top, through a deep burning red, into the full
+ * tint at its foot (`.ember`) — and everything else sits on flat cards a
+ * tone off the ground. The tint is the person's own: Ember by default, one
+ * of eight, chosen in Settings, carried on <html data-tint>; every accent
+ * and every gradient is drawn from it.
  *
  * Every colour is an RGB triplet so opacity modifiers keep working. Every
  * text colour, every tint's ink and the ink that sits on every tint's fill
@@ -47,19 +48,35 @@
  * ------------------------------------------------------------------ */
 @layer base {
   /*
-   * The seven tints. Each is a bright fill that black ink reads on (all of
-   * them are light enough for #141414 at 9.7:1 or better), an ink dark
-   * enough to be text on white, the paper a light card is made of, and the
-   * two greys that read as muted and faint on the fill — at 4.6:1 or better
-   * even inside a well pressed into it.
+   * The eight tints. Each is a bright fill that near-black ink reads on
+   * (6.2:1 or better), an ink dark enough to be text on white and on the
+   * light page, the paper a light card is made of, the two greys that read
+   * as muted and faint on the fill, and the three colours of its gradient:
+   * `deep`, the colour the hero starts in at its top, `mid`, the one it
+   * burns through, and `foot`, the brightest it is allowed to get at its
+   * bottom edge — chosen so that white holds 5:1 on it, and the two
+   * off-whites that read as muted and faint hold 4.5:1.
    */
   :root,
+  :root[data-tint='ember'] {
+    --tint: 245 85 31;
+    --tint-ink: 170 52 8;
+    --tint-paper: 247 237 231;
+    --tint-muted: 59 20 8;
+    --tint-faint: 64 22 10;
+    --tint-deep: 42 8 4;
+    --tint-mid: 166 38 12;
+    --tint-foot: 200 58 20;
+  }
   :root[data-tint='lime'] {
     --tint: 197 245 79;
     --tint-ink: 76 104 0;
     --tint-paper: 239 244 227;
     --tint-muted: 58 70 30;
     --tint-faint: 67 80 35;
+    --tint-deep: 18 26 4;
+    --tint-mid: 74 104 10;
+    --tint-foot: 84 118 16;
   }
   :root[data-tint='sky'] {
     --tint: 140 200 255;
@@ -67,6 +84,9 @@
     --tint-paper: 235 241 239;
     --tint-muted: 36 48 58;
     --tint-faint: 43 56 68;
+    --tint-deep: 5 16 34;
+    --tint-mid: 14 76 150;
+    --tint-foot: 24 100 190;
   }
   :root[data-tint='violet'] {
     --tint: 196 178 255;
@@ -74,6 +94,9 @@
     --tint-paper: 239 239 239;
     --tint-muted: 46 42 57;
     --tint-faint: 53 48 65;
+    --tint-deep: 18 10 44;
+    --tint-mid: 78 52 180;
+    --tint-foot: 98 70 210;
   }
   :root[data-tint='coral'] {
     --tint: 255 166 133;
@@ -81,6 +104,9 @@
     --tint-paper: 243 239 231;
     --tint-muted: 56 40 33;
     --tint-faint: 65 46 38;
+    --tint-deep: 40 12 6;
+    --tint-mid: 160 60 24;
+    --tint-foot: 192 70 28;
   }
   :root[data-tint='mint'] {
     --tint: 112 228 194;
@@ -88,6 +114,9 @@
     --tint-paper: 233 243 235;
     --tint-muted: 34 60 52;
     --tint-faint: 40 69 60;
+    --tint-deep: 4 28 22;
+    --tint-mid: 10 112 84;
+    --tint-foot: 12 126 94;
   }
   :root[data-tint='rose'] {
     --tint: 255 164 202;
@@ -95,6 +124,9 @@
     --tint-paper: 243 238 235;
     --tint-muted: 58 41 48;
     --tint-faint: 67 47 55;
+    --tint-deep: 42 6 24;
+    --tint-mid: 160 30 90;
+    --tint-foot: 190 36 108;
   }
   :root[data-tint='amber'] {
     --tint: 255 210 92;
@@ -102,17 +134,20 @@
     --tint-paper: 243 242 228;
     --tint-muted: 66 56 31;
     --tint-faint: 77 66 36;
+    --tint-deep: 38 24 2;
+    --tint-mid: 150 96 6;
+    --tint-foot: 152 98 6;
   }
 
   :root {
     /* — Light ————————————————————————————————— */
-    --background: 236 237 233;
-    --surface: 236 237 233;
+    --background: 244 240 236;
+    --surface: 244 240 236;
     --surface-lowest: 255 255 255;
-    --surface-low: 246 247 244;
+    --surface-low: 249 246 243;
     --surface-base: 255 255 255;
-    --surface-high: 243 244 240;
-    --surface-highest: 228 229 225;
+    --surface-high: 243 239 235;
+    --surface-highest: 232 227 222;
     --surface-bright: 255 255 255;
 
     /* A card, and a card that sits a step forward of it. */
@@ -122,34 +157,39 @@
     --chrome: 255 255 255;
 
     /* Hairlines, expressed as an ink to be laid over a surface at low alpha. */
-    --hairline: 20 20 20;
+    --hairline: 23 20 18;
     --hairline-alpha: 0.08;
     --hairline-alpha-strong: 0.14;
-    --border: 226 227 222;
-    --border-strong: 205 206 200;
+    --border: 228 223 218;
+    --border-strong: 208 202 196;
 
     /* A control's fill — a track, a quiet button — and a well pressed in. */
-    --fill: 20 20 20;
+    --fill: 23 20 18;
     --fill-alpha: 0.06;
-    --well: 20 20 20;
+    --well: 23 20 18;
     --well-alpha: 0.045;
 
-    --text: 20 20 20;
-    --muted: 80 80 76;
-    --faint: 102 102 98;
+    --text: 23 20 18;
+    --muted: 92 87 82;
+    --faint: 110 105 98;
 
     /* The tint, as the rest of the app asks for it. */
     --primary: var(--tint-ink);
     --primary-strong: var(--tint);
-    --on-primary: 20 20 20;
-    --on-tint: 20 20 20;
+    --on-primary: 23 20 18;
+    --on-tint: 23 20 18;
     --primary-soft: var(--tint-paper);
+
+    /* The solid near-black of a pill or a tab: the same in both themes, so a
+       black pill on the ember hero stays black when the theme is light. */
+    --ink: 23 20 18;
+    --on-ink: 255 255 255;
 
     --secondary: 79 70 229;
     --on-secondary: 255 255 255;
 
-    /* Dark enough to hold 4.5:1 on white, on the stone page, in a well and
-       inside a badge's own wash — the smallest text they are ever set in. */
+    /* Dark enough to hold 4.5:1 on white, on the page, in a well and inside
+       a badge's own wash — the smallest text they are ever set in. */
     --success: 3 103 75;
     --on-success: 255 255 255;
     --warning: 138 65 6;
@@ -158,12 +198,12 @@
     --on-danger: 255 255 255;
     --info: 2 132 199;
 
-    --ambient: 20 20 20;
+    --ambient: 23 20 18;
     --ambient-a: 0.04;
     --ambient-b: 0.08;
 
     /* The glow behind the page, in the tint. */
-    --glow-opacity: 0.22;
+    --glow-opacity: 0.18;
     --grain-opacity: 0.02;
 
     color-scheme: light;
@@ -171,38 +211,40 @@
 
   .dark {
     /* — Dark ————————————————————————————————— */
-    --background: 24 24 24;
-    --surface: 24 24 24;
-    --surface-lowest: 18 18 18;
-    --surface-low: 30 30 30;
-    --surface-base: 42 42 42;
-    --surface-high: 50 50 50;
-    --surface-highest: 60 60 60;
-    --surface-bright: 74 74 74;
+    --background: 15 14 13;
+    --surface: 15 14 13;
+    --surface-lowest: 10 9 9;
+    --surface-low: 20 19 18;
+    --surface-base: 26 25 23;
+    --surface-high: 34 33 31;
+    --surface-highest: 44 42 40;
+    --surface-bright: 60 58 55;
 
-    --card: 42 42 42;
-    --card-raised: 50 50 50;
-    --chrome: 38 38 38;
+    --card: 26 25 23;
+    --card-raised: 34 33 31;
+    --chrome: 23 22 21;
 
     --hairline: 255 255 255;
-    --hairline-alpha: 0.09;
-    --hairline-alpha-strong: 0.16;
-    --border: 52 52 52;
-    --border-strong: 72 72 72;
+    --hairline-alpha: 0.08;
+    --hairline-alpha-strong: 0.15;
+    --border: 40 39 37;
+    --border-strong: 58 56 54;
 
     --fill: 255 255 255;
     --fill-alpha: 0.07;
-    /* Wells go darker, not lighter: pressed into the card, as the
-       reference's calendar sits in its card. */
+    /* Wells go darker, not lighter: pressed into the card. */
     --well: 0 0 0;
-    --well-alpha: 0.26;
+    --well-alpha: 0.28;
 
-    --text: 245 245 245;
-    --muted: 170 170 170;
-    --faint: 150 150 150;
+    --text: 245 242 238;
+    --muted: 168 163 157;
+    --faint: 140 135 129;
 
     /* On charcoal the tint is bright enough to be its own text. */
     --primary: var(--tint);
+
+    --ink: 15 14 13;
+    --on-ink: 255 255 255;
 
     --secondary: 192 193 255;
     --on-secondary: 16 0 169;
@@ -211,7 +253,7 @@
     --on-success: 0 46 30;
     --warning: 251 191 36;
     --on-warning: 56 36 0;
-    --danger: 255 140 130;
+    --danger: 255 122 122;
     --on-danger: 82 0 4;
     --info: 125 211 252;
 
@@ -219,7 +261,7 @@
     --ambient-a: 0.3;
     --ambient-b: 0.45;
 
-    --glow-opacity: 0.16;
+    --glow-opacity: 0.26;
     --grain-opacity: 0.025;
 
     color-scheme: dark;
@@ -276,10 +318,9 @@
   /* ---------------------------------------------------------------- *
    * Surfaces
    *
-   * Solid and flat. A card is a tone a step off the ground — charcoal on
-   * charcoal, white on stone — with large concentric radii. No glass, no
-   * specular line, and in dark no shadow at all: on near-black a shadow is
-   * invisible, and a hairline that nobody sees is noise.
+   * Solid and flat, but for the one ember card that leads a screen. A card
+   * is a tone a step off the ground — warm charcoal on near-black, white on
+   * warm off-white — with large concentric radii and a faint hairline.
    * ---------------------------------------------------------------- */
 
   /* The hero card. `.bezel` is only the frame it sits in. */
@@ -346,34 +387,71 @@
   }
 
   /*
-   * Tinted — a card made of the tint itself, as the reference's "Pay from"
-   * is made of lime. Kept for the one surface that matters most on a screen
-   * (Safe to Spend). Inside it the ink is near-black and money in and out
-   * keep their meaning in dark inks that read on every one of the seven.
+   * Ember — the hero surface: the tint as a gradient, from almost black at
+   * the top, through a deep burning red, to the full tint beyond its foot.
+   * The one card a screen leads with — the balance, an account's worth, a
+   * credit card — is made of it, as the reference's balance sits in ember.
+   *
+   * The gradient ends in the tint's `foot`, the brightest the card is
+   * allowed to get (#C83A14 on ember), and the glow at its corner is the
+   * same colour, so nothing inside is ever brighter: white holds 5:1 there
+   * and the two off-whites that read as muted and faint hold 4.5:1. A well
+   * pressed into it is darker, not lighter, so small figures in it read
+   * better still. Every token is re-pointed for a white-on-ember card, so a
+   * child asking for `text-muted` or `bg-fill` gets what reads here without
+   * knowing where it is. A black pill stays black (`--ink`) in both themes.
    */
-  .tinted {
-    background: rgb(var(--tint));
-    color: rgb(var(--on-tint));
-    --card: var(--tint);
-    --card-raised: var(--tint);
-    --surface-base: 255 255 255;
-    --surface-bright: 255 255 255;
-    --hairline: 0 0 0;
-    --hairline-alpha: 0.12;
-    --hairline-alpha-strong: 0.2;
-    --fill: 0 0 0;
-    --fill-alpha: 0.1;
+  .ember {
+    background:
+      radial-gradient(120% 90% at 100% 110%, rgb(var(--tint-foot) / 0.7) 0%, transparent 55%),
+      linear-gradient(172deg, rgb(var(--tint-deep)) 0%, rgb(var(--tint-mid)) 58%, rgb(var(--tint-foot)) 100%);
+    color: rgb(255 255 255);
+    --card: var(--tint-mid);
+    --card-raised: var(--tint-mid);
+    --surface-base: var(--tint-deep);
+    --surface-bright: var(--tint-mid);
+    --hairline: 255 255 255;
+    --hairline-alpha: 0.18;
+    --hairline-alpha-strong: 0.3;
+    --border: 255 255 255;
+    --border-strong: 255 255 255;
+    --fill: 255 255 255;
+    --fill-alpha: 0.14;
     --well: 0 0 0;
-    --well-alpha: 0.08;
-    --text: var(--on-tint);
-    --muted: var(--tint-muted);
-    --faint: var(--tint-faint);
-    --primary: var(--on-tint);
-    --primary-strong: var(--on-tint);
-    --on-primary: var(--tint);
-    --success: 6 74 43;
-    --warning: 110 60 0;
-    --danger: 122 12 39;
+    --well-alpha: 0.18;
+    --text: 255 255 255;
+    --muted: 255 246 242;
+    --faint: 255 244 238;
+    --primary: 255 255 255;
+    --primary-strong: 255 255 255;
+    --on-primary: var(--tint-deep);
+    --success: 198 255 222;
+    --warning: 255 232 170;
+    --danger: 255 228 220;
+    --secondary: 230 226 255;
+    --ambient: 0 0 0;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.12),
+      0 24px 48px -24px rgb(var(--tint-mid) / 0.7);
+  }
+
+  /*
+   * Glass — a translucent white chip or well on the ember surface: the
+   * reference's "2.46% this month" pill and its card-within-the-card. A
+   * fill and an inner highlight, no blur: the gradient beneath is smooth,
+   * so there is nothing for a blur to soften and nothing to repaint.
+   */
+  .glass {
+    background: rgb(255 255 255 / 0.14);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.2),
+      inset 0 1px 0 rgb(255 255 255 / 0.14);
+  }
+  .glass-strong {
+    background: rgb(255 255 255 / 0.22);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.28),
+      inset 0 1px 0 rgb(255 255 255 / 0.18);
   }
 
   /*

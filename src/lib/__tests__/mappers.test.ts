@@ -207,8 +207,8 @@ describe('toSettings', () => {
       accents: DEFAULT_ACCENTS,
       // Absent on an old profile row; today and tomorrow is the default.
       dueHorizonDays: 2,
-      // Absent before the tint migration: lime, as the column defaults to.
-      tint: 'lime',
+      // Absent before the tint migration: ember, as the column defaults to.
+      tint: 'ember',
       // Absent before pockets could be left out: they count, as the column defaults to.
       includeVirtual: true,
     });
@@ -224,9 +224,9 @@ describe('toSettings', () => {
     expect(s.tint).toBe('violet');
   });
 
-  it('falls back to lime for a tint the stylesheet cannot draw, rather than to no colour', () => {
+  it('falls back to ember for a tint the stylesheet cannot draw, rather than to no colour', () => {
     const s = toSettings({ display_name: 'Rohit', locale: 'en-GB', tint: 'chartreuse' } as unknown as ProfileRow);
-    expect(s.tint).toBe('lime');
+    expect(s.tint).toBe('ember');
   });
 });
 

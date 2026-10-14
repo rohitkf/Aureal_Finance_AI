@@ -8,7 +8,7 @@
       name="description"
       content="Aureal Finance AI is a personal financial operating system: balances, budgets, forecasting and a Safe-to-Spend figure calculated for you."
     />
-    <meta name="theme-color" content="#181818" />
+    <meta name="theme-color" content="#0f0e0d" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Aureal" />
@@ -22,19 +22,23 @@
       // first frame after a reload are already the right theme.
       (function () {
         try {
+          // Dark unless the person chose light, or chose to follow a device
+          // that is set to light: the app opens in the dark.
           var stored = localStorage.getItem('aureal.theme');
           var dark =
-            stored === 'dark' ||
-            ((stored === null || stored === 'system') &&
-              window.matchMedia('(prefers-color-scheme: dark)').matches);
+            stored === 'light'
+              ? false
+              : stored === 'system'
+                ? window.matchMedia('(prefers-color-scheme: dark)').matches
+                : true;
           document.documentElement.classList.toggle('dark', dark);
           document
             .querySelector('meta[name="theme-color"]')
-            .setAttribute('content', dark ? '#181818' : '#ecede9');
+            .setAttribute('content', dark ? '#0f0e0d' : '#f4f0ec');
           // The tint, mirrored from the profile by useTheme. Only a name the
           // stylesheet defines is applied; anything else leaves the default.
           var tint = localStorage.getItem('aureal.tint');
-          if (/^(lime|sky|violet|coral|mint|rose|amber)$/.test(tint || '')) {
+          if (/^(ember|lime|sky|violet|coral|mint|rose|amber)$/.test(tint || '')) {
             document.documentElement.setAttribute('data-tint', tint);
           }
         } catch (e) {

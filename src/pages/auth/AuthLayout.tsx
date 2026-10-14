@@ -33,8 +33,10 @@ export const AuthLayout = ({
         which re-rasterised on every frame of their drift. */}
     <Atmosphere />
 
-    {/* ---------------- Brand panel ---------------- */}
-    <div className="relative hidden flex-col justify-between px-16 py-24 lg:flex xl:px-24 xl:py-32">
+    {/* ---------------- Brand panel ----------------
+        In ember, as the app's hero cards are: the first thing anybody sees
+        is the colour the rest of the product is drawn in. */}
+    <div className="ember relative m-5 hidden flex-col justify-between gap-10 overflow-hidden rounded-[2.5rem] px-12 py-12 lg:flex xl:px-16 xl:py-14">
       <Reveal>
         <Link
           to="/login"
@@ -47,23 +49,23 @@ export const AuthLayout = ({
 
       <div className="max-w-xl">
         <Reveal delay={80}>
-          <Eyebrow tone="accent">Personal financial operating system</Eyebrow>
+          <Eyebrow className="glass rounded-full px-3 py-1.5">Personal financial operating system</Eyebrow>
         </Reveal>
         <Reveal delay={160}>
-          <h1 className="mt-8 font-display text-[clamp(2.75rem,4.6vw,4rem)] font-normal leading-[1.02] tracking-[-0.045em] text-text">
+          <h1 className="mt-6 font-display text-[clamp(2.25rem,3.8vw,3.5rem)] font-normal leading-[1.02] tracking-[-0.045em] text-text">
             Know exactly
             <br />
             what you can spend.
           </h1>
         </Reveal>
         <Reveal delay={240}>
-          <p className="mt-8 max-w-md text-[16px] leading-relaxed text-muted">
+          <p className="mt-6 max-w-md text-[15.5px] leading-relaxed text-muted">
             Aureal reads your accounts, subtracts everything already committed, protects your minimum balance, and
             gives you the one number that matters.
           </p>
         </Reveal>
 
-        <dl className="mt-14 space-y-7">
+        <dl className="mt-10 space-y-5">
           {PROMISES.map(([heading, body], i) => (
             <Reveal key={heading} delay={320 + i * 90}>
               <div className="flex gap-4">

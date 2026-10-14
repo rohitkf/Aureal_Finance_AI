@@ -44,8 +44,10 @@ begin
 
   -- The tint names a colour the stylesheet defines; any other word would
   -- draw no colour at all.
-  assert (select tint from public.profiles where id = v_user) = 'lime',
-    'a new profile should start on the lime tint';
+  assert (select tint from public.profiles where id = v_user) = 'ember',
+    'a new profile should start on the ember tint';
+  assert (select theme from public.profiles where id = v_user) = 'dark',
+    'a new profile should open in the dark';
   update public.profiles set tint = 'violet' where id = v_user;
   begin
     update public.profiles set tint = 'chartreuse' where id = v_user;

@@ -12,22 +12,26 @@ lands here in the same commit as the code.
 
 ## 1. The idea
 
-**Charcoal and paper, with one bright tint that is yours.**
+**Near-black and ember, with one glowing tint that is yours.**
 
-- **Flat, solid surfaces.** A card lifts off the page by its tone, not by a shadow, a blur or a
-  rim of light. Charcoal cards on a near-black page in dark; white cards on warm stone in light.
-- **One tint, chosen by the person.** Lime by default — six others in Settings. Every accent in
-  the app is drawn from it: the filled buttons, the chosen chip, the switch, the ring, the logo,
-  the Safe to Spend card and the faint glow behind the page. Change it and the whole product
-  changes with it, on every device the person signs in on.
+- **Dark by default.** The page is a warm near-black with the tint glowing in from the top, as
+  the reference's ember bleeds up behind its screens. Light is kept — warm off-white, white
+  cards — for anyone who prefers it; it is a designed palette, not an inversion.
+- **One tint, chosen by the person.** Ember by default — seven others in Settings. Every accent
+  in the app is drawn from it: the hero gradient, the filled buttons, the chosen chip, the
+  switch, the ring, the logo, the Safe to Spend figure and the glow behind the page. Change it
+  and the whole product changes with it, on every device the person signs in on.
+- **The hero is made of the tint.** One card per screen leads in `.ember`: the tint as a
+  gradient from almost black through a deep burning red to the fill, with white type, glass
+  chips and black action pills on it — the balance on Home, an account's worth, a credit card.
 - **Figures are the design.** Money is set large and *light* — weight 300 — with the currency
-  symbol small and raised beside it and the pence small on the baseline. Nothing boxes a headline
-  figure in.
+  symbol small and raised beside it and the pence small on the baseline.
 - **Everything round.** Pills for buttons, chips and navigation; circles for icons, icon buttons,
-  avatars and the logo; large concentric radii on cards (2rem hero, 1.75rem card, 1.25rem well).
-- **Two surfaces besides the card.** *Paper* — a pale card in the tint's family — sets plans
-  apart from money (goals, budgets, credit cards). *Tinted* — a card made of the tint itself — is
-  kept for the one figure the app exists to produce: Safe to Spend.
+  avatars, the quick actions and the logo; large concentric radii on cards (2rem hero, 1.75rem
+  card, 1.25rem well).
+- **Four surfaces besides the card.** *Ember* for the hero; *glass* — translucent white — for
+  what sits on it; *paper* — a pale card in the tint's family — for plans (goals, budgets);
+  *well* for what is pressed into a card.
 
 ### Simple on the surface, everything still there
 
@@ -41,7 +45,7 @@ tap away, never gone.**
 | Two to four headline figures standing on the page, side by side | `StatGroup` |
 | Rows on one card with inset hairlines, a round icon in front | `GroupedList` + `ListRow`, `IconTile` |
 | The less common options on a form behind one row, opening by themselves when one is in use | "More options" on `AddTransactionSheet` |
-| Filters that change one figure live on that figure's card | Dashboard balance chips |
+| Filters that change one figure live on that figure's card | The hero's balance chips |
 
 Nothing is removed to make a screen simpler. A folded section **always opens itself when
 something inside it is set**.
@@ -52,77 +56,92 @@ something inside it is set**.
 
 ### The tint
 
-Seven tints, set on `<html data-tint="…">`. Each defines five values:
+Eight tints, set on `<html data-tint="…">`. Each defines eight values:
 
 | Variable | What it is |
 | --- | --- |
-| `--tint` | The bright fill: buttons, the chosen chip, the switch knob, the logo, the Safe to Spend card, the glow |
-| `--tint-ink` | A dark version that reads as text on white and on paper — links, the ring, chart lines in light |
+| `--tint` | The bright fill: buttons, the chosen chip, the switch knob, the logo, the glow, the foot of the hero gradient |
+| `--tint-ink` | A dark version that reads as text on white, on the light page and on paper — links, the ring, chart lines and the Safe to Spend figure in light |
 | `--tint-paper` | The pale card colour in the tint's family (`.paper`) |
-| `--tint-muted`, `--tint-faint` | Secondary and caption greys *on the fill itself* (`.tinted`), warmed toward the hue |
+| `--tint-deep`, `--tint-mid`, `--tint-foot` | The hero gradient (`.ember`): the colour it starts in at the top, the one it burns through, and the brightest it is allowed to get at its bottom edge — the glow in its corner is the same colour, so nothing inside the card is ever lighter than the foot |
+| `--tint-muted`, `--tint-faint` | Secondary and caption greys on the fill itself, warmed toward the hue (chart labels on a fill) |
 
-| Tint | Fill | Ink | Paper | Ink on fill | Ink on white | Ink on paper | Fill on charcoal card |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| **Lime** (default) | `#C5F54F` | `#4C6800` | `#EFF4E3` | 14.5:1 | 6.4:1 | 5.7:1 | 11.3:1 |
-| Sky | `#8CC8FF` | `#0A5AAA` | `#EBF1EF` | 10.4:1 | 6.9:1 | 6.0:1 | 8.1:1 |
-| Violet | `#C4B2FF` | `#5B3FD1` | `#EFEFEF` | 9.8:1 | 6.8:1 | 5.9:1 | 7.6:1 |
-| Coral | `#FFA685` | `#B03A10` | `#F3EFE7` | 9.7:1 | 6.1:1 | 5.3:1 | 7.5:1 |
-| Mint | `#70E4C2` | `#087054` | `#E9F3EB` | 11.9:1 | 6.1:1 | 5.3:1 | 9.3:1 |
-| Rose | `#FFA4CA` | `#AE185E` | `#F3EEEB` | 10.0:1 | 6.8:1 | 5.9:1 | 7.8:1 |
-| Amber | `#FFD25C` | `#865800` | `#F3F2E4` | 12.8:1 | 6.2:1 | 5.5:1 | 10.0:1 |
+| Tint | Fill | Ink | Deep → Mid → Foot | Ink on fill | Ink on white | Ink on paper | Fill on dark card | White on foot |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Ember** (default) | `#F5551F` | `#AA3408` | `#2A0804` → `#A6260C` → `#C83A14` | 5.4:1 | 6.5:1 | 5.7:1 | 5.2:1 | 5.2:1 |
+| Lime | `#C5F54F` | `#4C6800` | `#121A04` → `#4A680A` → `#547610` | 14.5:1 | 6.4:1 | 5.7:1 | 13.8:1 | 5.3:1 |
+| Sky | `#8CC8FF` | `#0A5AAA` | `#051022` → `#0E4C96` → `#1864BE` | 10.4:1 | 6.9:1 | 6.0:1 | 9.9:1 | 5.8:1 |
+| Violet | `#C4B2FF` | `#5B3FD1` | `#120A2C` → `#4E34B4` → `#6246D2` | 9.8:1 | 6.8:1 | 5.9:1 | 9.3:1 | 6.3:1 |
+| Coral | `#FFA685` | `#B03A10` | `#280C06` → `#A03C18` → `#C0461C` | 9.7:1 | 6.1:1 | 5.3:1 | 9.2:1 | 5.1:1 |
+| Mint | `#70E4C2` | `#087054` | `#041C16` → `#0A7054` → `#0C7E5E` | 11.9:1 | 6.1:1 | 5.3:1 | 11.3:1 | 5.1:1 |
+| Rose | `#FFA4CA` | `#AE185E` | `#2A0618` → `#A01E5A` → `#BE246C` | 10.0:1 | 6.8:1 | 5.9:1 | 9.5:1 | 5.7:1 |
+| Amber | `#FFD25C` | `#865800` | `#261802` → `#966006` → `#986206` | 12.8:1 | 6.2:1 | 5.5:1 | 12.2:1 | 5.1:1 |
 
 "Ink on fill" is `#141414`, the text on every tint-filled control. Every fill is light enough for
-it — which is why the text on a primary button is near-black, never white, in both themes.
+it — which is why the text on a primary button is near-black, never white, in both themes. "White
+on foot" is the worst case inside the hero: the foot is the brightest colour the card contains,
+and on every tint white holds 5:1 there, the ember's muted (`#FFF6F2`) and faint (`#FFF4EE`)
+4.5:1, and its pale danger (`#FFE4DC`) 4.2:1 — large text only, which is what it is used for.
+A well inside the hero is 18% black, so a small figure in one reads better than on the gradient.
 
 **How the rest of the app asks for the tint.** Components never name `--tint` directly; they use
 the semantic tokens, which map to it per theme:
 
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
-| `primary` | `--tint-ink` | `--tint` | Text and lines in the tint: links, the selected quick category, chart lines, the ring |
-| `primary-strong` | `--tint` | `--tint` | Fills: the primary button, the chosen chip, the switch knob, the checked box, the selected day |
+| `primary` | `--tint-ink` | `--tint` | Text and lines in the tint: links, the Safe to Spend figure, the selected quick category, chart lines, the ring |
+| `primary-strong` | `--tint` | `--tint` | Fills: the primary button, the chosen chip, the switch knob, the checked box, the selected day, the tab bar's + |
 | `on-primary` / `on-tint` | `#141414` | `#141414` | Text on a fill |
 | `primary-soft` | `--tint-paper` | `--tint-paper` | A pale wash |
+| `ink` / `on-ink` | `#171412` / white | `#0F0E0D` / white | The solid near-black pill — the hero's quick actions — the same in both themes |
 
 The rule that falls out: **a fill is `primary-strong`, a line or a word is `primary`.** On white,
-lime as a line is 1.3:1 and disappears; its ink is 6.4:1.
+ember as a line is 3:1 and fails as body text; its ink is 6.5:1. A chosen chip is the fill with
+ink on it, never the tint as text on a wash of itself — on the dark card that is 4.3:1.
 
-**Where the choice lives.** `profiles.tint` (`text`, default `'lime'`, checked against the seven
+**Where the choice lives.** `profiles.tint` (`text`, default `'ember'`, checked against the eight
 names by `profiles_tint_check`), so it follows the person across devices. `useTheme` puts it on
 `<html data-tint>` and mirrors it to `localStorage['aureal.tint']`; the boot script in
-`index.html` applies that mirror before first paint, so a returning visitor never sees lime flash
-before their own colour. An unknown value from anywhere falls back to lime (`isTint`).
-`src/lib/tints.ts` holds the list, the labels and the swatch classes.
+`index.html` applies that mirror before first paint, so a returning visitor never sees ember flash
+before their own colour. An unknown value from anywhere falls back to ember (`isTint`).
+`src/lib/tints.ts` holds the list, the labels and the swatch classes. `profiles.theme` defaults
+to `'dark'` the same way, and the boot script opens in the dark unless light was chosen.
 
 **Adding a tint**: a block in `index.css`, an entry in `TINTS`, `TINT_LABELS`, `TINT_SWATCH`, the
 regex in the `index.html` boot script, and a new migration widening `profiles_tint_check`. Check
-all five values against the table's four contrasts and the `.tinted` greys inside a well (§3).
+all eight values against the table's five contrasts, and the ember's re-themed status colours on
+its foot (§2, Status).
 
 ### The neutrals
 
+Warm, not grey: every neutral leans a little toward the ember, so the page and the hero are one
+room.
+
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
-| `background` | `#ECEDE9` stone | `#181818` | The page |
-| `card` | `#FFFFFF` | `#2A2A2A` | Every card |
-| `card-raised` | `#FFFFFF` | `#323232` | A card a step forward — a selected row, the ledger's sticky line |
-| `chrome` @ `bar-alpha` 0.86 | white | `#262626` | The bars, sheets, search (with backdrop blur) |
-| `well` @ `well-alpha` | `#141414` @ 0.045 | black @ 0.26 | Pressed *into* a card — darker than it, as the reference's calendar sits in its card |
-| `fill` @ `fill-alpha` | `#141414` @ 0.06 | white @ 0.07 | A control at rest: a field, a track, a quiet button |
-| `hairline` @ `hairline-alpha` / `-strong` | `#141414` @ 0.08 / 0.14 | white @ 0.09 / 0.16 | Dividers; the outline of an outlined pill or circle |
-| `text` | `#141414` | `#F5F5F5` | Primary |
-| `muted` | `#50504C` | `#AAAAAA` | Secondary |
-| `faint` | `#666662` | `#969696` | Captions, axes |
+| `background` | `#F4F0EC` warm off-white | `#0F0E0D` | The page |
+| `card` | `#FFFFFF` | `#1A1917` | Every card |
+| `card-raised` | `#FFFFFF` | `#22211F` | A card a step forward — a selected row, the ledger's sticky line |
+| `chrome` @ `bar-alpha` 0.86 | white | `#171615` | The bars, sheets, search (with backdrop blur) |
+| `well` @ `well-alpha` | `#171412` @ 0.045 | black @ 0.28 | Pressed *into* a card — darker than it |
+| `fill` @ `fill-alpha` | `#171412` @ 0.06 | white @ 0.07 | A control at rest: a field, a track, a quiet button |
+| `hairline` @ `hairline-alpha` / `-strong` | `#171412` @ 0.08 / 0.14 | white @ 0.08 / 0.15 | Dividers; the outline of an outlined pill or circle |
+| `text` | `#171412` | `#F5F2EE` | Primary |
+| `muted` | `#5C5752` | `#A8A39D` | Secondary |
+| `faint` | `#6E6962` | `#8C8781` | Captions, axes |
 
 ### Status
 
-| Token | Light | Dark | On paper | On the tint |
+| Token | Light | Dark | On paper | On ember |
 | --- | --- | --- | --- | --- |
-| `success` — money in, on track | `#03674B` | `#4EDEA3` | `#026448` | `#064A2B` |
-| `warning` — approaching a limit | `#8A4106` | `#FBBF24` | `#8C4004` | `#6E3C00` |
-| `danger` — money out, over | `#B11138` | `#FF8C82` | `#A80E34` | `#7A0C27` |
+| `success` — money in, on track | `#03674B` | `#4EDEA3` | `#026448` | `#C6FFDE` |
+| `warning` — approaching a limit | `#8A4106` | `#FBBF24` | `#8C4004` | `#FFE8AA` |
+| `danger` — money out, over | `#B11138` | `#FF8C82` | `#A80E34` | `#FFE4DC` |
 
 Each column is dark (or bright) enough to hold **4.5:1 at the smallest size it is set in**: on
 the surface, on a well pressed into it, and inside a badge's own 10–15% wash of the same colour.
+On ember the three are pale tints of white: 4.2:1 on the foot, so a danger figure there is set
+at 18.66px bold or larger, or inside a well (5.8:1) — never as a caption on the gradient.
 Every coloured status is also said in words — colour is never the only signal.
 
 **Tailwind's opacity steps are the scale's, not any number.** `bg-primary/15` exists;
@@ -137,27 +156,30 @@ the tint. Use `muted` or `faint`, a lighter weight, or a smaller size.
 
 | Class | What it is | Where |
 | --- | --- | --- |
-| `.bezel` + `.bezel-core` | The hero card: 2rem radius, a faint hairline and a soft shadow | Total balance, the projection, the Budget overview, Time Machine's end figure, the sign-in card |
+| `.ember` | The hero: the tint as a gradient (`--tint-deep` → `--tint-mid` → `--tint-foot`, with a glow of the foot in its corner), white type, 2rem radius | One per screen: the balance on Home, an account's header, each credit card on Debts, the sign-in brand panel |
+| `.glass`, `.glass-strong` | Translucent white (14% / 22%) with an inner highlight — no blur, the gradient beneath is smooth | Chips, wells and the fourth quick action on the ember |
+| `.bezel` + `.bezel-core` | A large plain card with a faint hairline and a soft shadow | The sign-in form, Time Machine's end figure |
 | `.plate` | An ordinary card: 1.75rem radius | Every other card and grouped list |
 | `.well` | A fill pressed into its parent: 1.25rem radius | Nested figures, the Safe to Spend sum, notices, the quick-add tiles |
-| `.paper` | A card in `--tint-paper`, light in **both** themes | Goal cards, the Dashboard's Budgets card, credit cards on Debts |
-| `.tinted` | A card made of `--tint` | Safe to Spend only |
+| `.paper` | A card in `--tint-paper`, light in **both** themes | Goal cards, the Dashboard's Budgets card |
 | `.chrome` | The bar material, with `backdrop-filter: blur(24px) saturate(160%)` | The top bar's capsules, the tab bar, sheets, the command palette, the More menu |
 
-**`.paper` and `.tinted` re-theme what is inside them.** Each redeclares `--text`, `--muted`,
+**`.ember` and `.paper` re-theme what is inside them.** Each redeclares `--text`, `--muted`,
 `--faint`, `--primary`, the status colours, `--fill`, `--well` and `--hairline` for its own
 background. A child writes `text-muted` or `text-success` exactly as it would on any card and
 gets the colour that reads *there* — a goal card renders correctly in dark mode without one
-`dark:` class. Inside `.tinted`, `primary` is the near-black ink and `on-primary` is the tint, so
-a primary button on the tint inverts by itself.
+`dark:` class. Inside `.ember`, `primary` and `primary-strong` are white and `on-primary` is the
+tint's deep end, so a primary button on the hero inverts by itself; `ink` stays near-black in
+both themes, which is what the quick-action pills are made of.
 
-To put a card on paper: `<Card className="paper …">`. The tinted surface is for one card per
-screen at most; it stops meaning "this is the figure" the moment there are two.
+`<Card tone="ember">` is the hero. It is for one card per screen (a wallet of credit cards is
+the exception, as the reference draws its cards in the gradient); it stops meaning "this is the
+figure" the moment two compete. To put a card on paper: `<Card className="paper …">`.
 
-**The page behind.** `Atmosphere` paints two large radial fields of the tint at
-`--glow-opacity` (0.22 light, 0.16 dark) drifting slowly from opposite corners, plus a fine film
-grain — the reference's green bleeding in behind the device. It is the tint, so it recolours with
-it.
+**The page behind.** `Atmosphere` paints the tint glowing in from behind the top of the page —
+a large radial field of `--tint-mid` at `--glow-opacity` (0.18 light, 0.26 dark) — and a
+fainter one low to the side, drifting slowly, plus a fine film grain. It is the tint, so it
+recolours with it.
 
 ---
 
@@ -210,11 +232,11 @@ are sentence case.
 **Desktop (`lg`, 1024px+) — one bar across the top**, as the reference has:
 
 - The mark (tint disc, charcoal "A") and the wordmark at the left.
-- **The destinations in one `.chrome` capsule.** The page you are on is a solid pill in the ink
-  colour — white on charcoal, black on stone. From 1024 to 1535px the five primary destinations
-  show and Recurring, Goals, Debts and Reports sit under **More**, a menu that closes on Escape,
-  on a click outside and on navigation, and is itself drawn as selected while you are on one of
-  them. From `2xl` (1536px) all nine are in the row.
+- **The destinations in one `.chrome` capsule** — Home, Accounts, Transactions, Budget, Time
+  Machine. The page you are on is a solid pill in the ink colour — white on near-black, black on
+  off-white. From 1024 to 1535px Recurring, Goals, Debts and Reports sit under **More**, a menu
+  that closes on Escape, on a click outside and on navigation, and is itself drawn as selected
+  while you are on one of them. From `2xl` (1536px) all nine are in the row.
 - At the right: round outlined buttons (search, hide balances, theme), the tint-filled
   **New entry** pill, and the person — their initials in an ink circle (from 1720px with their
   name). It opens the **account menu**: who is signed in and their email, Settings, and
@@ -222,16 +244,22 @@ are sentence case.
   ↑ ↓ Home End move through it, Escape closes it and returns focus to the button, and a click
   outside, Tab or a new page closes it. The More menu works the same way.
 
-**Phone and tablet (below `lg`):**
+**Phone and tablet (below `lg`)** — the reference's frame:
 
-- The mark and round buttons at the top (search, hide balances; theme from `sm`; the person, with
-  the same account menu and Sign out).
-- **A floating `.chrome` tab bar** — Home, Transactions, Budget, Time Machine, More — with the
-  selected tab a solid ink pill, and a separate **tint-filled round +** beside it ("Add a
-  transaction"), because it does something rather than going somewhere. Tab widths follow their
-  labels so "Time Machine" never wraps.
-- **More** is a sheet: a grouped list of the other screens, then Dark mode and Hide balances as
-  switches. **+** opens Quick add: expense, income, transfer, then recurring and account links.
+- **The person at the top left**, as an avatar, with the account menu behind it (hanging from
+  its left edge). On Home the greeting sits beside it — "Good morning," over the first name;
+  everywhere else the mark and wordmark do. Two round buttons on the right: search and hide
+  balances. Theme lives on the More screen.
+- **A floating `.chrome` tab bar with the + in the middle**: Home · Transactions · **+** ·
+  Accounts · More. The selected tab is a solid ink pill; the + is a tint-filled circle with the
+  tint's own shadow ("Add a transaction"), in the middle because it is what a thumb reaches for
+  most, and in the tint because it does something rather than going somewhere.
+- **More is a screen** (`/more`), not a sheet: the person's row (which opens Settings), then
+  one tile per remaining destination — Budget, Time Machine, Recurring, Goals, Debts, Reports —
+  each with a live figure beneath its name, then Dark mode and Hide balances as switches. The
+  tab is drawn as selected on every screen behind it.
+- **+** opens Quick add: expense, income, transfer, then recurring and account links. The
+  hero's quick actions open the same sheet (`useShell`, an outlet context from `AppShell`).
 
 The search capsule, the skip link and the offline banner are the same on both.
 
@@ -242,6 +270,12 @@ The search capsule, the skip link and the offline banner are the same on both.
 | Control | Treatment |
 | --- | --- |
 | `Button` `primary` | A tint-filled pill, near-black text, brightens on hover |
+| `Button` `ink` | A solid near-black pill, white text, the same in both themes — for actions on the ember |
+| `Button` `glass` | A translucent white pill, for the quieter action beside an ink one |
+| `ActionPill` (`ui/Ember.tsx`) | A quick action on the hero: a black circle with one glyph and a word beneath; `tone="glass"` for the last one, as the reference sets "Add funds" apart |
+| `DeltaPill` | "↗ 2.46% this month": an arrow and a figure, as a glass chip on the ember or a coloured word under a tile |
+| `StatTile` | One figure on a card of its own, the icon of what it measures in the corner, how it moved beneath — the Home page's four tiles |
+| `Avatar` | The person as their initials in a circle: ink on the bar, tint in the menu and on More |
 | `Button` `secondary` | An outlined pill: a strong hairline, no fill until hover |
 | `Button` `ghost` | Muted text, no outline |
 | `IconButton`, steppers, the sheet close | An outlined circle |
@@ -344,8 +378,8 @@ never applies — an animation can never be the reason someone cannot read their
 
 | Width | Layout |
 | --- | --- |
-| 360–639 | One column. Top: mark, search, hide balances, the person. Tab bar with a separate tint **+**. Stat figures two-up |
-| 640–1023 | The theme button joins the top bar; two-column cards where they fit |
+| 360–639 | One column. Top: the person, the greeting or the mark, search, hide balances. Tab bar with the tint **+** in the middle. Stat tiles two-up; the accounts shelf scrolls sideways |
+| 640–1023 | Two-column cards where they fit |
 | 1024–1535 | The top pill navigation with five destinations and **More**; **New entry** appears; hero grids go to 12 columns |
 | 1536–1719 | All nine destinations in the bar |
 | 1720+ | The person's name beside their initials |
@@ -360,7 +394,7 @@ viewport jumping.
 An aperture "A" with a point of light, in charcoal (`#141414`) on a disc of the tint. In the app
 it is an SVG using `rgb(var(--tint))`, so it recolours with the tint. The favicon and the
 installed-app icons (`public/favicon.svg`, `public/icons/*.svg`) are files an operating system
-caches, so they stay in the default lime.
+caches, so they stay in the default ember (`#F5551F`).
 
 ---
 

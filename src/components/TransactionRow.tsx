@@ -86,28 +86,30 @@ export const TransactionRow = ({ transaction, onSelect, selected, compact, class
             <Icon name="repeat" size={13} className="shrink-0 text-faint" title="Recurring" />
           )}
         </div>
-        <div className="flex min-w-0 items-center gap-1.5 text-body-sm text-muted">
-          <span className="shrink-0">{category.name}</span>
+        {/* One line, cut short with an ellipsis as a whole: the category
+            first, so it is the last thing to go. */}
+        <p className="truncate text-body-sm text-muted">
+          {category.name}
           {!compact && account && (
-            <>
-              <span aria-hidden="true" className="hidden sm:inline">·</span>
-              <span className="hidden truncate sm:inline">{account.name}</span>
-            </>
+            <span className="hidden sm:inline">
+              <span aria-hidden="true"> · </span>
+              {account.name}
+            </span>
           )}
           {scheduled ? (
             <>
-              <span aria-hidden="true">·</span>
-              <span className={cn('shrink-0', overdue ? 'font-medium text-warning' : 'text-primary')}>
+              <span aria-hidden="true"> · </span>
+              <span className={overdue ? 'font-medium text-warning' : 'text-primary'}>
                 {overdue ? `Overdue · ${relativeDueLabel(transaction.date, today)}` : relativeDueLabel(transaction.date, today)}
               </span>
             </>
           ) : timeOf(transaction) ? (
             <>
-              <span aria-hidden="true">·</span>
-              <span className="shrink-0 tabular-nums text-faint">{formatTime(timeOf(transaction)!)}</span>
+              <span aria-hidden="true"> · </span>
+              <span className="tabular-nums text-faint">{formatTime(timeOf(transaction)!)}</span>
             </>
           ) : null}
-        </div>
+        </p>
       </div>
 
       <div className="shrink-0 text-right">

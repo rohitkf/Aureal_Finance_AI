@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/cn';
+import { greeting } from '@/lib/date';
 import { useAppState, useSettings, useStore } from '@/lib/store';
 import { useTheme } from '@/hooks/useTheme';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -8,11 +9,11 @@ import { useMenu } from '@/hooks/useMenu';
 import { useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/errors';
 import { MOBILE_NAV, MORE_NAV, PLANNING_NAV, PRIMARY_NAV, type NavItem } from './nav';
+import type { ShellActions } from './shell';
 import { Logo } from './Logo';
 import { Atmosphere } from './Atmosphere';
 import { AddTransactionSheet } from './AddTransactionSheet';
 import { CommandPalette } from './CommandPalette';
-import { Toggle } from './ui/Field';
 import { Icon, type IconName } from './ui/Icon';
 import { GroupedList, IconTile, ListRow, type TileTone } from './ui/List';
 import { Modal } from './ui/Modal';
@@ -52,9 +53,9 @@ const RoundButton = ({
 );
 
 /**
- * A destination on the top bar. The page you are on is a solid pill in the
- * ink colour — white on charcoal, black on stone — exactly as the reference
- * marks "Payment" in its bar.
+ * A destination on the desktop bar. The page you are on is a solid pill in
+ * the ink colour — white on near-black, near-black on off-white — as the
+ * reference marks the screen you are on.
  */
 const navPill = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -95,7 +96,6 @@ export const AppShell = () => {
   const toast = useToast();
 
   const [searchOpen, setSearchOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   /** The desktop bar's More, while there is no room for every destination. */
   const navMore = useMenu();
   const [quickOpen, setQuickOpen] = useState(false);
@@ -114,7 +114,6 @@ export const AppShell = () => {
   }, []);
 
   useEffect(() => {
-    setMoreOpen(false);
     setQuickOpen(false);
   }, [location.pathname]);
 
@@ -128,15 +127,29 @@ export const AppShell = () => {
   };
 
   const toggleMask = () => dispatch({ type: 'update-settings', settings: { maskBalances: !maskBalances } });
-  // Somewhere in More is the screen you are on: say so on the tab.
-  const inMore = MORE_NAV.some((item) => location.pathname.startsWith(item.to));
+  // Somewhere behind More is the screen you are on: say so on the tab.
+  const inMore = location.pathname === '/more' || MORE_NAV.some((item) => location.pathname.startsWith(item.to));
   const inPlanning = PLANNING_NAV.some((item) => location.pathname.startsWith(item.to));
+  const atHome = location.pathname === '/';
+  const firstName = state.settings.userName.trim().split(/\s+/)[0] || 'there';
 
   const openAdd = (type: TransactionType) => {
     setAddType(type);
     setQuickOpen(false);
     setAddOpen(true);
   };
+  const actions: ShellActions = { openAdd, openQuickAdd: () => setQuickOpen(true) };
+
+  const profile = (align: 'left' | 'right', className?: string) => (
+    <ProfileMenu
+      name={state.settings.userName}
+      email={user?.email}
+      offline={!online}
+      onSignOut={leave}
+      align={align}
+      className={className}
+    />
+  );
 
   return (
     <div className="relative min-h-[100dvh] bg-background">
@@ -150,19 +163,38 @@ export const AppShell = () => {
       </a>
 
       {/* ---------------- The top bar ----------------
-          The reference's: the mark on the left, the destinations in one
-          capsule, and the person on the right. Fixed, so content scrolls up
-          under a soft fade and the capsules' blur is composited once. */}
+          On a phone, the reference's: the person on the left with a greeting
+          beside them, and two round controls on the right. From `lg`, the
+          mark, the destinations in one capsule, and the person on the right.
+          Fixed, so content scrolls up under a soft fade and the capsules'
+          blur is composited once. */}
       <header className="pointer-events-none fixed inset-x-0 top-0 z-40">
         <div
           aria-hidden="true"
           className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[rgb(var(--background)/0.92)] via-[rgb(var(--background)/0.55)] to-transparent"
         />
         <div className="relative mx-auto flex max-w-[1480px] items-center gap-2.5 px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 lg:gap-4 lg:px-8">
+          {/* Phone: the person, then where you are. */}
+          <div className="pointer-events-auto flex min-w-0 items-center gap-3 lg:hidden">
+            {profile('left')}
+            {atHome ? (
+              <p className="min-w-0 leading-tight">
+                <span className="block text-[12px] text-muted">{greeting()},</span>
+                <span className="block truncate text-[15.5px] font-medium tracking-[-0.015em] text-text">{firstName}</span>
+              </p>
+            ) : (
+              <NavLink to="/" aria-label="Aureal home" className="flex items-center gap-2 rounded-full">
+                <Logo size={28} />
+                <span className="font-display text-[16px] font-medium tracking-[-0.02em] text-text">Aureal</span>
+              </NavLink>
+            )}
+          </div>
+
+          {/* Desktop: the mark. */}
           <NavLink
             to="/"
             aria-label="Aureal home"
-            className="pointer-events-auto flex shrink-0 items-center gap-2.5 rounded-full pr-2 transition-opacity duration-300 ease-fluid hover:opacity-80"
+            className="pointer-events-auto hidden shrink-0 items-center gap-2.5 rounded-full pr-2 transition-opacity duration-300 ease-fluid hover:opacity-80 lg:flex"
           >
             <Logo size={40} />
             <span className="font-display text-[17px] font-medium tracking-[-0.02em] text-text lg:hidden xl:inline">Aureal</span>
@@ -233,7 +265,7 @@ export const AppShell = () => {
               icon={resolved === 'dark' ? 'sun' : 'moon'}
               label={`Switch to ${resolved === 'dark' ? 'light' : 'dark'} mode`}
               onClick={toggle}
-              className="hidden sm:flex"
+              className="hidden lg:flex"
             />
             <button
               type="button"
@@ -243,9 +275,9 @@ export const AppShell = () => {
               <Icon name="plus" size={17} />
               New entry
             </button>
-            {/* The person, as the reference closes its bar: who is signed in,
-                their settings, and Sign out. */}
-            <ProfileMenu name={state.settings.userName} email={user?.email} offline={!online} onSignOut={leave} />
+            {/* The person, as the reference closes its desktop bar: who is
+                signed in, their settings, and Sign out. */}
+            {profile('right', 'hidden lg:flex')}
           </div>
         </div>
       </header>
@@ -260,7 +292,7 @@ export const AppShell = () => {
         )}
         <main id="main" className={cn('min-h-[100dvh] pt-[calc(env(safe-area-inset-top)+4.75rem)] lg:pt-24', !online && 'pt-[calc(env(safe-area-inset-top)+7.5rem)] lg:pt-32')}>
           <div className="mx-auto w-full max-w-[1480px] px-4 pb-36 pt-3 sm:px-6 lg:px-8 lg:pb-16 lg:pt-4">
-            <Outlet />
+            <Outlet context={actions} />
           </div>
         </main>
       </div>
@@ -272,81 +304,36 @@ export const AppShell = () => {
         className="pointer-events-none fixed inset-x-0 bottom-0 z-[45] h-28 bg-gradient-to-t from-[rgb(var(--background)/0.92)] via-[rgb(var(--background)/0.55)] to-transparent lg:hidden"
       />
 
+      {/* Two tabs, the +, two tabs — the reference's bar. The + is in the
+          middle because it is the thing a thumb reaches for most, and in the
+          tint because it does something rather than going somewhere. */}
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-[46] flex items-end justify-center gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-[46] flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
       >
-        <div className="chrome flex min-w-0 flex-1 items-center justify-between rounded-full p-1 sm:max-w-md">
-          {MOBILE_NAV.map((item) => (
+        <div className="chrome grid w-full max-w-md grid-cols-[1fr_1fr_auto_1fr_1fr] items-center rounded-full p-1">
+          {MOBILE_NAV.slice(0, 2).map((item) => (
             <TabLink key={item.to} item={item} />
           ))}
           <button
             type="button"
-            onClick={() => setMoreOpen(true)}
+            onClick={() => setQuickOpen(true)}
+            aria-label="Add a transaction"
             aria-haspopup="dialog"
-            aria-expanded={moreOpen}
+            aria-expanded={quickOpen}
             className={cn(
-              'relative flex h-[54px] min-w-0 flex-auto flex-col items-center justify-center gap-0.5 rounded-full px-1.5',
-              'transition-all duration-300 ease-fluid active:scale-[0.94]',
-              inMore ? 'bg-text text-[rgb(var(--card))]' : 'text-muted',
+              'mx-1.5 flex h-[54px] w-[54px] items-center justify-center rounded-full bg-primary-strong text-[rgb(var(--on-primary))]',
+              'shadow-[0_8px_20px_-8px_rgb(var(--tint)/0.8)]',
+              'transition-all duration-300 ease-fluid active:scale-[0.9]',
             )}
           >
-            <Icon name="more" size={21} className="rotate-90" />
-            <span className="whitespace-nowrap text-[10.5px] font-medium tracking-[-0.01em]">More</span>
+            <Icon name="plus" size={26} />
           </button>
+          {MOBILE_NAV.slice(2).map((item) => (
+            <TabLink key={item.to} item={item} active={item.to === '/more' ? inMore : undefined} />
+          ))}
         </div>
-
-        {/* Add sits apart from the tabs: it does something rather than going
-            somewhere. In the tint, as the reference's round + is in lime. */}
-        <button
-          type="button"
-          onClick={() => setQuickOpen(true)}
-          aria-label="Add a transaction"
-          className={cn(
-            'flex h-[62px] w-[62px] shrink-0 items-center justify-center rounded-full bg-primary-strong text-[rgb(var(--on-primary))]',
-            'shadow-[0_10px_24px_-10px_rgb(var(--ambient)/0.5)]',
-            'transition-all duration-300 ease-fluid active:scale-[0.9]',
-          )}
-        >
-          <Icon name="plus" size={26} />
-        </button>
       </nav>
-
-      {/* ---------------- More ---------------- */}
-      <Modal open={moreOpen} onClose={() => setMoreOpen(false)} title="More" size="sm">
-        <div className="space-y-6 pb-2">
-          <GroupedList>
-            {MORE_NAV.map((item) => (
-              <ListRow
-                key={item.to}
-                icon={item.icon}
-                tint={item.tint}
-                title={item.label}
-                subtitle={item.blurb}
-                chevron
-                onClick={() => {
-                  navigate(item.to);
-                  setMoreOpen(false);
-                }}
-              />
-            ))}
-          </GroupedList>
-
-          <GroupedList title="Display">
-            <li className="px-2 py-1">
-              <Toggle checked={resolved === 'dark'} onChange={toggle} label="Dark mode" />
-            </li>
-            <li className="px-2 py-1 shadow-[inset_0_1px_0_0_rgb(var(--hairline)/var(--hairline-alpha))]">
-              <Toggle
-                checked={maskBalances}
-                onChange={toggleMask}
-                label="Hide balances"
-                description="Shows dots instead of amounts, for using the app in public."
-              />
-            </li>
-          </GroupedList>
-        </div>
-      </Modal>
 
       {/* ---------------- Quick add ---------------- */}
       <Modal open={quickOpen} onClose={() => setQuickOpen(false)} title="Add" size="sm">
@@ -393,19 +380,19 @@ export const AppShell = () => {
 };
 
 /**
- * A tab. The selected one is a solid pill in the ink colour, as the top bar
- * marks the page you are on. Widths follow the labels — "Time Machine" needs
- * more room than "Home" — so no label ever has to wrap.
+ * A tab. The selected one is a solid pill in the ink colour, as the desktop
+ * bar marks the page you are on. `active` overrides the router's own answer
+ * for More, which is "on" for every screen behind it.
  */
-const TabLink = ({ item }: { item: NavItem }) => (
+const TabLink = ({ item, active }: { item: NavItem; active?: boolean }) => (
   <NavLink
     to={item.to}
     end={item.to === '/'}
     className={({ isActive }) =>
       cn(
-        'relative flex h-[54px] min-w-0 flex-auto flex-col items-center justify-center gap-0.5 rounded-full px-1.5',
+        'relative flex h-[54px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-full px-1',
         'transition-all duration-300 ease-fluid active:scale-[0.94]',
-        isActive ? 'bg-text text-[rgb(var(--card))]' : 'text-muted',
+        (active ?? isActive) ? 'bg-text text-[rgb(var(--card))]' : 'text-muted',
       )
     }
   >
