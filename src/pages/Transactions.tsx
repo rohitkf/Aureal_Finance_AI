@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
-import { formatFullDate, formatMediumDate, formatTime, monthKey, relativeDayLabel, timeOf } from '@/lib/date';
+import { formatFullDate, formatTime, monthKey, relativeDayLabel, timeOf } from '@/lib/date';
 import { downloadCsv } from '@/lib/csv';
 import { inAndOut, isMovement } from '@/lib/finance';
 import { Register } from '@/components/Register';
@@ -11,6 +11,7 @@ import { money } from '@/lib/format';
 import { newId, useAppState, useCategories, useCategoryLookup, useLabelLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { RecurringRemoveDialog, type Occurrence } from '@/components/RecurringRemoveDialog';
 import { LabelChip } from '@/components/LabelPicker';
 import { TransactionRow } from '@/components/TransactionRow';
 import { Badge } from '@/components/ui/Badge';
@@ -92,7 +93,19 @@ export const Transactions = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   /** A line drawn from a rule, opened for editing before any row exists. */
   const [occurrence, setOccurrence] = useState<Transaction | null>(null);
-  const [skipping, setSkipping] = useState<LedgerRow | null>(null);
+  /** Skip on a register line: the same question as deleting one. */
+  const setSkipping = (row: LedgerRow | null) => {
+    if (!row?.recurringId || !row.recurringDate) return;
+    setRemoving({
+      recurringId: row.recurringId,
+      occurrenceDate: row.recurringDate,
+      name: row.name,
+      amount: row.amount,
+      categoryId: row.categoryId,
+      date: row.date,
+      transactionId: row.transaction?.id,
+    });
+  };
   /**
    * The transaction a confirmation is currently asking about.
    *
@@ -100,7 +113,26 @@ export const Transactions = () => {
    * two places — the detail panel on the list, and the edit sheet the register
    * and reminders open — and a flag can only ever mean "the selected one".
    */
-  const [confirmDelete, setConfirmDelete] = useState<Transaction | null>(null);
+  const [confirmDeleteOne, setConfirmDeleteOne] = useState<Transaction | null>(null);
+  /** A payment of a schedule, being skipped or deleted: which ones go is asked. */
+  const [removing, setRemoving] = useState<Occurrence | null>(null);
+  const confirmDelete = confirmDeleteOne;
+  /** Delete a transaction — asking which, when it is one payment of a schedule. */
+  const setConfirmDelete = (t: Transaction | null) => {
+    if (t?.recurringId && t.recurringDate && state.recurring.some((r) => r.id === t.recurringId)) {
+      setRemoving({
+        recurringId: t.recurringId,
+        occurrenceDate: t.recurringDate,
+        name: t.merchant,
+        amount: t.amount,
+        categoryId: t.categoryId,
+        date: t.date,
+        transactionId: t.id,
+      });
+      return;
+    }
+    setConfirmDeleteOne(t);
+  };
   const categories = useCategories();
 
   useEffect(() => {
@@ -555,54 +587,20 @@ export const Transactions = () => {
         mode="create"
       />
 
-      <ConfirmDialog
-        open={Boolean(skipping)}
-        onClose={() => setSkipping(null)}
-        onConfirm={() => {
-          if (!skipping?.recurringId || !skipping.recurringDate) return;
-          dispatch({
-            type: 'skip-occurrence',
-            recurringId: skipping.recurringId,
-            occurrenceDate: skipping.recurringDate,
-          });
-          // Skipping is one click on the row, and the row it was on
-          // disappears — so if it was the wrong row, there is nothing left to
-          // click to find out. The way back has to come to you.
-          const { recurringId, recurringDate } = skipping;
-          toast({
-            tone: 'info',
-            title: 'Payment skipped',
-            description: `${skipping.name} on ${formatMediumDate(skipping.date)}. The schedule carries on.`,
-            action: {
-              label: 'Undo',
-              onClick: () =>
-                dispatch({ type: 'unskip-occurrence', recurringId, occurrenceDate: recurringDate }),
-            },
-          });
-          setSkipping(null);
+      {/* Skipping or deleting a payment that repeats asks which: this one,
+          this and every one after, or the whole schedule. */}
+      <RecurringRemoveDialog
+        occurrence={removing}
+        onClose={() => setRemoving(null)}
+        onDone={() => {
+          setSelected(null);
+          setEditing(null);
         }}
-        title="Skip this one payment?"
-        subject={
-          skipping && (
-            <div className="flex items-center gap-3">
-              <CategoryIcon categoryId={skipping.categoryId} />
-              <div className="min-w-0">
-                <p className="text-body-md font-semibold text-text">{skipping.name}</p>
-                <p className="tnum text-body-sm text-muted">
-                  {money(skipping.amount)} · {formatMediumDate(skipping.date)}
-                </p>
-              </div>
-            </div>
-          )
-        }
-        consequence="This one stops appearing, and your forecast is recalculated without it."
-        preserved="The schedule itself is untouched — every other payment happens as set up."
-        confirmLabel="Skip it"
       />
 
       <ConfirmDialog
         open={Boolean(confirmDelete)}
-        onClose={() => setConfirmDelete(null)}
+        onClose={() => setConfirmDeleteOne(null)}
         onConfirm={() => {
           if (!confirmDelete) return;
           dispatch({ type: 'delete-transaction', id: confirmDelete.id });
@@ -625,7 +623,6 @@ export const Transactions = () => {
           )
         }
         consequence="Your account balance will be adjusted back by this amount, and it will be removed from your budget and reports."
-        preserved="This does not affect any recurring payment schedule it came from."
       />
     </div>
   );
