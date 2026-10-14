@@ -411,7 +411,9 @@ describe('undoing a skip', () => {
 
     await user.click(screen.getByRole('radio', { name: /^Reminders/ }));
     await user.click(screen.getByRole('button', { name: /skip gym/i }));
-    await user.click(screen.getByRole('button', { name: /skip it/i }));
+    // It repeats, so it asks which; "only this one" is already chosen.
+    expect(screen.getByRole('radio', { name: /only this payment/i })).toHaveAttribute('aria-checked', 'true');
+    await user.click(screen.getByRole('button', { name: /skip this one/i }));
 
     expect(dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'skip-occurrence', recurringId: 'rec-1' }),
@@ -427,5 +429,94 @@ describe('undoing a skip', () => {
       recurringId: 'rec-1',
       occurrenceDate: '2026-09-25',
     });
+  });
+});
+
+/**
+ * Removing a payment that repeats asks which: only this one, this one and
+ * every one after it, or the whole schedule.
+ */
+describe('removing a payment that repeats', () => {
+  const RULE = {
+    id: 'rec-1', name: 'Gym', amount: 40, direction: 'out', categoryId: 'cat-food', accountId: 'acc-1',
+    frequency: 'monthly', anchorDay: 25, startDate: '2026-01-25', status: 'active',
+  } as unknown as AppState['recurring'][number];
+  const SCHEDULED: Transaction = {
+    id: 'txn-3', date: '2026-09-25', merchant: 'Gym', amount: 40, type: 'expense', accountId: 'acc-1',
+    categoryId: 'cat-food', status: 'scheduled', recurringId: 'rec-1', recurringDate: '2026-09-25',
+  };
+
+  const skipGym = async () => {
+    const user = userEvent.setup();
+    state.transactions = [...TXNS, SCHEDULED];
+    state.recurring = [RULE];
+    render();
+    await user.click(screen.getByRole('radio', { name: /^Reminders/ }));
+    await user.click(screen.getAllByRole('button', { name: /skip gym/i })[0]!);
+    return user;
+  };
+
+  it('offers all three, in that order', async () => {
+    await skipGym();
+    expect(screen.getAllByRole('radio', { name: /payment|after|schedule/i }).map((r) => r.textContent?.split(/(?<=[a-z])(?=[A-Z0-9£])/)[0])).toEqual([
+      'Only this payment',
+      'This and all after it',
+      'The whole schedule',
+    ]);
+  });
+
+  it('stops the schedule from this one on, taking this one with it', async () => {
+    const user = await skipGym();
+    await user.click(screen.getByRole('radio', { name: /this and all after it/i }));
+    await user.click(screen.getByRole('button', { name: /stop from here/i }));
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'end-recurring-from',
+      recurringId: 'rec-1',
+      fromDate: '2026-09-25',
+      transactionId: 'txn-3',
+    });
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'delete-recurring' }));
+  });
+
+  it('deletes the whole schedule when asked to', async () => {
+    const user = await skipGym();
+    await user.click(screen.getByRole('radio', { name: /the whole schedule/i }));
+    await user.click(screen.getByRole('button', { name: /delete schedule/i }));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'delete-recurring', id: 'rec-1' });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'delete-transaction', id: 'txn-3' });
+  });
+
+  it('asks the same when the payment is deleted from its own sheet', async () => {
+    const user = userEvent.setup();
+    state.transactions = [...TXNS, SCHEDULED];
+    state.recurring = [RULE];
+    render();
+    await user.click(screen.getByRole('radio', { name: /^Reminders/ }));
+    await user.click(screen.getAllByText('Gym')[0]!);
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    expect(screen.getByRole('dialog', { name: /this payment repeats/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /skip this one/i }));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'skip-occurrence', recurringId: 'rec-1', occurrenceDate: '2026-09-25' });
+  });
+
+  it('asks nothing extra for a one-off', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.click(screen.getByText('Dunn, Baker & Co'));
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    expect(screen.queryByRole('dialog', { name: /this payment repeats/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /delete transaction/i })).toBeInTheDocument();
+  });
+
+  it('does not offer "this and all after" on the first payment, where it means the whole schedule', async () => {
+    const user = userEvent.setup();
+    const first: Transaction = { ...SCHEDULED, date: '2026-01-25', recurringDate: '2026-01-25', id: 'txn-first' };
+    state.transactions = [...TXNS, first];
+    state.recurring = [RULE];
+    render();
+    await user.click(screen.getByRole('radio', { name: /^Reminders/ }));
+    await user.click(screen.getAllByRole('button', { name: /skip gym/i })[0]!);
+    expect(screen.queryByRole('radio', { name: /this and all after it/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /the whole schedule/i })).toBeInTheDocument();
   });
 });

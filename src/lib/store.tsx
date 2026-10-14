@@ -29,7 +29,7 @@ import { describeError, errorMessage } from './errors';
 import { supabase } from './supabase';
 import { useAuth } from './auth';
 import { useToast } from '@/components/ui/Toast';
-import { ISO } from './date';
+import { ISO, addDays } from './date';
 import { setRegion } from './intl';
 import {
   accountToRow,
@@ -91,6 +91,12 @@ export type Action =
   | { type: 'skip-occurrence'; recurringId: string; occurrenceDate: string }
   /** Put a struck-out occurrence back. */
   | { type: 'unskip-occurrence'; recurringId: string; occurrenceDate: string }
+  /**
+   * Stop a rule from one occurrence onward: that one and every one after it
+   * go, and the rule ends the day before. What has already happened, after
+   * that date or before it, is kept.
+   */
+  | { type: 'end-recurring-from'; recurringId: string; fromDate: string; transactionId?: string }
   | { type: 'upsert-budget'; budget: Budget }
   | { type: 'delete-budget'; month: string; categoryId: string }
   | { type: 'upsert-goal'; goal: Goal }
@@ -821,6 +827,54 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             return ['recurringSkips', 'transactions', 'accounts'];
           });
           break;
+
+        case 'end-recurring-from': {
+          const rule = stateRef.current.recurring.find((r) => r.id === action.recurringId);
+          const lastDay = addDays(action.fromDate, -1);
+          run('stop those payments', async () => {
+            // From its first payment on is all of it, and a rule cannot end
+            // before it starts (`recurring_end_after_start`): delete it, the
+            // way Delete does — what has gone through stays, unlinked.
+            if (rule && lastDay < rule.startDate) {
+              check(
+                await supabase
+                  .from('transactions')
+                  .delete()
+                  .eq('recurring_id', rule.id)
+                  .eq('status', 'scheduled'),
+              );
+              if (action.transactionId) {
+                check(await supabase.from('transactions').delete().eq('id', action.transactionId));
+              }
+              check(await supabase.from('recurring_payments').delete().eq('id', rule.id));
+              return ['recurring', 'recurringSkips', 'transactions', 'accounts'];
+            }
+            if (rule && (!rule.endDate || rule.endDate > lastDay)) {
+              check(
+                await supabase
+                  .from('recurring_payments')
+                  .update(recurringToRow({ ...rule, endDate: lastDay }))
+                  .eq('id', rule.id),
+              );
+            }
+            // Written-down payments still to come go with it; anything that
+            // has gone through is history and stays.
+            check(
+              await supabase
+                .from('transactions')
+                .delete()
+                .eq('recurring_id', action.recurringId)
+                .eq('status', 'scheduled')
+                .gte('recurring_date', action.fromDate),
+            );
+            // The one it was asked from goes too, whatever its state.
+            if (action.transactionId) {
+              check(await supabase.from('transactions').delete().eq('id', action.transactionId));
+            }
+            return ['recurring', 'transactions', 'accounts'];
+          });
+          break;
+        }
 
         case 'unskip-occurrence':
           run('restore that payment', async () => {
