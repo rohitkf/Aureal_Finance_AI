@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react';
+import { useIsDesktop } from '@/hooks/useMediaQuery';
+import { cn as cx } from '@/lib/cn';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { formatDay, formatMediumDate, relativeDueLabel } from '@/lib/date';
@@ -27,14 +29,60 @@ import { Icon } from './ui/Icon';
  * the tint, so the one number the whole app exists to produce is the one
  * thing on the screen written in the brand's colour.
  */
-export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; className?: string }) => {
+export const SafeToSpendCard = ({
+  data,
+  className,
+  compact,
+}: {
+  data: SafeToSpend;
+  className?: string;
+  /** The figure and one line, as a card that leads to the full working on Home. */
+  compact?: boolean;
+}) => {
   const { maskBalances } = useSettings();
   const today = useToday();
+  const isDesktop = useIsDesktop();
   const [open, setOpen] = useState<{ in: boolean; out: boolean }>({ in: false, out: false });
+  // The sum beneath the figure: open from `lg`, folded on a phone, where the
+  // figure and its sentence are what the screen is for and the working is a
+  // tap away.
+  const [working, setWorking] = useState<boolean | null>(null);
+  const showWorking = working ?? isDesktop;
   const toggle = (which: 'in' | 'out') => setOpen((o) => ({ ...o, [which]: !o[which] }));
   const negative = data.amount < 0;
   const m = (value: number) => money(value, { masked: maskBalances });
   const nextIncome = data.incoming[0];
+
+  if (compact) {
+    return (
+      <Link
+        to="/"
+        className={cx(
+          'plate flex items-center gap-4 p-4 transition-colors duration-300 ease-fluid hover:bg-[rgb(var(--card-raised))] sm:p-5',
+          className,
+        )}
+        aria-label={`Safe to spend ${m(data.amount)} until ${formatMediumDate(data.through)}. See how it’s worked out on Home.`}
+      >
+        <span className="min-w-0 flex-1">
+          <Eyebrow>
+            <Icon name="shield" size={15} />
+            Safe to spend
+          </Eyebrow>
+          <span className={cx('figure mt-2 block whitespace-nowrap text-[clamp(1.75rem,6vw,2.25rem)] leading-none', negative ? 'text-danger' : 'text-primary')}>
+            <FigureText text={m(data.amount)} />
+          </span>
+          <span className="mt-2 block text-[12.5px] text-muted">
+            {negative
+              ? `${m(Math.abs(data.amount))} short until ${formatMediumDate(data.through)}`
+              : `About ${m(data.perDay)} a day until ${formatMediumDate(data.through)}`}
+            {' · '}
+            <span className="text-primary">how it’s worked out</span>
+          </span>
+        </span>
+        <Icon name="chevron-right" size={16} className="shrink-0 text-faint" />
+      </Link>
+    );
+  }
 
   return (
     <section className={cn('plate relative flex flex-col overflow-hidden rounded-[2rem] p-5 sm:p-7', className)} aria-labelledby="sts-heading">
@@ -102,8 +150,22 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
         </div>
 
         <div className="relative mt-6">
-          <p className="mb-2 text-[13px] font-semibold tracking-[-0.005em] text-muted">How it’s worked out</p>
-          <dl className="well space-y-0.5 p-2.5">
+          <button
+            type="button"
+            aria-expanded={showWorking}
+            aria-controls="sts-working"
+            onClick={() => setWorking(!showWorking)}
+            className="mb-2 flex min-h-[32px] w-full items-center justify-between gap-3 rounded-xl text-left text-[13px] font-semibold tracking-[-0.005em] text-muted transition-colors duration-300 ease-fluid hover:text-text"
+          >
+            How it’s worked out
+            <Icon
+              name="chevron-down"
+              size={14}
+              className={cx('shrink-0 text-faint transition-transform duration-300 ease-fluid', showWorking && 'rotate-180')}
+            />
+          </button>
+          {showWorking && (
+          <dl id="sts-working" className="well animate-fade-in space-y-0.5 p-2.5">
             <Row label="In your accounts now" value={m(data.available)} />
             <Row
               label="Still coming in"
@@ -130,7 +192,7 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
               note={
                 <>
                   Your minimum balance ·{' '}
-                  <Link to="/settings" className="underline decoration-[rgb(var(--hairline)/0.3)] underline-offset-2 hover:text-text">
+                  <Link to="/settings/safe-to-spend" className="underline decoration-[rgb(var(--hairline)/0.3)] underline-offset-2 hover:text-text">
                     change
                   </Link>
                 </>
@@ -139,6 +201,7 @@ export const SafeToSpendCard = ({ data, className }: { data: SafeToSpend; classN
             <div className="!my-1.5 mx-2 h-px bg-[rgb(var(--hairline)/var(--hairline-alpha-strong))]" />
             <Row label="Safe to spend" value={m(data.amount)} strong tone={negative ? 'danger' : 'neutral'} />
           </dl>
+          )}
         </div>
 
         <div className="relative mt-5 flex items-center gap-2">

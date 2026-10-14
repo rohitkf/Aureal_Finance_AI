@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, Eyebrow, PageHeader } from '@/components/ui/Card';
 import { MoneyDial } from '@/components/ui/MoneyDial';
 import { SelectField } from '@/components/ui/Field';
-import { Icon } from '@/components/ui/Icon';
 import { Progress, Ring } from '@/components/ui/Progress';
 import { FigureText } from '@/components/ui/Figure';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
@@ -114,11 +113,11 @@ export const Budget = () => {
         }
       />
 
-      {/* The month at a glance, then each category, with Safe to Spend beside
-          them from `lg`. On a phone the categories come before Safe to Spend:
-          they are what this screen is for, and Safe to Spend is on Home. */}
-      <section className="grid gap-4 lg:grid-cols-12">
-        <Card tone="bezel" className="min-w-0 lg:col-span-7" bodyClassName="space-y-5">
+      {/* The month at a glance, then each category; Safe to Spend — in brief,
+          the full working is on Home — and the categories without a budget
+          beside them from `lg`, after them on a phone. */}
+      <section className="grid gap-4 lg:grid-cols-12 lg:grid-rows-[auto_1fr]">
+        <Card className="min-w-0 lg:col-span-7 lg:row-start-1" bodyClassName="space-y-5">
           <div className="flex items-center justify-between gap-5">
             <div className="min-w-0">
               <Eyebrow>Left to spend</Eyebrow>
@@ -158,15 +157,38 @@ export const Budget = () => {
           </dl>
         </Card>
 
-        <SafeToSpendCard
-          data={sts}
-          className="order-last min-w-0 lg:order-none lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1"
-        />
+        <aside className="order-last min-w-0 space-y-4 lg:order-none lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1">
+          <SafeToSpendCard data={sts} compact />
+          {unbudgeted.length > 0 && (
+            <Card className="space-y-3">
+              <CardHeader
+                title="Spending without a budget"
+                description="You’re spending in these categories but haven’t set a limit."
+              />
+              <ul className="grid gap-2">
+                {unbudgeted.map(([id, amount]) => (
+                  <li key={id} className="well flex items-center justify-between gap-3 p-3">
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <CategoryIcon categoryId={id} size="sm" />
+                      <span className="truncate text-body-md text-text">{lookupCategory(id).name}</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="tnum text-body-sm font-semibold text-text">{money(amount, { compact: true })}</span>
+                      <Button size="sm" onClick={() => setEditing({ categoryId: id, limit: String(Math.ceil(amount / 10) * 10) })}>
+                        Set limit
+                      </Button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </aside>
 
-        <section className="min-w-0 space-y-3 lg:col-span-7">
+        <section className="min-w-0 space-y-3 lg:col-span-7 lg:col-start-1 lg:row-start-2">
           <div className="px-1">
             <h2 className="font-display text-[20px] font-medium tracking-[-0.02em] text-text">Categories</h2>
-            <p className="text-[13px] text-muted">Closest to its limit first. Tap one to change it.</p>
+            <p className="text-[13px] text-muted">Closest to its limit first. Tap one to change or remove it.</p>
           </div>
 
           {progress.length === 0 ? (
@@ -187,12 +209,12 @@ export const Budget = () => {
                 const category = lookupCategory(b.categoryId);
                 const tone = TONE[b.state];
                 return (
-                  <li key={b.categoryId} className="flex items-center gap-1 pr-2">
+                  <li key={b.categoryId}>
                     <button
                       type="button"
                       onClick={() => setEditing({ categoryId: b.categoryId, limit: String(b.limit) })}
                       aria-label={`Edit ${category.name} budget`}
-                      className="flex min-w-0 flex-1 items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-300 ease-fluid hover:bg-fill"
+                      className="flex w-full min-w-0 items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-300 ease-fluid hover:bg-fill"
                     >
                       <CategoryIcon categoryId={b.categoryId} />
                       <span className="min-w-0 flex-1">
@@ -221,14 +243,6 @@ export const Budget = () => {
                         </span>
                       </span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleting(b.categoryId)}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-faint transition-colors duration-300 ease-fluid hover:bg-fill hover:text-danger"
-                      aria-label={`Remove ${category.name} budget`}
-                    >
-                      <Icon name="trash" size={15} />
-                    </button>
                   </li>
                 );
               })}
@@ -236,34 +250,6 @@ export const Budget = () => {
           )}
         </section>
       </section>
-
-      {unbudgeted.length > 0 && (
-        <Card className="space-y-3">
-          <CardHeader
-            title="Spending without a budget"
-            description="You’re spending in these categories but haven’t set a limit."
-          />
-          <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {unbudgeted.map(([id, amount]) => (
-              <li
-                key={id}
-                className="flex items-center justify-between gap-3 well p-3"
-              >
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <CategoryIcon categoryId={id} size="sm" />
-                  <span className="truncate text-body-md text-text">{lookupCategory(id).name}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <span className="tnum text-body-sm font-semibold text-text">{money(amount, { compact: true })}</span>
-                  <Button size="sm" onClick={() => setEditing({ categoryId: id, limit: String(Math.ceil(amount / 10) * 10) })}>
-                    Set limit
-                  </Button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
 
       <Modal
         open={Boolean(editing)}
@@ -277,6 +263,20 @@ export const Budget = () => {
         size="sm"
         footer={
           <>
+            {/* Removing lives with editing: one place for everything about a budget. */}
+            {editing && current.some((b) => b.categoryId === editing.categoryId) && (
+              <Button
+                variant="ghost"
+                icon="trash"
+                className="mr-auto text-danger hover:text-danger"
+                onClick={() => {
+                  setDeleting(editing.categoryId);
+                  setEditing(null);
+                }}
+              >
+                Remove
+              </Button>
+            )}
             <Button onClick={() => setEditing(null)}>Cancel</Button>
             <Button variant="primary" icon="check" onClick={saveBudget}>
               Save budget

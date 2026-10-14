@@ -1,4 +1,5 @@
 import type { IconName } from './ui/Icon';
+import type { TileTone } from './ui/List';
 
 /**
  * Which tint an item's icon tile is drawn in, as the rows in iOS Settings
@@ -51,3 +52,32 @@ export const MORE_NAV: NavItem[] = [
   ...PLANNING_NAV,
   { to: '/settings', label: 'Settings', icon: 'settings', tint: 'neutral', blurb: 'Profile, safety cushion, data' },
 ];
+
+/** Every section of Settings: what it is called, what it holds, and where it sits. */
+export interface SettingsSection {
+  id: string;
+  label: string;
+  icon: IconName;
+  tint: TileTone;
+  blurb: string;
+  group: 'You' | 'Organise' | 'Your data' | 'Advanced';
+}
+
+export const SETTINGS_SECTIONS: SettingsSection[] = [
+  { id: 'account', label: 'Your account', icon: 'user', tint: 'primary', blurb: 'Your name, your email, sign out', group: 'You' },
+  { id: 'appearance', label: 'Appearance', icon: 'sun', tint: 'warning', blurb: 'Dark or light, and the accent colour', group: 'You' },
+  { id: 'safe-to-spend', label: 'Safe to Spend', icon: 'shield', tint: 'success', blurb: 'Your safety cushion and what counts', group: 'You' },
+  { id: 'region', label: 'Currency & region', icon: 'wallet', tint: 'neutral', blurb: 'How figures and dates are written', group: 'You' },
+  { id: 'categories', label: 'Categories', icon: 'layers', tint: 'primary', blurb: 'What transactions are filed under', group: 'Organise' },
+  { id: 'labels', label: 'Labels', icon: 'flag', tint: 'secondary', blurb: 'Tags that cut across categories', group: 'Organise' },
+  { id: 'colours', label: 'Colours', icon: 'sparkles', tint: 'danger', blurb: 'How each kind of line is drawn', group: 'Organise' },
+  { id: 'reminders', label: 'Reminders', icon: 'bell', tint: 'warning', blurb: 'How far ahead a due date is counted', group: 'Organise' },
+  { id: 'backup', label: 'Backup & restore', icon: 'download', tint: 'neutral', blurb: 'One file holding everything', group: 'Your data' },
+  { id: 'data', label: 'Your data', icon: 'box', tint: 'neutral', blurb: 'Sample data, or a clean slate', group: 'Your data' },
+  { id: 'security', label: 'Security & privacy', icon: 'lock', tint: 'success', blurb: 'Password, export, what is stored', group: 'Your data' },
+  { id: 'connections', label: 'Bank connections', icon: 'bank', tint: 'neutral', blurb: 'Automatic syncing, when it comes', group: 'Your data' },
+  { id: 'developer', label: 'Developer', icon: 'bolt', tint: 'neutral', blurb: 'Raw errors, on this device only', group: 'Advanced' },
+  { id: 'delete', label: 'Delete your account', icon: 'trash', tint: 'danger', blurb: 'Everything goes, at once', group: 'Advanced' },
+];
+
+export const SETTINGS_GROUPS: SettingsSection['group'][] = ['You', 'Organise', 'Your data', 'Advanced'];

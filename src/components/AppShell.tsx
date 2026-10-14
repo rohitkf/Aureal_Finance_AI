@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { greeting } from '@/lib/date';
 import { useAppState, useSettings, useStore } from '@/lib/store';
@@ -63,6 +63,19 @@ const navPill = ({ isActive }: { isActive: boolean }) =>
     'transition-all duration-300 ease-fluid',
     isActive ? 'bg-text font-medium text-[rgb(var(--card))]' : 'text-muted hover:text-text',
   );
+
+/**
+ * Where a phone's back link leads from a screen that is not a tab of its
+ * own: an account leads back to Accounts, a settings section to Settings,
+ * and everything behind More to More. The tab roots have no parent, and
+ * show the mark instead.
+ */
+const parentOf = (pathname: string): { to: string; label: string } | null => {
+  if (/^\/accounts\/[^/]+/.test(pathname)) return { to: '/accounts', label: 'Accounts' };
+  if (/^\/settings\/[^/]+/.test(pathname)) return { to: '/settings', label: 'Settings' };
+  if (MORE_NAV.some((item) => pathname === item.to || pathname.startsWith(item.to + '/'))) return { to: '/more', label: 'More' };
+  return null;
+};
 
 /* ------------------------------------------------------------------ */
 /* Quick add                                                           */
@@ -131,6 +144,7 @@ export const AppShell = () => {
   const inMore = location.pathname === '/more' || MORE_NAV.some((item) => location.pathname.startsWith(item.to));
   const inPlanning = PLANNING_NAV.some((item) => location.pathname.startsWith(item.to));
   const atHome = location.pathname === '/';
+  const parent = parentOf(location.pathname);
   const firstName = state.settings.userName.trim().split(/\s+/)[0] || 'there';
 
   const openAdd = (type: TransactionType) => {
@@ -182,6 +196,15 @@ export const AppShell = () => {
                 <span className="block text-[12px] text-muted">{greeting()},</span>
                 <span className="block truncate text-[15.5px] font-medium tracking-[-0.015em] text-text">{firstName}</span>
               </p>
+            ) : parent ? (
+              // The way back, where iOS puts it: the parent's name behind a chevron.
+              <Link
+                to={parent.to}
+                className="-ml-1 flex h-11 items-center gap-0.5 rounded-full pr-3 text-[15px] font-medium text-primary transition-opacity duration-300 ease-fluid hover:opacity-80"
+              >
+                <Icon name="chevron-left" size={20} />
+                {parent.label}
+              </Link>
             ) : (
               <NavLink to="/" aria-label="Aureal home" className="flex items-center gap-2 rounded-full">
                 <Logo size={28} />

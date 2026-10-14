@@ -29,12 +29,13 @@ import {
   type Backup,
 } from '@/lib/backup';
 import { useDevMode } from '@/lib/devMode';
-import { useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
 import { money } from '@/lib/format';
 import { useAppState, useCategories, useLabels, useStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/hooks/useTheme';
+import { useIsDesktop } from '@/hooks/useMediaQuery';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { NewCategoryDialog } from '@/components/NewCategoryDialog';
 import { LabelDialog } from '@/components/LabelDialog';
@@ -45,7 +46,9 @@ import { CURRENCIES, LOCALES } from '@/lib/intl';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Card, CardHeader, Label, PageHeader } from '@/components/ui/Card';
-import { IconTile } from '@/components/ui/List';
+import { Avatar } from '@/components/ui/Ember';
+import { GroupedList, IconTile, ListRow } from '@/components/ui/List';
+import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from '@/components/nav';
 import { TINTS, TINT_LABELS, TINT_SWATCH } from '@/lib/tints';
 import { MoneyDial } from '@/components/ui/MoneyDial';
 import { SelectField, TextField, Toggle } from '@/components/ui/Field';
@@ -54,20 +57,6 @@ import { ConfirmDialog } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
 import type { Category, Label as LabelType } from '@/lib/types';
-
-/** Where the jump links at the top of the page go, in page order. */
-const SECTIONS = [
-  { id: 'account', label: 'Account' },
-  { id: 'appearance', label: 'Appearance & colour' },
-  { id: 'safe-to-spend', label: 'Safe to Spend' },
-  { id: 'region', label: 'Currency' },
-  { id: 'categories', label: 'Categories' },
-  { id: 'labels', label: 'Labels' },
-  { id: 'colours', label: 'Colours' },
-  { id: 'reminders', label: 'Reminders' },
-  { id: 'backup', label: 'Backup' },
-  { id: 'security', label: 'Security' },
-];
 
 const THEMES: Array<{ value: 'light' | 'dark' | 'system'; label: string; icon: IconName }> = [
   { value: 'light', label: 'Light', icon: 'sun' },
@@ -170,20 +159,82 @@ export const Settings = () => {
     setPendingRestore(result.backup);
   };
 
+  /**
+   * One section at a time. On a phone, Settings opens as a list of its
+   * sections and each one is a screen of its own, with the bar's back link
+   * leading home to the list; from `lg` the list is a rail beside the open
+   * section, and the first section opens by itself. Fourteen cards on one
+   * scroll was nobody's idea of easy.
+   */
+  const { section } = useParams<{ section?: string }>();
+  const isDesktop = useIsDesktop();
+  const known = SETTINGS_SECTIONS.find((s) => s.id === section);
+  if (section && !known) return <Navigate to="/settings" replace />;
+  const current = known?.id ?? (isDesktop ? 'account' : null);
+  const show = (id: string) => current === id;
+
   return (
-    <div className="max-w-4xl space-y-6 sm:space-y-8">
-      <PageHeader title="Settings" subtitle="Your profile, how Aureal works for you, and your data.">
-        {/* A long page, so a way straight to each part of it. */}
-        <nav aria-label="Settings sections" className="hide-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
-          {SECTIONS.map((section) => (
-            <a key={section.id} href={`#${section.id}`} className={pillClass(false)}>
-              {section.label}
-            </a>
+    <div className="space-y-6 sm:space-y-8">
+      {current === null ? (
+        <>
+          <PageHeader title="Settings" subtitle="Your profile, how Aureal works for you, and your data." />
+          <Link
+            to="/settings/account"
+            className="plate flex items-center gap-4 p-4 transition-colors duration-300 ease-fluid hover:bg-[rgb(var(--card-raised))]"
+          >
+            <Avatar name={state.settings.userName} size="lg" tone="tint" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[17px] font-medium tracking-[-0.015em] text-text">{state.settings.userName}</span>
+              {user?.email && <span className="block truncate text-[13px] text-muted">{user.email}</span>}
+            </span>
+            <Icon name="chevron-right" size={16} className="shrink-0 text-faint" />
+          </Link>
+          {SETTINGS_GROUPS.map((group) => (
+            <GroupedList key={group} title={group}>
+              {SETTINGS_SECTIONS.filter((s) => s.group === group).map((s) => (
+                <ListRow key={s.id} icon={s.icon} tint={s.tint} title={s.label} subtitle={s.blurb} to={`/settings/${s.id}`} chevron />
+              ))}
+            </GroupedList>
           ))}
-        </nav>
-      </PageHeader>
+        </>
+      ) : (
+      <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start lg:gap-8">
+        {/* The rail, from `lg`: every section by name, the open one as a solid pill. */}
+        <aside className="hide-scrollbar hidden lg:sticky lg:top-24 lg:block lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto">
+          <PageHeader title="Settings" className="mb-6" />
+          <nav aria-label="Settings sections" className="space-y-5">
+            {SETTINGS_GROUPS.map((group) => (
+              <div key={group}>
+                <p className="caption mb-1.5 px-3">{group}</p>
+                <ul className="space-y-0.5">
+                  {SETTINGS_SECTIONS.filter((s) => s.group === group).map((s) => (
+                    <li key={s.id}>
+                      <Link
+                        to={`/settings/${s.id}`}
+                        aria-current={show(s.id) ? 'page' : undefined}
+                        className={cn(
+                          'flex h-10 items-center gap-2.5 rounded-full px-3 text-[13.5px] tracking-[-0.01em] transition-all duration-300 ease-fluid',
+                          show(s.id) ? 'bg-text font-medium text-[rgb(var(--card))]' : 'text-muted hover:bg-fill hover:text-text',
+                        )}
+                      >
+                        <Icon name={s.icon} size={16} className="shrink-0" />
+                        {s.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="min-w-0 max-w-4xl space-y-6 sm:space-y-8">
+          {/* A phone shows one section with the bar's back link above it; the
+              card's own heading is the title, and this is for screen readers. */}
+          <h1 className="sr-only">Settings · {known?.label ?? 'Your account'}</h1>
 
       {/* ---------------- Account ---------------- */}
+      {show('account') && (
       <Card className="scroll-mt-24 space-y-6" id="account">
         <CardHeader title="Your account" description="How Aureal addresses you, and who is signed in." />
         <div className="grid gap-5 sm:grid-cols-2">
@@ -208,8 +259,10 @@ export const Settings = () => {
           </Button>
         </div>
       </Card>
+      )}
 
       {/* ---------------- Appearance ---------------- */}
+      {show('appearance') && (
       <Card className="scroll-mt-24 space-y-6" id="appearance">
         <CardHeader
           title="Appearance"
@@ -287,8 +340,10 @@ export const Settings = () => {
           description="Masks every figure until you choose to reveal it. Useful on a shared screen."
         />
       </Card>
+      )}
 
       {/* ---------------- Safe to spend ---------------- */}
+      {show('safe-to-spend') && (
       <Card className="scroll-mt-24 space-y-6" id="safe-to-spend">
         <CardHeader
           title="Safe to Spend"
@@ -339,8 +394,10 @@ export const Settings = () => {
           description="Count their money in your total balance and Safe to Spend. Each one can still be left out on its own page. Your net worth includes them either way."
         />
       </Card>
+      )}
 
       {/* ---------------- Currency & region ---------------- */}
+      {show('region') && (
       <Card className="scroll-mt-24 space-y-6" id="region">
         <CardHeader
           title="Currency & region"
@@ -394,8 +451,10 @@ export const Settings = () => {
           anything: £100 already recorded becomes €100, not its value in euros.
         </p>
       </Card>
+      )}
 
       {/* ---------------- Categories ---------------- */}
+      {show('categories') && (
       <Card className="scroll-mt-24 space-y-6" id="categories">
         <CardHeader
           title="Categories"
@@ -459,8 +518,10 @@ export const Settings = () => {
           )
         )}
       </Card>
+      )}
 
       {/* ---------------- Labels ---------------- */}
+      {show('labels') && (
       <Card className="scroll-mt-24 space-y-6" id="labels">
         <CardHeader
           title="Labels"
@@ -502,8 +563,10 @@ export const Settings = () => {
           </ul>
         )}
       </Card>
+      )}
 
       {/* ---------------- Colours ---------------- */}
+      {show('colours') && (
       <Card className="scroll-mt-24 space-y-6" id="colours">
         <CardHeader
           title="Colours"
@@ -567,8 +630,10 @@ export const Settings = () => {
           Back to the defaults
         </Button>
       </Card>
+      )}
 
       {/* ---------------- Reminders ---------------- */}
+      {show('reminders') && (
       <Card className="scroll-mt-24 space-y-6" id="reminders">
         <CardHeader
           title="Reminders"
@@ -603,8 +668,10 @@ export const Settings = () => {
           </p>
         </div>
       </Card>
+      )}
 
       {/* ---------------- Backup ---------------- */}
+      {show('backup') && (
       <Card className="scroll-mt-24 space-y-6" id="backup">
         <CardHeader
           title="Backup & restore"
@@ -637,8 +704,10 @@ export const Settings = () => {
           the file rather than copied, which is the same way they are maintained normally.
         </p>
       </Card>
+      )}
 
       {/* ---------------- Data ---------------- */}
+      {show('data') && (
       <Card className="scroll-mt-24 space-y-6" id="data">
         <CardHeader
           title="Your data"
@@ -679,8 +748,10 @@ export const Settings = () => {
           on its own.
         </p>
       </Card>
+      )}
 
       {/* ---------------- Security ---------------- */}
+      {show('security') && (
       <Card className="scroll-mt-24 space-y-6" id="security">
         <CardHeader title="Security & privacy" description="What Aureal stores, and how you stay in control." />
         <div className="space-y-2">
@@ -725,14 +796,18 @@ export const Settings = () => {
           />
         </div>
       </Card>
+      )}
 
       {/* ---------------- Bank connections ---------------- */}
+      {show('connections') && (
       <Card className="scroll-mt-24 space-y-6" id="connections">
         <CardHeader title="Bank connections" description="Where automatic transaction syncing will live." />
         <BankConnectionsUpcoming />
       </Card>
+      )}
 
       {/* ---------------- Development mode ---------------- */}
+      {show('developer') && (
       <Card className="scroll-mt-24 space-y-6" id="developer">
         <CardHeader
           title="Developer"
@@ -745,8 +820,10 @@ export const Settings = () => {
           description="Shows the underlying error whenever something fails, instead of the plain-English message. Applies to this device only, and stays on until you turn it off."
         />
       </Card>
+      )}
 
       {/* ---------------- Danger zone ---------------- */}
+      {show('delete') && (
       <Card className="scroll-mt-24 space-y-5" id="delete">
         <CardHeader
           title="Delete your account"
@@ -756,6 +833,11 @@ export const Settings = () => {
           Delete account
         </Button>
       </Card>
+      )}
+
+        </div>
+      </div>
+      )}
 
       <DeleteAccountDialog
         open={deletingAccount}

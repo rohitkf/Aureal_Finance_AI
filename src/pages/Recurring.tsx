@@ -8,7 +8,8 @@ import { isSelectable, monthlyCommitments, monthlyRecurringIncome, monthlyTransf
 import { newId, useAppState, useCategories, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { Badge } from '@/components/ui/Badge';
-import { Button, IconButton } from '@/components/ui/Button';
+import { Button } from '@/components/ui/Button';
+import { RowMenu } from '@/components/ui/Menu';
 import { Card, PageHeader, StatGroup } from '@/components/ui/Card';
 import {
   AmountField,
@@ -329,17 +330,55 @@ export const Recurring = () => {
         </Card>
       ) : (
         <ul
-          className="plate divide-y divide-[rgb(var(--hairline)/0.07)] overflow-hidden p-0"
+          // Not `overflow-hidden`: a row's menu opens past the card's edge.
+          // The first and last rows round themselves to the card instead.
+          className="plate divide-y divide-[rgb(var(--hairline)/0.07)] p-0"
           aria-label={`${tab === 'all' ? 'All' : tab} recurring payments`}
         >
           {rules.map((rule) => {
             const next = nextDates(rule)[0];
             const account = state.accounts.find((a) => a.id === rule.accountId);
+            const edit = () =>
+              setDraft({
+                id: rule.id,
+                name: rule.name,
+                amount: String(rule.amount),
+                direction: rule.direction,
+                categoryId: rule.categoryId,
+                accountId: rule.accountId,
+                toAccountId: rule.toAccountId ?? '',
+                frequency: rule.frequency,
+                interval: String(rule.interval ?? 1),
+                customIntervalDays: String(rule.customIntervalDays ?? 30),
+                anchorDay: String(rule.anchorDay),
+                startDate: rule.startDate,
+                endMode: rule.endDate ? 'date' : rule.occurrences ? 'count' : 'never',
+                endDate: rule.endDate ?? '',
+                occurrences: String(rule.occurrences ?? 12),
+                weekendMode: rule.weekendMode ?? 'none',
+                isSubscription: Boolean(rule.isSubscription),
+                notes: rule.notes ?? '',
+              });
+            const toggleStatus = () => {
+              const status = rule.status === 'active' ? 'paused' : 'active';
+              dispatch({ type: 'set-recurring-status', id: rule.id, status });
+              toast({
+                tone: 'info',
+                title: status === 'paused' ? 'Payment paused' : 'Payment resumed',
+                description: `${rule.name} · your forecast has been updated.`,
+              });
+            };
             return (
               <li
                 key={rule.id}
-                className="flex flex-wrap items-center gap-x-3.5 gap-y-2 px-4 py-3.5 transition-colors duration-300 ease-fluid hover:bg-fill sm:flex-nowrap"
+                className="relative flex items-center gap-3 px-3 py-2 transition-colors duration-300 ease-fluid first:rounded-t-[1.75rem] last:rounded-b-[1.75rem] hover:bg-fill sm:px-4"
               >
+                {/* The row is the way in: tap it to change the payment. */}
+                <button
+                  type="button"
+                  onClick={edit}
+                  className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3.5 gap-y-2 rounded-2xl py-1.5 text-left sm:flex-nowrap"
+                >
                 <CategoryIcon categoryId={rule.categoryId} />
 
                 <div className="min-w-0 flex-1">
@@ -378,7 +417,7 @@ export const Recurring = () => {
                 </div>
 
                 <div className="ml-auto flex w-full items-center justify-between gap-3 pl-[3.25rem] sm:w-auto sm:justify-end sm:gap-4 sm:pl-0">
-                  <div className="sm:text-right">
+                  <div className="text-right">
                     <p
                       className={cn(
                         'tnum text-metric-sm font-semibold',
@@ -398,51 +437,17 @@ export const Recurring = () => {
                     </p>
                   </div>
 
-                  <div className="flex gap-1">
-                    <IconButton
-                      icon={rule.status === 'active' ? 'pause' : 'play'}
-                      label={rule.status === 'active' ? `Pause ${rule.name}` : `Resume ${rule.name}`}
-                      size={16}
-                      onClick={() => {
-                        const status = rule.status === 'active' ? 'paused' : 'active';
-                        dispatch({ type: 'set-recurring-status', id: rule.id, status });
-                        toast({
-                          tone: 'info',
-                          title: status === 'paused' ? 'Payment paused' : 'Payment resumed',
-                          description: `${rule.name} · your forecast has been updated.`,
-                        });
-                      }}
-                    />
-                    <IconButton
-                      icon="edit"
-                      label={`Edit ${rule.name}`}
-                      size={16}
-                      onClick={() =>
-                        setDraft({
-                          id: rule.id,
-                          name: rule.name,
-                          amount: String(rule.amount),
-                          direction: rule.direction,
-                          categoryId: rule.categoryId,
-                          accountId: rule.accountId,
-                          toAccountId: rule.toAccountId ?? '',
-                          frequency: rule.frequency,
-                          interval: String(rule.interval ?? 1),
-                          customIntervalDays: String(rule.customIntervalDays ?? 30),
-                          anchorDay: String(rule.anchorDay),
-                          startDate: rule.startDate,
-                          endMode: rule.endDate ? 'date' : rule.occurrences ? 'count' : 'never',
-                          endDate: rule.endDate ?? '',
-                          occurrences: String(rule.occurrences ?? 12),
-                          weekendMode: rule.weekendMode ?? 'none',
-                          isSubscription: Boolean(rule.isSubscription),
-                          notes: rule.notes ?? '',
-                        })
-                      }
-                    />
-                    <IconButton icon="trash" label={`Delete ${rule.name}`} size={16} onClick={() => setDeleting(rule)} />
-                  </div>
                 </div>
+                </button>
+
+                <RowMenu
+                  label={`More for ${rule.name}`}
+                  items={[
+                    { label: rule.status === 'active' ? 'Pause' : 'Resume', icon: rule.status === 'active' ? 'pause' : 'play', onSelect: toggleStatus },
+                    { label: 'Edit', icon: 'edit', onSelect: edit },
+                    { label: 'Delete', icon: 'trash', tone: 'danger', onSelect: () => setDeleting(rule) },
+                  ]}
+                />
               </li>
             );
           })}
