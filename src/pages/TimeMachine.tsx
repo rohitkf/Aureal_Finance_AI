@@ -356,25 +356,47 @@ export const TimeMachine = () => {
                     <li className="relative space-y-2 pl-9">
                       <span
                         aria-hidden="true"
-                        className="absolute left-[6px] top-1.5 h-3 w-3 rounded-full bg-surface-base shadow-[inset_0_0_0_2px_rgb(var(--hairline)/0.35)]"
+                        className="absolute left-[5px] top-[1.375rem] h-3.5 w-3.5 rounded-full bg-primary-strong shadow-[0_0_0_3px_rgb(var(--card))]"
                       />
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <h3 className="flex min-w-0 items-baseline gap-2">
-                          <span className="font-display text-[17px] font-semibold tracking-[-0.015em] text-text">{relative}</span>
-                          {['Today', 'Yesterday', 'Tomorrow'].includes(relative) && (
-                            <span className="truncate text-body-sm text-faint">{formatFullDate(day.date)}</span>
-                          )}
+                      {/* The day, as a band in the tint's gradient that stays
+                          at the top while its payments scroll beneath it, so
+                          on a long timeline it is always clear which day a
+                          line belongs to and what that day leaves you with. */}
+                      <div className="ember sticky top-[calc(env(safe-area-inset-top)+4.25rem)] z-10 flex items-center justify-between gap-3 rounded-[1.25rem] px-4 py-2.5 lg:top-24">
+                        <h3 className="min-w-0">
+                          <span className="block truncate font-display text-[17px] font-semibold leading-tight tracking-[-0.015em] text-text">
+                            {relative}
+                          </span>
+                          <span className="block truncate text-[12.5px] text-muted">
+                            {['Today', 'Yesterday', 'Tomorrow'].includes(relative)
+                              ? formatFullDate(day.date)
+                              : day.date < today
+                                ? 'Already happened'
+                                : `In ${daysBetween(today, day.date)} days`}
+                          </span>
                         </h3>
-                        <span className="tnum shrink-0 text-body-sm text-muted">
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span className="tnum text-right text-[12px] text-muted">
+                            Ends on{' '}
+                            <strong className="text-[16px] font-semibold tracking-[-0.01em] text-text">
+                              {money(day.closing, { masked: maskBalances })}
+                            </strong>
+                          </span>
                           {day.net !== 0 && (
-                            <span className={day.net > 0 ? 'text-success' : 'text-danger'}>
+                            // In a well: on the gradient a small pale red or
+                            // green word falls short of 4.5:1; pressed into
+                            // the darker well it holds.
+                            <span
+                              className={cn(
+                                'well tnum rounded-full px-2 py-0.5 text-[12px] font-semibold',
+                                day.net > 0 ? 'text-success' : 'text-danger',
+                              )}
+                            >
                               {day.net > 0 ? '+' : '−'}
-                              {money(Math.abs(day.net), { masked: maskBalances })}
-                              {' · '}
+                              {money(Math.abs(day.net), { masked: maskBalances })} this day
                             </span>
                           )}
-                          Total <span className="font-semibold text-text">{money(day.closing, { masked: maskBalances })}</span>
-                        </span>
+                        </div>
                       </div>
 
                       <ul className="space-y-1.5">
