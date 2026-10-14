@@ -70,3 +70,33 @@ describe('the time of a transaction', () => {
     expect(saved.time).toBeUndefined();
   });
 });
+
+describe('the calculator keys under the amount', () => {
+  it('types the sum the number pad cannot, shows what it comes to, and = settles it', async () => {
+    const user = userEvent.setup();
+    render(<AddTransactionSheet open onClose={vi.fn()} />);
+    const amount = screen.getByLabelText('Amount');
+    await user.type(amount, '20');
+    await user.click(screen.getByRole('button', { name: 'Times' }));
+    await user.type(amount, '2');
+    expect(amount).toHaveValue('20*2');
+    expect(screen.getByText('20 × 2 = £40.00')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Equals' }));
+    expect(amount).toHaveValue('40');
+
+    await user.click(screen.getByRole('button', { name: /Save/ }));
+    expect(sent().find((a) => a.type === 'add-transaction').transaction.amount).toBe(40);
+  });
+
+  it('saves the worked-out figure even when = is never pressed', async () => {
+    const user = userEvent.setup();
+    render(<AddTransactionSheet open onClose={vi.fn()} />);
+    const amount = screen.getByLabelText('Amount');
+    await user.type(amount, '12.40');
+    await user.click(screen.getByRole('button', { name: 'Plus' }));
+    await user.type(amount, '3.60');
+    await user.click(screen.getByRole('button', { name: /Save/ }));
+    expect(sent().find((a) => a.type === 'add-transaction').transaction.amount).toBe(16);
+  });
+});

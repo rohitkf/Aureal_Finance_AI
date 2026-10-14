@@ -575,7 +575,7 @@ describe('arithmetic in the amount field', () => {
     open();
 
     await user.keyboard('12.40+3.60');
-    expect(screen.getByText('= £16.00')).toBeInTheDocument();
+    expect(screen.getByText('12.40 + 3.60 = £16.00')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /save transaction/i }));
     expect(dispatch.mock.calls[0][0].transaction.amount).toBe(16);
