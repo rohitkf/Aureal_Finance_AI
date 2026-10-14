@@ -1,11 +1,13 @@
 import {
   forwardRef,
   useId,
+  useRef,
   useState,
   type InputHTMLAttributes,
   type ReactNode,
   type TextareaHTMLAttributes,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { cn } from '@/lib/cn';
 import { Icon } from './Icon';
 import { Select } from './Select';
@@ -334,14 +336,50 @@ TextAreaField.displayName = 'TextAreaField';
  * expense should take a couple of seconds, so this is what the eye and the
  * thumb land on first.
  */
+/** The calculator's keys: what is shown, what is typed, and what a screen reader says. */
+const CALC_KEYS: Array<{ show: string; type: string; name: string }> = [
+  { show: '+', type: '+', name: 'Plus' },
+  { show: '−', type: '-', name: 'Minus' },
+  { show: '×', type: '*', name: 'Times' },
+  { show: '÷', type: '/', name: 'Divided by' },
+  { show: '(', type: '(', name: 'Open bracket' },
+  { show: ')', type: ')', name: 'Close bracket' },
+];
+
+/**
+ * The text with `insert` put where the caret is (or over the selection), and
+ * where the caret should go after it.
+ */
+const insertAtCaret = (input: HTMLInputElement, insert: string): { text: string; caret: number } => {
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  return { text: input.value.slice(0, start) + insert + input.value.slice(end), caret: start + insert.length };
+};
+
 export const AmountField = forwardRef<
   HTMLInputElement,
-  InputProps & { tone?: 'expense' | 'income' | 'transfer' }
->(({ label, hint, error, tone = 'expense', className, ...rest }, ref) => {
+  InputProps & {
+    tone?: 'expense' | 'income' | 'transfer';
+    /**
+     * A row of + − × ÷ ( ) = keys under the figure. A phone's number pad has
+     * none of them, so without these the field's arithmetic could only be
+     * used from a keyboard. `evaluate` works out what `=` writes back;
+     * `onInput` receives the field's new text, as its `onChange` would.
+     */
+    calculator?: { evaluate: (text: string) => number; onInput: (text: string) => void };
+  }
+>(({ label, hint, error, tone = 'expense', className, calculator, ...rest }, ref) => {
   const color = tone === 'income' ? 'text-success' : tone === 'transfer' ? 'text-primary' : 'text-text';
+  const inner = useRef<HTMLInputElement | null>(null);
+  const setRefs = (node: HTMLInputElement | null) => {
+    inner.current = node;
+    if (typeof ref === 'function') ref(node);
+    else if (ref) ref.current = node;
+  };
   return (
     <Field label={label} hint={hint} error={error} hideLabel>
       {({ id, describedBy, invalid }) => (
+        <div className="space-y-2">
         <div
           className={cn(
             'flex items-baseline justify-center gap-1 rounded-[1.5rem] bg-fill px-5 py-7',
@@ -357,7 +395,6 @@ export const AmountField = forwardRef<
             £
           </span>
           <input
-            ref={ref}
             id={id}
             inputMode="decimal"
             autoComplete="off"
@@ -379,7 +416,55 @@ export const AmountField = forwardRef<
               className,
             )}
             {...rest}
+            ref={setRefs}
           />
+        </div>
+        {calculator && (
+          <div role="group" aria-label="Calculator" className="grid grid-cols-7 gap-1.5">
+            {CALC_KEYS.map((key) => (
+              <button
+                key={key.name}
+                type="button"
+                aria-label={key.name}
+                // Keep the caret in the figure: a tap here must not take focus
+                // away from the field it is typing into.
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  const input = inner.current;
+                  if (!input) return;
+                  const { text, caret } = insertAtCaret(input, key.type);
+                  // Written back before this handler returns, so the next
+                  // keystroke lands on the new text and the caret goes after
+                  // the sign, with no frame in between for either to slip.
+                  flushSync(() => calculator.onInput(text));
+                  input.focus();
+                  input.setSelectionRange(caret, caret);
+                }}
+                className="tnum flex h-11 items-center justify-center rounded-2xl bg-fill text-[19px] font-medium text-text transition-all duration-200 ease-fluid hover:bg-[rgb(var(--fill)/calc(var(--fill-alpha)*1.8))] active:scale-[0.94]"
+              >
+                {key.show}
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-label="Equals"
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const input = inner.current;
+                if (!input) return;
+                const value = calculator.evaluate(input.value);
+                if (!Number.isFinite(value)) return;
+                const text = String(value);
+                flushSync(() => calculator.onInput(text));
+                input.focus();
+                input.setSelectionRange(text.length, text.length);
+              }}
+              className="flex h-11 items-center justify-center rounded-2xl bg-primary-strong text-[19px] font-semibold text-[rgb(var(--on-primary))] transition-all duration-200 ease-fluid hover:brightness-[1.06] active:scale-[0.94]"
+            >
+              =
+            </button>
+          </div>
+        )}
         </div>
       )}
     </Field>

@@ -88,3 +88,21 @@ describe('what the field accepts as it is typed', () => {
     expect(isPlainNumber('12+3')).toBe(false);
   });
 });
+
+describe('the signs a phone or a calculator writes', () => {
+  it('reads × ÷ and a true minus as the operators they are', async () => {
+    const { evaluateExpression, stripToExpression } = await import('../calc');
+    expect(evaluateExpression(stripToExpression('20×2'))).toBe(40);
+    expect(evaluateExpression(stripToExpression('90÷4'))).toBe(22.5);
+    expect(evaluateExpression(stripToExpression('50−12.50'))).toBe(37.5);
+    expect(evaluateExpression(stripToExpression('1,200+50'))).toBe(1250);
+  });
+
+  it('shows a sum the way it would be written by hand', async () => {
+    const { prettyExpression } = await import('../calc');
+    expect(prettyExpression('20*2')).toBe('20 × 2');
+    expect(prettyExpression('(18+4)/2')).toBe('(18 + 4) ÷ 2');
+    expect(prettyExpression('50-12.5')).toBe('50 − 12.5');
+    expect(prettyExpression('-5+3')).toBe('-5 + 3');
+  });
+});

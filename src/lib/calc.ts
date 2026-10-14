@@ -18,7 +18,26 @@ const ALLOWED = /^[0-9.+\-*/() ]*$/;
  * Keeps only what the grammar below can read, so a stray letter is dropped as
  * it is typed rather than silently invalidating the whole field.
  */
-export const stripToExpression = (raw: string): string => raw.replace(/[^0-9.+\-*/() ]/g, '');
+export const stripToExpression = (raw: string): string =>
+  raw
+    // The signs a phone or a calculator writes, read as the ones the parser knows.
+    .replace(/×/g, '*')
+    .replace(/÷/g, '/')
+    .replace(/[−–]/g, '-')
+    .replace(/,/g, '')
+    .replace(/[^0-9.+\-*/() ]/g, '');
+
+/**
+ * The sum as it should read on screen: × and ÷ and a true minus, with a
+ * little room around each, so `20*2` shows as `20 × 2`.
+ */
+export const prettyExpression = (raw: string): string =>
+  raw
+    .replace(/\s+/g, '')
+    .replace(/(?<=[\d)])([+\-*/])/g, ' $1 ')
+    .replace(/\*/g, '×')
+    .replace(/\//g, '÷')
+    .replace(/(?<= )-(?= )/g, '−');
 
 /** Whether the text is a bare number, with no arithmetic to show a result for. */
 export const isPlainNumber = (text: string): boolean => /^\s*\d*\.?\d*\s*$/.test(text);

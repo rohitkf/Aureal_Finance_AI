@@ -11,7 +11,7 @@ import {
   parseISO,
   timeOf,
 } from '@/lib/date';
-import { evaluateExpression, isPlainNumber, stripToExpression } from '@/lib/calc';
+import { evaluateExpression, isPlainNumber, prettyExpression, stripToExpression } from '@/lib/calc';
 import { money } from '@/lib/format';
 import { clearDraft, readDraft, writeDraft } from '@/lib/draft';
 import { rememberedMerchants, suggestMerchants } from '@/lib/merchants';
@@ -758,7 +758,14 @@ export const AddTransactionSheet = ({
             value={amount}
             tone={type}
             error={error}
-            hint={sum !== null ? `= ${money(sum)}` : undefined}
+            hint={sum !== null ? `${prettyExpression(amount)} = ${money(sum)}` : amount === '' ? 'Use the keys below to work it out, like 20 × 2' : undefined}
+            calculator={{
+              evaluate: evaluateExpression,
+              onInput: (text) => {
+                setAmount(stripToExpression(text));
+                setError(undefined);
+              },
+            }}
             autoFocus
             onChange={(e) => {
               setAmount(stripToExpression(e.target.value));
