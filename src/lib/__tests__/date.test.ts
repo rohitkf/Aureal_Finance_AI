@@ -282,3 +282,26 @@ describe('lastWorkingDayOfMonth', () => {
     expect(lastWorkingDayOfMonth('2026-10-31')).toBe('2026-10-30');
   });
 });
+
+describe('parseTime', () => {
+  it('reads a time however it is typed', async () => {
+    const { parseTime } = await import('../date');
+    expect(parseTime('14:37')).toBe('14:37');
+    expect(parseTime('2:37pm')).toBe('14:37');
+    expect(parseTime('2.37 PM')).toBe('14:37');
+    expect(parseTime('9pm')).toBe('21:00');
+    expect(parseTime('12am')).toBe('00:00');
+    expect(parseTime('12pm')).toBe('12:00');
+    expect(parseTime('0915')).toBe('09:15');
+    expect(parseTime('9')).toBe('09:00');
+  });
+
+  it('refuses what is not a time', async () => {
+    const { parseTime } = await import('../date');
+    expect(parseTime('25:00')).toBeUndefined();
+    expect(parseTime('13pm')).toBeUndefined();
+    expect(parseTime('9:60')).toBeUndefined();
+    expect(parseTime('soon')).toBeUndefined();
+    expect(parseTime('')).toBeUndefined();
+  });
+});

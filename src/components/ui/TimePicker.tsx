@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { formatTime, isValidTime, nowTime } from '@/lib/date';
+import { formatTime, isValidTime, nowTime, parseTime } from '@/lib/date';
 import { Icon } from './Icon';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-/** Five-minute steps. Nobody records a coffee at 14:37 on purpose. */
-const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+/** Every minute: a receipt says 14:37, and the picker should be able to say it too. */
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 
 interface TimePickerProps {
   value: string;
@@ -23,10 +23,12 @@ interface TimePickerProps {
  * none of them draw like this app, which is why it is not used anywhere here.
  * Two columns rather than a clock face: picking an hour and a minute is what
  * people actually want, and a clock is a lovely thing that takes four gestures
- * to do it with.
+ * to do it with. Any minute can be picked, and a time can simply be typed —
+ * "14:37", "2:37pm", "9pm" — which is quicker still.
  */
 export const TimePicker = ({ value, onChange, id, describedBy, invalid, disabled }: TimePickerProps) => {
   const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -48,6 +50,13 @@ export const TimePicker = ({ value, onChange, id, describedBy, invalid, disabled
   }, [open]);
 
   const set = (h: string, m: string) => onChange(`${h}:${m}`);
+  const typedTime = parseTime(typed);
+  const commitTyped = () => {
+    if (!typedTime) return;
+    onChange(typedTime);
+    setTyped('');
+    close();
+  };
 
   return (
     <div ref={rootRef} className="relative">
@@ -87,18 +96,44 @@ export const TimePicker = ({ value, onChange, id, describedBy, invalid, disabled
           aria-label="Choose a time"
           className="absolute right-0 z-50 mt-1.5 w-full min-w-[15rem] rounded-2xl bg-[rgb(var(--surface-base))] p-3 shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong)),0_24px_48px_-16px_rgb(var(--ambient)/0.7)]"
         >
-          <div className="mb-2 flex justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                onChange(nowTime());
-                close();
+          <div className="mb-2 flex items-center gap-2">
+            {/* Type it: the quickest way to any time at all. */}
+            <input
+              type="text"
+              inputMode="numeric"
+              aria-label="Type a time"
+              placeholder="e.g. 14:37 or 2:37pm"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitTyped();
+                }
               }}
-              className="rounded-full bg-primary/15 px-3 py-1.5 text-[13px] font-semibold text-primary transition-all duration-300 ease-fluid hover:bg-primary/20"
-            >
-              Now
-            </button>
-            <span className="self-center text-label-sm text-faint">Hour · Minute</span>
+              className="tnum h-10 min-w-0 flex-1 rounded-xl bg-fill px-3 text-[13.5px] text-text outline-none placeholder:text-faint focus-visible:shadow-[inset_0_0_0_1.5px_rgb(var(--primary))]"
+            />
+            {typed ? (
+              <button
+                type="button"
+                disabled={!typedTime}
+                onClick={commitTyped}
+                className="rounded-full bg-primary-strong px-3 py-2 text-[13px] font-semibold text-[rgb(var(--on-primary))] transition-all duration-300 ease-fluid disabled:opacity-40"
+              >
+                {typedTime ? `Use ${formatTime(typedTime)}` : 'Use'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(nowTime());
+                  close();
+                }}
+                className="rounded-full bg-primary/15 px-3 py-2 text-[13px] font-semibold text-primary transition-all duration-300 ease-fluid hover:bg-primary/20"
+              >
+                Now
+              </button>
+            )}
           </div>
 
           <div className="flex gap-2">
