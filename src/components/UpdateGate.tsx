@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppUpdate } from '@/hooks/useAppUpdate';
 import { Button } from './ui/Button';
@@ -15,8 +15,27 @@ import { Icon } from './ui/Icon';
  * z-index sits above every other layer, including the skip link at 200, since
  * nothing behind it should be reachable.
  */
+/**
+ * Whether a form or sheet is open. The gate waits for it to close: reloading
+ * under somebody who is halfway through typing a transaction loses what they
+ * typed, and the update can wait the minute it takes them to finish.
+ */
+const useDialogOpen = (): boolean => {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const check = () => setOpen(document.querySelector('[role="dialog"][aria-modal="true"]') !== null);
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+  return open;
+};
+
 export const UpdateGate = () => {
-  const { updateReady, applyUpdate, applying } = useAppUpdate();
+  const { updateReady: ready, applyUpdate, applying } = useAppUpdate();
+  const busy = useDialogOpen();
+  const updateReady = ready && !busy;
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 

@@ -13,6 +13,7 @@ import {
 } from '@/lib/date';
 import { evaluateExpression, isPlainNumber, stripToExpression } from '@/lib/calc';
 import { money } from '@/lib/format';
+import { clearDraft, readDraft, writeDraft } from '@/lib/draft';
 import { rememberedMerchants, suggestMerchants } from '@/lib/merchants';
 import { FREQUENCY_LABELS, WEEKEND_LABELS, cadencePhrase, previewOccurrences } from '@/lib/recurrence';
 import { newId, useAppState, useCategories, useStore, useToday } from '@/lib/store';
@@ -271,6 +272,15 @@ export const AddTransactionSheet = ({
   /** The interval, clamped the way the database clamps it. */
   const everyN = Math.min(Math.max(Number(interval) || 1, 1), 99);
 
+  /**
+   * Reset when the sheet opens, or when it is pointed at a different
+   * transaction. Keyed on the id rather than the object: a refresh replaces
+   * every transaction with a fresh object, and keyed on the object that wiped
+   * an edit in progress whenever the data was reloaded.
+   */
+  const editingId = editing?.id ?? null;
+  /** The sheet opened on an entry left unfinished last time. */
+  const [restored, setRestored] = useState(false);
   useEffect(() => {
     if (!open) return;
     setType(editing?.type ?? initialType);
@@ -325,7 +335,40 @@ export const AddTransactionSheet = ({
       setCategoryId(editing.categoryId);
       if (editing.toAccountId) setToAccountId(editing.toAccountId);
     }
-  }, [open, initialType, today, editing]);
+    // A new entry left unfinished — the app reloaded for an update, or the
+    // phone discarded it in the background — comes back as it was.
+    const draft = editing ? null : readDraft();
+    if (draft) {
+      setType(draft.type);
+      setAmount(draft.amount);
+      setMerchant(draft.merchant);
+      setNotes(draft.notes);
+      setCategoryChosen(draft.categoryChosen);
+      if (draft.accountId) setAccountId(draft.accountId);
+      if (draft.toAccountId) setToAccountId(draft.toAccountId);
+      if (draft.categoryId) setCategoryId(draft.categoryId);
+      setDate(draft.date);
+      setTime(draft.time);
+      setDateMode(draft.dateMode);
+      setLabelIds(draft.labelIds);
+      setRestored(true);
+    } else {
+      setRestored(false);
+    }
+    // `editing` is read through its id on purpose; see above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialType, today, editingId]);
+
+  // Keep a new entry as it is typed, so nothing is lost if the app goes away.
+  useEffect(() => {
+    if (!open || editing) return;
+    const blank = !amount && !merchant && !notes && labelIds.length === 0;
+    if (blank) {
+      clearDraft();
+      return;
+    }
+    writeDraft({ type, amount, merchant, notes, categoryChosen, accountId, toAccountId, categoryId, date, time, dateMode, labelIds });
+  }, [open, editing, type, amount, merchant, notes, categoryChosen, accountId, toAccountId, categoryId, date, time, dateMode, labelIds]);
 
   /**
    * A new transaction's status follows its date, until it is answered by hand.
@@ -604,6 +647,13 @@ export const AddTransactionSheet = ({
           ? `${money(transaction.amount)} · ${transaction.merchant} · repeats ${FREQUENCY_LABELS[frequency].toLowerCase()}`
           : `${money(transaction.amount)} · ${transaction.merchant}`,
     });
+    if (!editing) clearDraft();
+    onClose();
+  };
+
+  /** Closing on purpose throws the unfinished entry away; the app going away does not. */
+  const close = () => {
+    if (!editing) clearDraft();
     onClose();
   };
 
@@ -652,7 +702,7 @@ export const AddTransactionSheet = ({
     <>
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={close}
         title={editing ? (mode === 'create' ? 'Change this one' : 'Edit transaction') : 'Add transaction'}
         description={
           mode === 'create' && editing?.recurringId
@@ -668,7 +718,7 @@ export const AddTransactionSheet = ({
                 Delete
               </Button>
             )}
-            <Button onClick={onClose}>Cancel</Button>
+            <Button onClick={close}>Cancel</Button>
             <Button variant="primary" icon="check" onClick={submit} disabled={!valid}>
               {editing ? (mode === 'create' ? 'Save this one' : 'Save changes') : 'Save transaction'}
             </Button>
@@ -676,6 +726,33 @@ export const AddTransactionSheet = ({
         }
       >
         <div className="space-y-8">
+          {restored && (
+            <div role="status" className="well flex items-center justify-between gap-3 p-3 pl-4 text-[13px] text-muted">
+              <span className="flex items-center gap-2">
+                <Icon name="sync" size={15} className="shrink-0 text-primary" />
+                Picked up where you left off.
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  clearDraft();
+                  setRestored(false);
+                  setAmount('');
+                  setMerchant('');
+                  setNotes('');
+                  setLabelIds([]);
+                  setCategoryChosen(false);
+                  setDate(today);
+                  setTime(nowTime());
+                  setDateMode('today');
+                  setType(initialType);
+                }}
+              >
+                Start again
+              </Button>
+            </div>
+          )}
           <AmountField
             label="Amount"
             value={amount}

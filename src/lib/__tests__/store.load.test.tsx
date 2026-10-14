@@ -35,7 +35,7 @@ vi.mock('@/lib/supabase', () => ({
   isSupabaseConfigured: true,
 }));
 
-const user = { id: '11111111-1111-4111-8111-111111111111', email: 'a@b.c' };
+let user = { id: '11111111-1111-4111-8111-111111111111', email: 'a@b.c' };
 vi.mock('@/lib/auth', () => ({ useAuth: () => ({ user, loading: false }) }));
 vi.mock('@/components/ui/Toast', () => ({ useToast: () => vi.fn() }));
 
@@ -228,3 +228,23 @@ describe('what the person actually sees when the load fails', () => {
     );
   });
 });
+
+describe('coming back to the app', () => {
+  it('does not reload, or blank the screens, when the token is refreshed for the same person', async () => {
+    replyFor = (table) => ok(table);
+    const view = mount();
+    await waitFor(() => expect(at('loaded')).toBe('true'));
+    const loadsSoFar = attempts;
+
+    // Supabase refreshes the token on the way back: a new user object, the same id.
+    user = { ...user };
+    view.rerender(<StoreProvider><Probe /></StoreProvider>);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+
+    expect(attempts).toBe(loadsSoFar);
+    expect(at('loading')).toBe('false');
+  });
+});
+

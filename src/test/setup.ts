@@ -54,3 +54,17 @@ Object.defineProperty(HTMLElement.prototype, 'offsetParent', {
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = vi.fn();
 }
+
+/**
+ * Each test starts with an empty browser storage. The transaction form keeps
+ * an unfinished entry there (`lib/draft.ts`), and without this one test's
+ * half-typed amount would open the next test's form already filled in.
+ */
+import { beforeEach as clearStorageBeforeEach } from 'vitest';
+clearStorageBeforeEach(() => {
+  try {
+    window.localStorage.clear();
+  } catch {
+    // No storage in this environment.
+  }
+});
