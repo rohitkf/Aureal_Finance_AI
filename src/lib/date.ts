@@ -239,5 +239,25 @@ export const formatTime = (value: string): string => {
 /** Whether a string is a 24-hour `HH:MM` this app can store. */
 export const isValidTime = (value: string): boolean => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 
+/**
+ * A time as somebody might type it, read into `HH:MM`: "14:37", "2:37pm",
+ * "2.37 PM", "9pm", "0915", "9" (nine in the morning). Anything else is
+ * `undefined`, so the caller can keep what it had.
+ */
+export const parseTime = (raw: string): string | undefined => {
+  const text = raw.trim().toLowerCase().replace(/\s+/g, '');
+  const m = /^(\d{1,2})(?:[:.h]?(\d{2}))?(am|pm|a|p)?$/.exec(text);
+  if (!m) return undefined;
+  let hour = Number(m[1]);
+  const minute = m[2] === undefined ? 0 : Number(m[2]);
+  const meridiem = m[3]?.[0];
+  if (meridiem) {
+    if (hour < 1 || hour > 12) return undefined;
+    hour = (hour % 12) + (meridiem === 'p' ? 12 : 0);
+  }
+  if (hour > 23 || minute > 59) return undefined;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
+
 /** Now, as `HH:MM`. */
 export const nowTime = (): string => new Date().toTimeString().slice(0, 5);
