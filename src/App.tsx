@@ -142,7 +142,7 @@ const ProtectedApp = () => (
           <Route path="goals" element={<Screen><Goals /></Screen>} />
           <Route path="debts" element={<Screen><Debts /></Screen>} />
           <Route path="reports" element={<Screen><Reports /></Screen>} />
-          <Route path="settings" element={<Screen><Settings /></Screen>} />
+          <Route path="settings/:section?" element={<Screen><Settings /></Screen>} />
           <Route path="more" element={<Screen><More /></Screen>} />
           <Route path="*" element={<NotFound />} />
         </Route>

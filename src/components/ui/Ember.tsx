@@ -158,6 +158,13 @@ export const StatTile = ({
   );
 };
 
+/** One letter for one name, two for two: "R" for Rohit, "RK" for Rohit Kumar. */
+const mark = (name: string): string => {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '·';
+  return words.length === 1 ? (words[0]?.[0] ?? '·').toUpperCase() : initials(name);
+};
+
 /** The person, as their initials in a circle: on the bar, in the menu, on the hero. */
 export const Avatar = ({
   name,
@@ -183,6 +190,6 @@ export const Avatar = ({
       className,
     )}
   >
-    {initials(name) || '·'}
+    {mark(name)}
   </span>
 );

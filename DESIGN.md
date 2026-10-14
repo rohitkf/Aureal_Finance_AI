@@ -46,6 +46,9 @@ tap away, never gone.**
 | Rows on one card with inset hairlines, a round icon in front | `GroupedList` + `ListRow`, `IconTile` |
 | The less common options on a form behind one row, opening by themselves when one is in use | "More options" on `AddTransactionSheet` |
 | Filters that change one figure live on that figure's card | The hero's balance chips |
+| A row is the way in; its other actions sit behind one ⋯ menu, never a row of buttons | Recurring rows + `RowMenu` (`ui/Menu.tsx`); a budget's Remove lives in its edit dialog |
+| A long settings page is a list of sections, each a screen of its own | `/settings` → `/settings/:section`; a rail beside the open section from `lg` |
+| A figure's working is folded on a phone and open on a desktop | Safe to Spend's "How it's worked out" |
 
 Nothing is removed to make a screen simpler. A folded section **always opens itself when
 something inside it is set**.
@@ -247,9 +250,11 @@ are sentence case.
 **Phone and tablet (below `lg`)** — the reference's frame:
 
 - **The person at the top left**, as an avatar, with the account menu behind it (hanging from
-  its left edge). On Home the greeting sits beside it — "Good morning," over the first name;
-  everywhere else the mark and wordmark do. Two round buttons on the right: search and hide
-  balances. Theme lives on the More screen.
+  its left edge). On Home the greeting sits beside it — "Good morning," over the first name. On
+  a tab's own screen the mark and wordmark do. On any screen beneath one — an account, a
+  settings section, anything behind More — the way back sits there instead: a chevron and the
+  parent's name (`parentOf` in `AppShell`), where iOS puts it. Two round buttons on the right:
+  search and hide balances. Theme lives on the More screen.
 - **A floating `.chrome` tab bar with the + in the middle**: Home · Transactions · **+** ·
   Accounts · More. The selected tab is a solid ink pill; the + is a tint-filled circle with the
   tint's own shadow ("Add a transaction"), in the middle because it is what a thumb reaches for
@@ -260,6 +265,12 @@ are sentence case.
   tab is drawn as selected on every screen behind it.
 - **+** opens Quick add: expense, income, transfer, then recurring and account links. The
   hero's quick actions open the same sheet (`useShell`, an outlet context from `AppShell`).
+
+**Settings** opens as a list of its fourteen sections in four groups (You, Organise, Your data,
+Advanced) on a phone, each a screen of its own at `/settings/<section>` with the bar's back link
+above it; from `lg` the list is a sticky rail beside the open section, and `/settings` opens on
+the account. Links into a particular section (the Safe to Spend card's "change", the bank
+connections note on Accounts) name it in the address.
 
 The search capsule, the skip link and the offline banner are the same on both.
 

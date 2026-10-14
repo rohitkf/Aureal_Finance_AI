@@ -9,7 +9,7 @@
  */
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_ACCENTS } from '@/lib/accents';
 import type { AppState } from '@/lib/types';
@@ -53,9 +53,12 @@ vi.mock('@/components/ui/Toast', () => ({ useToast: () => vi.fn() }));
 
 const { Settings } = await import('../Settings');
 
-const page = () => (
-  <MemoryRouter>
-    <Settings />
+/** Settings opens one section at a time; each test opens the one it is about. */
+const page = (section = 'safe-to-spend') => (
+  <MemoryRouter initialEntries={[`/settings/${section}`]}>
+    <Routes>
+      <Route path="/settings/:section?" element={<Settings />} />
+    </Routes>
   </MemoryRouter>
 );
 
@@ -95,11 +98,11 @@ describe('your name, when Settings draws before the profile loads', () => {
     const user = userEvent.setup();
     // The empty state's name, before the profile has loaded.
     userName = 'You';
-    const { rerender } = render(page());
+    const { rerender } = render(page('account'));
     expect(screen.getByLabelText('Name')).toHaveValue('You');
 
     userName = 'Rohit Kumar';
-    rerender(page());
+    rerender(page('account'));
     expect(screen.getByLabelText('Name')).toHaveValue('Rohit Kumar');
 
     await user.click(screen.getByLabelText('Name'));
@@ -111,7 +114,7 @@ describe('your name, when Settings draws before the profile loads', () => {
 describe('the accent colour', () => {
   it('offers all eight tints, ember first, with the chosen one marked', () => {
     tint = 'sky';
-    render(page());
+    render(page('appearance'));
     const group = screen.getByRole('radiogroup', { name: 'Accent colour' });
     const options = within(group).getAllByRole('radio');
     expect(options.map((o) => o.getAttribute('aria-label'))).toEqual([
@@ -129,14 +132,14 @@ describe('the accent colour', () => {
 
   it('saves the tint chosen, so it follows you to every device', async () => {
     const user = userEvent.setup();
-    render(page());
+    render(page('appearance'));
     await user.click(screen.getByRole('radio', { name: 'Coral' }));
     expect(dispatch).toHaveBeenCalledWith({ type: 'update-settings', settings: { tint: 'coral' } });
   });
 
   it('puts the stored tint on the page, where every colour in the app is read from', () => {
     tint = 'mint';
-    render(page());
+    render(page('appearance'));
     expect(document.documentElement.dataset.tint).toBe('mint');
   });
 });

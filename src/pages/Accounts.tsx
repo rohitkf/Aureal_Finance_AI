@@ -414,7 +414,7 @@ export const Accounts = () => {
             </p>
           </div>
         </div>
-        <ButtonLink to="/settings#connections" size="sm">
+        <ButtonLink to="/settings/connections" size="sm">
           Read more
         </ButtonLink>
       </Card>

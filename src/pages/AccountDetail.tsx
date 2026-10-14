@@ -86,8 +86,9 @@ export const AccountDetail = () => {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      {/* The back link: where you came from, with a chevron. */}
-      <nav className="-ml-1 flex items-center gap-0.5 text-[15px]" aria-label="Breadcrumb">
+      {/* The back link: where you came from, with a chevron. On a phone the
+          bar carries it, so it shows from `lg`. */}
+      <nav className="-ml-1 hidden items-center gap-0.5 text-[15px] lg:flex" aria-label="Breadcrumb">
         <Link to="/accounts" className="inline-flex min-h-[32px] items-center gap-0.5 rounded-full pr-2 font-medium text-primary hover:opacity-80">
           <Icon name="chevron-left" size={18} />
           Accounts
