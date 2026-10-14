@@ -8,6 +8,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useMenu } from '@/hooks/useMenu';
 import { useAuth } from '@/lib/auth';
 import { errorMessage } from '@/lib/errors';
+import { hasDraft } from '@/lib/draft';
 import { MOBILE_NAV, MORE_NAV, PLANNING_NAV, PRIMARY_NAV, type NavItem } from './nav';
 import type { ShellActions } from './shell';
 import { Logo } from './Logo';
@@ -112,7 +113,9 @@ export const AppShell = () => {
   /** The desktop bar's More, while there is no room for every destination. */
   const navMore = useMenu();
   const [quickOpen, setQuickOpen] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
+  // An entry left unfinished — the app was reloaded or discarded in the
+  // background — opens again by itself, as it was.
+  const [addOpen, setAddOpen] = useState(() => hasDraft());
   const [addType, setAddType] = useState<TransactionType>('expense');
 
   useEffect(() => {

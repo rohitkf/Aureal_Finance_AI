@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { daysBetween, formatDay, formatFullDate, formatMediumDate, relativeDayLabel } from '@/lib/date';
+import { daysBetween, formatDay, formatMediumDate, relativeDayLabel } from '@/lib/date';
 import { money } from '@/lib/format';
 import { accountNamer } from '@/lib/ledger';
 import { useAppState, useCategoryLookup, useLoading, useSettings, useToday } from '@/lib/store';
@@ -356,46 +356,59 @@ export const TimeMachine = () => {
                     <li className="relative space-y-2 pl-9">
                       <span
                         aria-hidden="true"
-                        className="absolute left-[5px] top-[1.375rem] h-3.5 w-3.5 rounded-full bg-primary-strong shadow-[0_0_0_3px_rgb(var(--card))]"
+                        className="absolute left-[5px] top-[0.875rem] h-3.5 w-3.5 sm:top-[1.375rem] rounded-full bg-primary-strong shadow-[0_0_0_3px_rgb(var(--card))]"
                       />
                       {/* The day, as a band in the tint's gradient that stays
                           at the top while its payments scroll beneath it, so
                           on a long timeline it is always clear which day a
                           line belongs to and what that day leaves you with. */}
-                      <div className="ember sticky top-[calc(env(safe-area-inset-top)+4.25rem)] z-10 flex items-center justify-between gap-3 rounded-[1.25rem] px-4 py-2.5 lg:top-24">
-                        <h3 className="min-w-0">
-                          <span className="block truncate font-display text-[17px] font-semibold leading-tight tracking-[-0.015em] text-text">
-                            {relative}
+                      <div className="ember sticky top-[calc(env(safe-area-inset-top)+4.25rem)] z-10 flex items-center justify-between gap-2 rounded-2xl px-3 py-2 sm:gap-3 sm:rounded-[1.25rem] sm:px-4 sm:py-2.5 lg:top-24">
+                        {/* One line on a phone — the day, its change, what it ends on —
+                            so a pinned band takes as little of the screen as it
+                            can; two lines from `sm`, with room to spare. */}
+                        <h3 className="min-w-0 truncate sm:whitespace-normal">
+                          <span className="font-display text-[15px] font-semibold leading-tight tracking-[-0.015em] text-text sm:block sm:text-[17px]">
+                            {/* "Mon 5 Oct" on a phone, beside the figures; the
+                                whole weekday from `sm`. Today, Yesterday and
+                                Tomorrow are short already. */}
+                            <span className="sm:hidden">{relative.replace(/^([A-Za-z]{3})[a-z]+(?= )/, '$1')}</span>
+                            <span className="hidden sm:inline">{relative}</span>
                           </span>
-                          <span className="block truncate text-[12.5px] text-muted">
+                          <span className="hidden truncate text-[12.5px] text-muted sm:block">
                             {['Today', 'Yesterday', 'Tomorrow'].includes(relative)
-                              ? formatFullDate(day.date)
+                              ? formatDay(day.date)
                               : day.date < today
-                                ? 'Already happened'
+                                ? 'Done'
                                 : `In ${daysBetween(today, day.date)} days`}
                           </span>
                         </h3>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <span className="tnum text-right text-[12px] text-muted">
-                            Ends on{' '}
-                            <strong className="text-[16px] font-semibold tracking-[-0.01em] text-text">
-                              {money(day.closing, { masked: maskBalances })}
-                            </strong>
-                          </span>
+                        <div className="flex shrink-0 items-center gap-1.5 sm:flex-col sm:items-end sm:gap-1">
                           {day.net !== 0 && (
                             // In a well: on the gradient a small pale red or
                             // green word falls short of 4.5:1; pressed into
                             // the darker well it holds.
                             <span
                               className={cn(
-                                'well tnum rounded-full px-2 py-0.5 text-[12px] font-semibold',
+                                'well tnum order-first rounded-full px-1.5 py-0.5 sm:px-2 text-[11.5px] font-semibold sm:order-last sm:text-[12px]',
                                 day.net > 0 ? 'text-success' : 'text-danger',
                               )}
                             >
                               {day.net > 0 ? '+' : '−'}
-                              {money(Math.abs(day.net), { masked: maskBalances })} this day
+                              {/* Whole pounds on a phone: the band is one line, and
+                                  the closing balance beside it keeps the pence. */}
+                              <span className="sm:hidden">{money(Math.abs(day.net), { compact: true, masked: maskBalances })}</span>
+                              <span className="hidden sm:inline">{money(Math.abs(day.net), { masked: maskBalances })} this day</span>
                             </span>
                           )}
+                          <span className="tnum text-right text-[12px] text-muted">
+                            <span className="hidden sm:inline">Ends on </span>
+                            <strong
+                              className="text-[15px] font-semibold tracking-[-0.01em] text-text sm:text-[16px]"
+                              title="What you end the day on"
+                            >
+                              {money(day.closing, { masked: maskBalances })}
+                            </strong>
+                          </span>
                         </div>
                       </div>
 

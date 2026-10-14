@@ -389,9 +389,16 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
+  /**
+   * Whether this session has loaded once. A later reload refreshes the data
+   * in place: it never puts the screens back on their skeletons, because a
+   * screen on its skeleton has unmounted whatever form was open on it.
+   */
+  const loadedOnce = useRef(false);
+
   const reload = useCallback(async () => {
     if (!userRef.current) return;
-    setLoading(true);
+    if (!loadedOnce.current) setLoading(true);
     setError(null);
 
     let lastError: unknown;
@@ -410,6 +417,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         }
         setState((prev) => ({ ...prev, ...next }));
         setLoaded(true);
+        loadedOnce.current = true;
         setError(null);
         setLoading(false);
         return;
@@ -446,17 +454,27 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  // Load on sign-in; clear completely on sign-out so nothing leaks between users.
+  /**
+   * Load on sign-in; clear completely on sign-out so nothing leaks between users.
+   *
+   * Keyed on the id, not the user object. Supabase hands back a new session,
+   * and so a new user object, every time it refreshes the token, and it does
+   * that the moment a backgrounded tab comes back. Keyed on the object, every
+   * return to the app reloaded everything and put each screen back on its
+   * skeleton, unmounting whatever form was half filled in.
+   */
+  const userId = user?.id ?? null;
   useEffect(() => {
-    userRef.current = user?.id ?? null;
-    if (!user) {
+    userRef.current = userId;
+    if (!userId) {
       setState(emptyAppState(DEFAULT_SETTINGS));
       setLoaded(false);
+      loadedOnce.current = false;
       setLoading(false);
       return;
     }
     void reload();
-  }, [user, reload]);
+  }, [userId, reload]);
 
   const refresh = useCallback(
     async (slices: Slice[]) => {
