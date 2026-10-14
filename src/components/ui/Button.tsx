@@ -3,16 +3,20 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { Icon, type IconName } from './Icon';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success' | 'ink' | 'glass';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 /**
- * The brand's buttons. The tint, filled, with black ink, for the one thing a
- * screen is for; an outlined pill for everything else; plain text for the
- * quiet ones. No glows — on charcoal a bright fill already lifts itself.
+ * The brand's buttons. The tint, filled, with near-black ink, for the one
+ * thing a screen is for; a solid near-black pill (`ink`) for the actions on
+ * the ember hero, black in both themes as the reference draws them; a
+ * translucent white pill (`glass`) beside them; an outlined pill for
+ * everything else; plain text for the quiet ones.
  */
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-primary-strong text-[rgb(var(--on-primary))] hover:brightness-[1.06]',
+  ink: 'bg-ink text-[rgb(var(--on-ink))] hover:brightness-[1.25]',
+  glass: 'glass text-text hover:brightness-[1.1]',
   secondary:
     'text-text shadow-[inset_0_0_0_1px_rgb(var(--hairline)/var(--hairline-alpha-strong))] hover:bg-fill',
   ghost: 'text-muted hover:bg-fill hover:text-text',

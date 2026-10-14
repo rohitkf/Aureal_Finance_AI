@@ -28,6 +28,7 @@ const Budget = lazy(() => import('@/pages/Budget').then((m) => ({ default: m.Bud
 const Debts = lazy(() => import('@/pages/Debts').then((m) => ({ default: m.Debts })));
 const TimeMachine = lazy(() => import('@/pages/TimeMachine').then((m) => ({ default: m.TimeMachine })));
 const Goals = lazy(() => import('@/pages/Goals').then((m) => ({ default: m.Goals })));
+const More = lazy(() => import('@/pages/More').then((m) => ({ default: m.More })));
 const Recurring = lazy(() => import('@/pages/Recurring').then((m) => ({ default: m.Recurring })));
 const Reports = lazy(() => import('@/pages/Reports').then((m) => ({ default: m.Reports })));
 const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.Settings })));
@@ -142,6 +143,7 @@ const ProtectedApp = () => (
           <Route path="debts" element={<Screen><Debts /></Screen>} />
           <Route path="reports" element={<Screen><Reports /></Screen>} />
           <Route path="settings" element={<Screen><Settings /></Screen>} />
+          <Route path="more" element={<Screen><More /></Screen>} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

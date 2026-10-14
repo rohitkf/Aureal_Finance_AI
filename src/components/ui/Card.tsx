@@ -7,13 +7,14 @@ interface CardProps {
   children: ReactNode;
   className?: string;
   /**
-   * `bezel` is the hero card, reserved for the one or two surfaces that lead
-   * a screen. `plate` is an ordinary card. `well` is a fill darker than its
-   * parent, pressed into it rather than floating on it. For a card on paper
-   * or in the tint, add `paper` or `tinted` to `className`.
+   * `ember` is the hero card: the tint as a gradient, for the one surface
+   * that leads a screen. `bezel` is a large plain card for the next figure
+   * down. `plate` is an ordinary card. `well` is a fill darker than its
+   * parent, pressed into it rather than floating on it. For a card on paper,
+   * add `paper` to `className`.
    */
-  tone?: 'plate' | 'bezel' | 'well';
-  as?: 'div' | 'section' | 'article' | 'li';
+  tone?: 'plate' | 'bezel' | 'well' | 'ember';
+  as?: 'div' | 'section' | 'article' | 'li' | 'header';
   id?: string;
   /**
    * Layout applied to the inner pane. With `bezel`, `className` sizes the
@@ -35,6 +36,13 @@ export const Card = ({
     return (
       <Tag id={id} className={cn('bezel', className)}>
         <div className={cn('bezel-core h-full p-5 sm:p-7', bodyClassName)}>{children}</div>
+      </Tag>
+    );
+  }
+  if (tone === 'ember') {
+    return (
+      <Tag id={id} className={cn('ember relative overflow-hidden rounded-[2rem] p-5 sm:p-7', className, bodyClassName)}>
+        {children}
       </Tag>
     );
   }

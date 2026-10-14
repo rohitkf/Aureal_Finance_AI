@@ -432,8 +432,10 @@ const chipClass = (on: boolean) =>
   cn(
     'inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px]',
     'transition-all duration-300 ease-fluid active:scale-[0.96]',
+    // The chosen chip is tint-filled with ink on it, as every chosen chip is:
+    // the tint as text on a 15% wash of itself fell to 4.3:1 on ember.
     on
-      ? 'bg-primary/15 font-semibold text-primary'
+      ? 'bg-primary-strong font-semibold text-[rgb(var(--on-primary))]'
       : 'bg-fill font-medium text-muted hover:text-text',
   );
 

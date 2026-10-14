@@ -120,7 +120,8 @@ export const CommandPalette = ({ open, onClose }: { open: boolean; onClose: () =
       });
     }
 
-    for (const item of [...PRIMARY_NAV, ...MORE_NAV]) {
+    const destinations = new Map([...PRIMARY_NAV, ...MORE_NAV].map((item) => [item.to, item]));
+    for (const item of destinations.values()) {
       if (!item.label.toLowerCase().includes(q)) continue;
       out.push({ id: `nav-${item.to}`, group: 'Go to', title: item.label, subtitle: item.to, to: item.to });
     }

@@ -19,7 +19,7 @@ export const useTheme = () => {
   const { state, dispatch } = useStore();
   const preference = state.settings.theme;
   const resolved: Resolved = preference === 'system' ? systemTheme() : preference;
-  // A settings object from before tints existed has none; lime, as the
+  // A settings object from before tints existed has none; ember, as the
   // column defaults to.
   const tint: Tint = isTint(state.settings.tint) ? state.settings.tint : DEFAULT_TINT;
 
@@ -28,7 +28,7 @@ export const useTheme = () => {
     root.classList.toggle('dark', resolved === 'dark');
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', resolved === 'dark' ? '#181818' : '#ecede9');
+      ?.setAttribute('content', resolved === 'dark' ? '#0f0e0d' : '#f4f0ec');
     try {
       // Mirrored so the boot script in index.html can apply it before paint,
       // including on the signed-out screens where no profile is loaded.

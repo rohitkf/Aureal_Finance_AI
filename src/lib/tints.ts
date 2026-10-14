@@ -1,19 +1,21 @@
 /**
  * The app's tint: the one colour every accent is drawn in.
  *
- * Seven, each defined in src/styles/index.css as `:root[data-tint=…]` and
+ * Eight, each defined in src/styles/index.css as `:root[data-tint=…]` and
  * each checked for contrast there (DESIGN.md has the figures): a bright fill
- * that black ink reads on, an ink dark enough for text on white, the paper a
- * light card is made of. `profiles.tint` refuses any other name, so a stored
+ * that near-black ink reads on, an ink dark enough for text on white, the
+ * paper a light card is made of, and the two dark ends of the gradient the
+ * hero card is made of. `profiles.tint` refuses any other name, so a stored
  * value is always one the stylesheet can draw.
  */
-export const TINTS = ['lime', 'sky', 'violet', 'coral', 'mint', 'rose', 'amber'] as const;
+export const TINTS = ['ember', 'lime', 'sky', 'violet', 'coral', 'mint', 'rose', 'amber'] as const;
 
 export type Tint = (typeof TINTS)[number];
 
-export const DEFAULT_TINT: Tint = 'lime';
+export const DEFAULT_TINT: Tint = 'ember';
 
 export const TINT_LABELS: Record<Tint, string> = {
+  ember: 'Ember',
   lime: 'Lime',
   sky: 'Sky',
   violet: 'Violet',
@@ -28,6 +30,7 @@ export const TINT_LABELS: Record<Tint, string> = {
  * built from the name: Tailwind only emits a class it can find in the source.
  */
 export const TINT_SWATCH: Record<Tint, string> = {
+  ember: 'bg-[rgb(245_85_31)]',
   lime: 'bg-[rgb(197_245_79)]',
   sky: 'bg-[rgb(140_200_255)]',
   violet: 'bg-[rgb(196_178_255)]',

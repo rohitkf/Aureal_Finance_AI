@@ -127,7 +127,7 @@ const DEFAULT_SETTINGS: Settings = {
   minimumBalance: 0,
   userName: 'You',
   maskBalances: false,
-  theme: 'system',
+  theme: 'dark',
   accents: DEFAULT_ACCENTS,
   dueHorizonDays: 2,
   includeVirtual: true,

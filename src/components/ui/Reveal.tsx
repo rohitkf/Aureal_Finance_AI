@@ -25,12 +25,16 @@ export const Reveal = ({
   className,
   delay = 0,
   as: Tag = 'div',
+  ...rest
 }: {
   children: ReactNode;
   className?: string;
   /** Milliseconds, for staggering siblings. */
   delay?: number;
   as?: ElementType;
+  /** Anything else — an `aria-label`, an id — goes on the element itself. */
+  [attr: `aria-${string}`]: string | undefined;
+  id?: string;
 }) => {
   const ref = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(false);
@@ -73,6 +77,7 @@ export const Reveal = ({
       className={cn('reveal', className)}
       data-visible={visible ? 'true' : 'false'}
       style={delay ? { transitionDelay: `${delay}ms` } : undefined}
+      {...rest}
     >
       {children}
     </Tag>

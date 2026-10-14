@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
 import {
-  balanceHistory,
   buildForecast,
   budgetProgress,
   isCounted,
@@ -9,27 +9,31 @@ import {
   isVirtualIn,
   monthIncome,
   monthSpend,
+  owesMoney,
   reported,
   safeToSpend,
 } from '@/lib/finance';
-import { formatDay, formatMonthYear, greeting, monthKey, relativeDueLabel } from '@/lib/date';
+import { addMonths, formatDay, formatMonthYear, greeting, monthKey, relativeDueLabel, startOfMonth } from '@/lib/date';
 import { money, round2 } from '@/lib/format';
 import { useAppState, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { BalanceChart } from '@/components/charts/BalanceChart';
-import { Sparkline } from '@/components/charts/Sparkline';
+import { ACCOUNT_ICON } from '@/components/accountIcon';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { SafeToSpendCard } from '@/components/SafeToSpendCard';
-import { Badge } from '@/components/ui/Badge';
-import { ArrowLink, ButtonLink } from '@/components/ui/Button';
-import { Card, CardHeader, Eyebrow, Label, PageHeader, StatGroup } from '@/components/ui/Card';
+import { TransactionRow } from '@/components/TransactionRow';
+import { useShell } from '@/components/shell';
+import { ArrowLink, Button, ButtonLink } from '@/components/ui/Button';
+import { Card, CardHeader, Eyebrow, Label, PageHeader } from '@/components/ui/Card';
+import { ActionPill, DeltaPill, StatTile } from '@/components/ui/Ember';
 import { FigureText } from '@/components/ui/Figure';
 import { Reveal } from '@/components/ui/Reveal';
 import { SegmentedControl, Toggle } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
+import { IconTile } from '@/components/ui/List';
 import { Progress } from '@/components/ui/Progress';
 import { EmptyState, SkeletonCard, SkeletonChart, SkeletonRows } from '@/components/ui/States';
-import { SegmentedBar, type Segment } from '@/components/ui/Progress';
-import type { AccountType } from '@/lib/types';
+import { Link } from 'react-router-dom';
+import type { AccountType, Transaction } from '@/lib/types';
 
 type Horizon = '7' | '30' | '90' | '180' | '365';
 
@@ -49,6 +53,20 @@ const FILTERS: Array<{ value: AccountType | 'all'; label: string }> = [
   { value: 'cash', label: 'Cash' },
 ];
 
+/** How this month compares with last, said as the reference says it: "2.46% from last month". */
+const against = (now: number, before: number): { up: boolean; text: string } | undefined => {
+  if (before === 0) return undefined;
+  const pct = Math.abs(((now - before) / before) * 100);
+  return { up: now >= before, text: `${pct >= 10 ? pct.toFixed(0) : pct.toFixed(1)}% vs last month` };
+};
+
+/** Newest first: by day, then by the time written on it, then by when it was entered. */
+const byRecency = (a: Transaction, b: Transaction): number =>
+  b.date.localeCompare(a.date) ||
+  (b.time ?? '').localeCompare(a.time ?? '') ||
+  (b.createdAt ?? '').localeCompare(a.createdAt ?? '') ||
+  b.id.localeCompare(a.id);
+
 export const Dashboard = () => {
   const state = useAppState();
   const today = useToday();
@@ -56,11 +74,14 @@ export const Dashboard = () => {
   const { dispatch } = useStore();
   const loading = useLoading();
   const lookupCategory = useCategoryLookup();
+  const navigate = useNavigate();
+  const { openAdd, openQuickAdd } = useShell();
   const accountName = (id: string) => state.accounts.find((a) => a.id === id)?.name ?? 'Closed account';
   const [horizon, setHorizon] = useState<Horizon>('30');
   const [filter, setFilter] = useState<AccountType | 'all'>('all');
 
   const month = monthKey(today);
+  const lastMonth = monthKey(addMonths(startOfMonth(today), -1));
   const sts = useMemo(() => safeToSpend(state, today), [state, today]);
   const forecast = useMemo(() => buildForecast(state, today, Number(horizon)), [state, today, horizon]);
   const budgets = useMemo(() => budgetProgress(state, month), [state, month]);
@@ -83,10 +104,11 @@ export const Dashboard = () => {
   const inVirtual = round2(virtualAccounts.reduce((s, a) => s + a.balance, 0));
 
   const monthToDateIncome = monthIncome(state, month);
-  const trend = useMemo(() => balanceHistory(state, today, 30), [state, today]);
-  // What actually moved this month, rather than a figure baked into the design.
-  const monthChange = useMemo(() => monthIncome(state, month) - monthSpend(state, month), [state, month]);
   const spentThisMonth = monthSpend(state, month);
+  const lastIncome = monthIncome(state, lastMonth);
+  const lastSpend = monthSpend(state, lastMonth);
+  // What actually moved this month, rather than a figure baked into the design.
+  const monthChange = monthToDateIncome - spentThisMonth;
 
   // The next two weeks of money movements, for the cash-flow timeline.
   const upcoming = useMemo(
@@ -96,26 +118,30 @@ export const Dashboard = () => {
     [forecast],
   );
 
-  const allocation = useMemo(
+  /** The accounts on the hero's shelf: every one that is open and counted. */
+  const shelf = useMemo(() => state.accounts.filter((a) => isCounted(a) && !a.archived).slice(0, 8), [state.accounts]);
+
+  const recent = useMemo(
     () =>
-      counted
-        .filter(isSpendable)
-        .map((a): Segment => ({
-          value: Math.max(a.balance, 0),
-          tone: a.type === 'savings' ? 'success' : a.type === 'cash' ? 'secondary' : 'primary',
-          label: `${a.name}: ${money(a.balance)}`,
-        })),
-    [counted],
+      state.transactions
+        .filter((t) => !t.isOpening && t.status !== 'void' && t.date <= today)
+        .sort(byRecency)
+        .slice(0, 5),
+    [state.transactions, today],
   );
 
   if (loading) {
     return (
       <div className="space-y-8">
-        <SkeletonCard className="h-32" />
         <div className="grid gap-4 lg:grid-cols-12">
-          <SkeletonCard className="lg:col-span-5" />
-          <SkeletonCard className="lg:col-span-4" />
-          <SkeletonCard className="lg:col-span-3" />
+          <SkeletonCard className="h-72 lg:col-span-7" />
+          <SkeletonCard className="h-72 lg:col-span-5" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <SkeletonCard className="h-32" />
+          <SkeletonCard className="h-32" />
+          <SkeletonCard className="h-32" />
+          <SkeletonCard className="h-32" />
         </div>
         <SkeletonChart />
         <SkeletonRows />
@@ -125,10 +151,14 @@ export const Dashboard = () => {
 
   const hasData = state.transactions.length > 0 || state.recurring.length > 0;
   const firstName = state.settings.userName.split(' ')[0];
+  const inDelta = against(monthToDateIncome, lastIncome);
+  const outDelta = against(spentThisMonth, lastSpend);
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <Reveal>
+      {/* On a phone the greeting is in the top bar beside the person; the
+          heading stays for screen readers. From `lg` it is the page title. */}
+      <Reveal className="sr-only lg:not-sr-only">
         <PageHeader
           title={
             <>
@@ -141,42 +171,41 @@ export const Dashboard = () => {
       </Reveal>
 
       {!hasData ? (
-        <Card className="p-0">
+        <Card tone="ember" className="p-0 sm:p-0">
           <EmptyState
             icon="wallet"
             title="Let’s set up your financial picture"
-            description="Add your first transaction or a recurring payment and your dashboard, budget and forecast will start filling in."
+            description="Add your first transaction or a recurring payment and your home, budget and forecast will start filling in."
             secondary={
-              <ButtonLink to="/transactions" variant="primary" icon="plus">
+              <Button variant="ink" icon="plus" onClick={() => openAdd('expense')}>
                 Add your first transaction
-              </ButtonLink>
+              </Button>
             }
           />
         </Card>
       ) : (
         <>
           {/* ---------- Hero ----------
-              Two panes side by side from `lg`: the balance on the left with
-              this month's flow beneath it, Safe to Spend — which shows its
-              working — the full height of the right. One column below that. */}
-          <Reveal delay={60}>
-            <section className="grid gap-4 lg:grid-cols-12 lg:grid-rows-[auto_auto]">
-              <Card tone="bezel" className="min-w-0 lg:col-span-7" bodyClassName="flex flex-col gap-6">
-                <div>
+              The balance in ember on the left, with the four things people
+              do most beneath it; Safe to Spend — which shows its working —
+              the full height of the right. One column below `lg`. */}
+          <Reveal delay={40}>
+            <section className="grid gap-4 lg:grid-cols-12 lg:grid-rows-[auto_1fr]">
+              <Card tone="ember" as="section" className="flex min-w-0 flex-col gap-6 lg:col-span-7 lg:row-start-1" id="balance">
+                <div className="min-w-0">
                   <div className="flex items-start justify-between gap-3">
-                    <Eyebrow>{filter === 'credit' ? 'Total owed' : 'Total balance'}</Eyebrow>
+                    <h2>
+                      <Eyebrow>{filter === 'credit' ? 'Total owed' : 'Total balance'}</Eyebrow>
+                    </h2>
                     {monthChange !== 0 && (
-                      <Badge
-                        tone={monthChange >= 0 ? 'success' : 'danger'}
-                        icon={monthChange >= 0 ? 'arrow-up' : 'arrow-down'}
-                      >
+                      <DeltaPill up={monthChange >= 0} className="glass">
                         {monthChange >= 0 ? '+' : '−'}
-                        {money(Math.abs(monthChange), { compact: true })} this month
-                      </Badge>
+                        {money(Math.abs(monthChange), { compact: true, masked: maskBalances })} this month
+                      </DeltaPill>
                     )}
                   </div>
 
-                  <p className="figure mt-4 text-[clamp(3rem,8.5vw,4.75rem)] leading-[0.95] text-text">
+                  <p className="figure mt-4 text-[clamp(3rem,9vw,5rem)] leading-[0.95] text-text">
                     <FigureText text={money(filteredTotal, { masked: maskBalances })} />
                   </p>
                   <p className="mt-2 text-[13.5px] text-muted">
@@ -184,6 +213,26 @@ export const Dashboard = () => {
                       ? `Across the ${filteredAccounts.length === 1 ? 'account' : `${filteredAccounts.length} accounts`} in your cash flow`
                       : `Across ${filteredAccounts.length} account${filteredAccounts.length === 1 ? '' : 's'}`}
                   </p>
+
+                  {/* The filter changes this figure and nothing else, so it
+                      lives on this card rather than over the whole page. */}
+                  <div
+                    role="group"
+                    aria-label="Show balance for"
+                    className="hide-scrollbar -mx-5 mt-5 flex gap-2 overflow-x-auto px-5 sm:-mx-7 sm:px-7"
+                  >
+                    {FILTERS.map((f) => (
+                      <button
+                        key={f.value}
+                        type="button"
+                        onClick={() => setFilter(f.value)}
+                        aria-pressed={filter === f.value}
+                        className={pillClass(filter === f.value)}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
 
                   {filter === 'all' && virtualAccounts.length > 0 && (
                     <div className="-mx-2 mt-3">
@@ -199,109 +248,107 @@ export const Dashboard = () => {
                       />
                     </div>
                   )}
-
-                  {/* The filter changes this figure and nothing else, so it
-                      lives on this card rather than over the whole page. */}
-                  <div
-                    role="group"
-                    aria-label="Show balance for"
-                    className="hide-scrollbar -mx-5 mt-4 flex gap-2 overflow-x-auto px-5 sm:-mx-7 sm:px-7"
-                  >
-                    {FILTERS.map((f) => (
-                      <button
-                        key={f.value}
-                        type="button"
-                        onClick={() => setFilter(f.value)}
-                        aria-pressed={filter === f.value}
-                        className={pillClass(filter === f.value)}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
-                <div>
-                  <div className="flex items-baseline justify-between">
-                    <Label>Last 30 days</Label>
-                    <span className="tnum text-[12.5px] text-muted">
-                      {trend.length > 1 && trend[trend.length - 1]! >= trend[0]!
-                        ? `+${money(trend[trend.length - 1]! - trend[0]!, { compact: true })}`
-                        : `−${money(Math.abs((trend[trend.length - 1] ?? 0) - (trend[0] ?? 0)), { compact: true })}`}
-                    </span>
-                  </div>
-                  <Sparkline
-                    values={trend}
-                    height={64}
-                    tone={trend[trend.length - 1]! >= trend[0]! ? 'success' : 'danger'}
-                    className="mt-2"
-                  />
+                {/* The four things people do most, as the reference draws
+                    Send, Receive and Add funds beneath its balance. */}
+                <div className="mt-auto flex items-start gap-2 sm:gap-3" role="group" aria-label="Quick actions">
+                  <ActionPill icon="minus" label="Expense" onClick={() => openAdd('expense')} />
+                  <ActionPill icon="plus" label="Income" onClick={() => openAdd('income')} />
+                  <ActionPill icon="swap" label="Transfer" onClick={() => openAdd('transfer')} />
+                  <ActionPill icon="more" label="More" tone="glass" onClick={openQuickAdd} />
                 </div>
-
-                <dl className="grid grid-cols-2 gap-3">
-                  <div className="well p-4">
-                    <dt className="text-[13px] font-medium text-muted">In this month</dt>
-                    <dd className="figure mt-1 whitespace-nowrap text-[clamp(1.5rem,3vw,1.875rem)] leading-tight text-success">
-                      <FigureText text={money(monthToDateIncome, { compact: true, masked: maskBalances })} />
-                    </dd>
-                  </div>
-                  <div className="well p-4">
-                    <dt className="text-[13px] font-medium text-muted">Out this month</dt>
-                    <dd className="figure mt-1 whitespace-nowrap text-[clamp(1.5rem,3vw,1.875rem)] leading-tight text-text">
-                      <FigureText text={money(spentThisMonth, { compact: true, masked: maskBalances })} />
-                    </dd>
-                  </div>
-                </dl>
-
-                {filter === 'all' && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Where it sits</Label>
-                      <span className="text-[12.5px] text-faint">{allocation.length} accounts</span>
-                    </div>
-                    <SegmentedBar segments={allocation} />
-                    <div className="grid grid-cols-3 gap-x-4 gap-y-2 pt-1 sm:grid-cols-4">
-                      {counted.filter(isSpendable).map((a) => (
-                        <div key={a.id} className="min-w-0">
-                          <span className="block truncate text-[12px] text-faint">{a.name}</span>
-                          <span className="tnum block text-[14px] font-medium text-text">
-                            {money(a.balance, { compact: true, masked: maskBalances })}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </Card>
 
-              <SafeToSpendCard data={sts} className="min-w-0 lg:col-span-5 lg:row-span-2" />
+              <SafeToSpendCard data={sts} className="min-w-0 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1" />
 
-              <StatGroup
-                className="min-w-0 lg:col-span-7"
-                stats={[
-                  {
-                    label: 'Still coming in',
-                    value: money(sts.expectedIncome, { masked: maskBalances }),
-                    tone: 'success',
-                    note: `${money(monthToDateIncome, { compact: true })} received so far`,
-                  },
-                  {
-                    label: 'Still to pay this month',
-                    value: money(sts.committed, { masked: maskBalances }),
-                    tone: 'danger',
-                    note:
-                      sts.outgoing.length > 0
-                        ? `Next: ${sts.outgoing[0]!.label}, ${formatDay(sts.outgoing[0]!.date)}`
-                        : 'Nothing left to pay this month',
-                  },
-                ]}
-              />
+              {/* The accounts, as the reference shelves its cards under the
+                  balance: a row to thumb through on a phone, a grid under
+                  the hero from `lg`. */}
+              {shelf.length > 0 && (
+                <section aria-labelledby="shelf-heading" className="min-w-0 space-y-3 lg:col-span-7 lg:col-start-1 lg:row-start-2">
+                  <div className="flex items-center justify-between px-1">
+                    <h2 id="shelf-heading" className="font-display text-[19px] font-medium leading-tight tracking-[-0.02em] text-text">
+                      Your accounts
+                    </h2>
+                    <ArrowLink to="/accounts">All accounts</ArrowLink>
+                  </div>
+                  {/* `relative`: without it Chromium counts the row's hidden
+                      overflow towards the page's width, and the page scrolls
+                      sideways. */}
+                  <ul className="hide-scrollbar relative -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-3 lg:px-0">
+                    {shelf.map((a, i) => (
+                      <li key={a.id} className={cn('w-[11.5rem] shrink-0 snap-start lg:w-auto', i >= 6 && 'lg:hidden')}>
+                    <Link
+                      to={`/accounts/${a.id}`}
+                      className="plate flex h-full flex-col justify-between gap-5 p-4 transition-colors duration-300 ease-fluid hover:bg-[rgb(var(--card-raised))]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <IconTile icon={ACCOUNT_ICON[a.type]} tint={owesMoney(a) ? 'danger' : a.type === 'savings' ? 'success' : 'primary'} size="sm" />
+                        <Icon name="chevron-right" size={14} className="text-faint" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-[13.5px] font-medium tracking-[-0.01em] text-text">{a.name}</p>
+                        <p className="truncate text-[12px] text-muted">{a.institution || (owesMoney(a) ? 'Owed' : 'Balance')}</p>
+                        <p className={cn('figure mt-2 whitespace-nowrap text-[22px] leading-none', owesMoney(a) ? 'text-danger' : 'text-text')}>
+                          <FigureText text={money(a.balance, { masked: maskBalances })} />
+                        </p>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+                  </ul>
+                </section>
+              )}
             </section>
+          </Reveal>
+
+          {/* ---------- This month, in four tiles ---------- */}
+          <Reveal delay={40} as="section" aria-label="This month">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <StatTile
+                label="In this month"
+                value={money(monthToDateIncome, { compact: true, masked: maskBalances })}
+                icon="arrow-down"
+                tone="success"
+                delta={inDelta && { ...inDelta, good: inDelta.up }}
+                note={inDelta ? undefined : 'Nothing to compare with yet'}
+              />
+              <StatTile
+                label="Out this month"
+                value={money(spentThisMonth, { compact: true, masked: maskBalances })}
+                icon="bag"
+                delta={outDelta && { ...outDelta, good: !outDelta.up }}
+                note={outDelta ? undefined : 'Nothing to compare with yet'}
+              />
+              <StatTile
+                label="Still coming in"
+                value={money(sts.expectedIncome, { compact: true, masked: maskBalances })}
+                icon="calendar"
+                tone="success"
+                note={
+                  sts.incoming.length > 0
+                    ? `Next: ${sts.incoming[0]!.label}, ${formatDay(sts.incoming[0]!.date)}`
+                    : 'Nothing more expected this month'
+                }
+              />
+              <StatTile
+                label="Still to pay"
+                value={money(sts.committed, { compact: true, masked: maskBalances })}
+                icon="receipt"
+                tone={sts.committed > 0 ? 'danger' : 'text'}
+                note={
+                  sts.outgoing.length > 0
+                    ? `Next: ${sts.outgoing[0]!.label}, ${formatDay(sts.outgoing[0]!.date)}`
+                    : 'Nothing left to pay this month'
+                }
+              />
+            </div>
           </Reveal>
 
           {/* ---------- Projected balance ---------- */}
           <Reveal delay={40}>
-            <Card tone="bezel" bodyClassName="space-y-5">
+            <Card className="space-y-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <CardHeader title="Projected balance" description="Where your balance is heading, from what’s scheduled." />
                 <SegmentedControl
@@ -467,6 +514,28 @@ export const Dashboard = () => {
               <ButtonLink to="/budget" fullWidth iconRight="arrow-right" className="justify-between">
                 All budgets
               </ButtonLink>
+            </Card>
+          </Reveal>
+
+          {/* ---------- Recent transactions ---------- */}
+          <Reveal delay={40}>
+            <Card className="space-y-3">
+              <CardHeader
+                title="Recent transactions"
+                description="The last few things that happened."
+                action={<ArrowLink to="/transactions">All transactions</ArrowLink>}
+              />
+              {recent.length === 0 ? (
+                <p className="py-6 text-center text-body-sm text-muted">Nothing yet. Add one from the + below.</p>
+              ) : (
+                <ul className="-mx-2 space-y-0.5">
+                  {recent.map((t) => (
+                    <li key={t.id}>
+                      <TransactionRow transaction={t} onSelect={() => navigate('/transactions')} className="bg-transparent" />
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Card>
           </Reveal>
         </>

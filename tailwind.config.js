@@ -49,6 +49,12 @@ export default {
         // The person's tint, and the ink that sits on it.
         tint: token('tint'),
         'on-tint': token('on-tint'),
+        'tint-deep': token('tint-deep'),
+        'tint-mid': token('tint-mid'),
+        'tint-foot': token('tint-foot'),
+        // The solid near-black of a pill, the same in both themes.
+        ink: token('ink'),
+        'on-ink': token('on-ink'),
       },
       fontFamily: {
         // One family, as on an iPhone: Geist carries the interface, every
