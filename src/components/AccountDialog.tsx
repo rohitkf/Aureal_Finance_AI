@@ -5,7 +5,7 @@ import { cashFlowByDefault, groupOf, kindOf, sortGroups, STANDARD_GROUPS } from 
 import { owesMoney } from '@/lib/finance';
 import { money, round2 } from '@/lib/format';
 import { Button } from './ui/Button';
-import { AmountField, CheckboxField, DateField, SelectField, TextAreaField, TextField, Toggle } from './ui/Field';
+import { AmountField, CheckboxField, DateField, SegmentedControl, SelectField, TextAreaField, TextField, Toggle } from './ui/Field';
 import { DayOfMonthPicker } from './ui/DayOfMonthPicker';
 import { DigitsField } from './ui/DigitsField';
 import { MoneyDial } from './ui/MoneyDial';
@@ -99,6 +99,13 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
   const [dueDay, setDueDay] = useState('');
   const [aer, setAer] = useState('');
   /**
+   * Which figure off a card's statement is being typed: what is owed, or the
+   * credit left to spend. Both sit side by side on a banking app and look
+   * alike, and typing one into a box that meant the other put £851 of debt
+   * down as £148.
+   */
+  const [enterAs, setEnterAs] = useState<'owed' | 'left'>('owed');
+  /**
    * Three fields the app already knew about and could not be told.
    *
    * The note is printed on the account card, the statement day on the account
@@ -129,6 +136,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
     setName(editing?.name ?? '');
     setInstitution(editing?.institution ?? '');
     setBalance(editing ? String(editing.balance) : '');
+    setEnterAs('owed');
     setLastFour(editing?.maskedNumber?.replace(/\D/g, '') ?? '');
     setCreditLimit(editing?.creditLimit ? String(editing.creditLimit) : '');
     setApr(editing?.apr ? String(editing.apr) : '');
@@ -214,17 +222,36 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
 
   const isCredit = type === 'credit';
   /** The balance field can hold a sum, so it is worked out rather than read off. */
-  const balanceValue = parseAmount(balance);
+  const entered = parseAmount(balance);
+  const limitValue = parseAmount(creditLimit);
+  const fromCreditLeft = isCredit && enterAs === 'left';
+  /**
+   * What is owed, which is what an account's balance is on a card. Typed as
+   * the credit left, it is the limit less that — so it needs the limit.
+   */
+  const balanceValue = fromCreditLeft
+    ? entered !== null && limitValue !== null
+      ? round2(limitValue - entered)
+      : null
+    : entered;
   const parsedBalance = balanceValue ?? 0;
   /** A sum still being typed, like `120-` — nothing to save yet. */
-  const unfinished = balance.trim() !== '' && balanceValue === null;
+  const unfinished = balance.trim() !== '' && entered === null;
+  /** Credit left was typed, but there is no limit to take it from. */
+  const needsLimit = fromCreditLeft && balance.trim() !== '' && limitValue === null;
+  /** More credit left than the card's limit: one of the two is wrong. */
+  const overLimit = fromCreditLeft && entered !== null && limitValue !== null && entered > limitValue;
   /**
    * Only an account that holds money can be below zero, and only once it
    * exists: overdrawn is a state a current account gets into, not one it is
    * opened in, and what is owed on a card is already a positive figure.
    */
   const belowZero = balanceValue !== null && balanceValue < 0 && (!editing || owesMoney(editing));
-  const balanceError = belowZero
+  const balanceError = needsLimit
+    ? 'Set the credit limit above first — what you owe is the limit less the credit left.'
+    : overLimit
+      ? `That is more than the ${money(limitValue ?? 0)} limit. Check the limit, or whether this is what you owe.`
+      : belowZero
     ? owesMoney(editing ?? { type })
       ? 'What is owed can’t be below £0.'
       : 'An opening balance can’t be below £0.'
@@ -237,7 +264,17 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
    */
   const adjustment = editing && balanceValue !== null ? round2(balanceValue - editing.balance) : 0;
   const valid =
-    name.trim().length > 0 && (Boolean(group) || (needsGroup && Boolean(parent))) && !unfinished && !belowZero;
+    name.trim().length > 0 &&
+    (Boolean(group) || (needsGroup && Boolean(parent))) &&
+    !unfinished &&
+    !belowZero &&
+    !needsLimit &&
+    !overLimit;
+  /** On a card, both figures in one line, so it is plain which was typed. */
+  const cardLine =
+    isCredit && balanceValue !== null && limitValue !== null && balanceValue >= 0 && balanceValue <= limitValue
+      ? `You owe ${money(balanceValue)} of your ${money(limitValue)} limit, with ${money(round2(limitValue - balanceValue))} left to spend.`
+      : undefined;
 
   const save = () => {
     if (!valid) return;
@@ -376,9 +413,91 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
       }
     >
       <div className="space-y-8">
+        {/* The one question about what this account is. It used to be two
+            — a Type, and a group to "file it under" — that read as the same
+            question with different answers. The group is the answer, and
+            the type follows from it (`kindOf`). A pocket is not asked: it
+            is a virtual account by being one. */}
+        {!asPocket && (
+        <SelectField
+          label="Account type"
+          value={groupId}
+          onChange={setGroupId}
+          placeholder="Choose a group"
+          action={{ label: 'New group…', onSelect: () => setNewGroupOpen(true) }}
+          error={accountGroups.length === 0 ? 'You have no groups yet. Add one, or put the standard ones back in Account group setup.' : undefined}
+          hint={
+            virtual
+              ? 'Money set aside. Out of Safe to Spend unless you switch it on in Cash flow setup.'
+              : group
+                ? GROUP_HINT[type]
+                : undefined
+          }
+        >
+          {SIDES.map(({ side, label, hint, tone, icon, badge }) => (
+            <optgroup key={side} label={label} data-hint={hint} data-tone={tone} data-icon={icon} data-badge={badge}>
+              {sortGroups(accountGroups)
+                .filter((g) => g.side === side)
+                .map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+            </optgroup>
+          ))}
+        </SelectField>
+        )}
+
+        {/* A card's statement shows two figures that look alike: what you owe,
+            and the credit left. Say which is being typed, with the limit
+            beside it, so one is never entered as the other. */}
+        {isCredit && (
+          <div className="space-y-5">
+            <MoneyDial
+              label="Credit limit"
+              value={creditLimit}
+              onChange={setCreditLimit}
+              max={20_000}
+              min={100}
+              placeholder="2950"
+              hint="The most the card lets you borrow, from your statement or the app."
+            />
+            <SegmentedControl
+              label="Which figure you are entering"
+              value={enterAs}
+              onChange={(next) => {
+                // The same money, re-said the other way round, so switching
+                // does not quietly change what the card owes.
+                if (balanceValue !== null && limitValue !== null) {
+                  setBalance(String(next === 'left' ? round2(limitValue - balanceValue) : balanceValue));
+                }
+                setEnterAs(next);
+              }}
+              options={[
+                { value: 'owed', label: 'What I owe' },
+                { value: 'left', label: 'Credit left' },
+              ]}
+              hint={
+                enterAs === 'owed'
+                  ? 'The balance on your statement — what you would pay to clear the card.'
+                  : 'What you can still spend. What you owe is worked out as the limit less this.'
+              }
+              className="w-full [&>button]:flex-1"
+            />
+          </div>
+        )}
+
+        {/* The amount box draws no label of its own; on a card the words
+            matter, so they are said above it. */}
+        <div className="space-y-2">
+        {isCredit && (
+          <p aria-hidden="true" className="pl-1 text-[13px] font-medium tracking-[-0.005em] text-muted">
+            {fromCreditLeft ? 'Credit left to spend' : 'Balance owed today'}
+          </p>
+        )}
         {editing ? (
           <AmountField
-            label={owesMoney(editing) ? 'Balance owed today' : 'Balance today'}
+            label={fromCreditLeft ? 'Credit left to spend' : owesMoney(editing) ? 'Balance owed today' : 'Balance today'}
             tone={(adjustment < 0) === !owesMoney(editing) ? 'expense' : 'income'}
             {...sumField(balance, setBalance)}
             error={balanceError}
@@ -386,6 +505,8 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
               sumHint(balance) ??
               (unfinished
                 ? 'Finish the sum to see what it comes to.'
+                : cardLine && adjustment === 0
+                ? cardLine
                 : adjustment === 0
                 ? 'Change it to match your bank. The difference is recorded as a Balance adjustment.'
                 : `${adjustment > 0 ? '+' : '−'}${money(Math.abs(adjustment))} will be recorded as a Balance adjustment today, and counted as ${
@@ -395,12 +516,21 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
           />
         ) : (
           <AmountField
-            label={parent ? 'In the pocket today' : owesMoney({ type }) ? 'Balance owed today' : 'Balance today'}
+            label={
+              parent
+                ? 'In the pocket today'
+                : fromCreditLeft
+                  ? 'Credit left to spend'
+                  : owesMoney({ type })
+                    ? 'Balance owed today'
+                    : 'Balance today'
+            }
             tone={owesMoney({ type }) ? 'expense' : 'income'}
             {...sumField(balance, setBalance)}
             error={balanceError}
             hint={
               sumHint(balance) ??
+              cardLine ??
               (parent
                 ? `What it holds now, as your bank shows it. ${parent.name}'s main balance stays as it is; its total worth is the two together.`
                 : virtual
@@ -409,6 +539,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
             }
           />
         )}
+        </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
           <TextField
@@ -419,40 +550,6 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
             autoFocus={Boolean(editing)}
             required
           />
-          {/* The one question about what this account is. It used to be two
-              — a Type, and a group to "file it under" — that read as the same
-              question with different answers. The group is the answer, and
-              the type follows from it (`kindOf`). A pocket is not asked: it
-              is a virtual account by being one. */}
-          {!asPocket && (
-          <SelectField
-            label="Account type"
-            value={groupId}
-            onChange={setGroupId}
-            placeholder="Choose a group"
-            action={{ label: 'New group…', onSelect: () => setNewGroupOpen(true) }}
-            error={accountGroups.length === 0 ? 'You have no groups yet. Add one, or put the standard ones back in Account group setup.' : undefined}
-            hint={
-              virtual
-                ? 'Money set aside. Out of Safe to Spend unless you switch it on in Cash flow setup.'
-                : group
-                  ? GROUP_HINT[type]
-                  : undefined
-            }
-          >
-            {SIDES.map(({ side, label, hint, tone, icon, badge }) => (
-              <optgroup key={side} label={label} data-hint={hint} data-tone={tone} data-icon={icon} data-badge={badge}>
-                {sortGroups(accountGroups)
-                  .filter((g) => g.side === side)
-                  .map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-              </optgroup>
-            ))}
-          </SelectField>
-          )}
 
           {/* Like a Revolut Pocket or a Monzo Pot: a mini account inside a bank
               account, or — part of nothing — money kept somewhere the app
@@ -557,14 +654,6 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
 
           {isCredit && (
             <>
-              <MoneyDial
-                label="Credit limit"
-                value={creditLimit}
-                onChange={setCreditLimit}
-                max={20_000}
-                min={100}
-                placeholder="2950"
-              />
               {/* The database allows up to 200%; the track stops at 60, where
                   every real card is, and + reaches the rest. */}
               <RangeField
@@ -578,13 +667,14 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
                 step={0.1}
                 typed={{ decimals: 2, unit: '% APR' }}
                 describe={(v) => `${Number(v.toFixed(2))}% APR`}
+                hint="The yearly interest rate on purchases, as your statement gives it. Tap the figure to type it exactly."
               />
               <DayOfMonthPicker
                 label="Payment due day"
                 optional
                 value={dueDay === '' ? null : Number(dueDay)}
                 onChange={(day) => setDueDay(day === null ? '' : String(day))}
-                hint="Day of the month."
+                hint="The day each month your payment must reach the card."
               />
               {/* Both of these were already printed on the account screen and
                   on Debts, read from a row nothing could write. */}
@@ -601,6 +691,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
                 onChange={setMinimumPayment}
                 max={1_000}
                 placeholder="25"
+                hint="The least you must pay each month to avoid a late fee — not what you owe."
               />
             </>
           )}
