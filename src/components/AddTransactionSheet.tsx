@@ -55,6 +55,7 @@ import { Icon } from './ui/Icon';
 import { NewCategoryDialog } from './NewCategoryDialog';
 import { AccountDialog } from './AccountDialog';
 import { LabelPicker } from './LabelPicker';
+import { TransferAccounts } from './TransferAccounts';
 import { SplitEditor } from './SplitEditor';
 import { partAmount, splitIsValid, splitTotals, type SplitKind, type SplitPart } from '@/lib/splits';
 
@@ -809,12 +810,53 @@ export const AddTransactionSheet = ({
               transactions against it.
             </p>
           ) : (
+            type === 'transfer' ? (
+              // One above the other, with a swap between them, as a bank's
+              // Move money is laid out: which way the money goes is the
+              // thing a transfer most often gets backwards.
+              <TransferAccounts
+                onSwap={() => {
+                  setAccountId(toAccountId);
+                  setToAccountId(accountId);
+                }}
+                from={
+                  <SelectField
+                    label="From account"
+                    hideLabel
+                    value={accountId}
+                    onChange={(value) => setAccountId(value)}
+                    action={{ label: 'New account…', onSelect: () => setNewAccountFor('from') }}
+                  >
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id} data-hint={money(a.balance)}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </SelectField>
+                }
+                to={
+                  <SelectField
+                    label="To account"
+                    hideLabel
+                    value={toAccountId}
+                    onChange={(value) => setToAccountId(value)}
+                    action={{ label: 'New account…', onSelect: () => setNewAccountFor('to') }}
+                  >
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id} data-hint={money(a.balance)}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </SelectField>
+                }
+              />
+            ) : (
             <div className="grid gap-5 sm:grid-cols-2">
               {/* Each account carries what is in it. Choosing where a payment
                   comes from without seeing whether it can cover it is the
                   question this dropdown was always being asked silently. */}
               <SelectField
-                label={type === 'transfer' ? 'From account' : 'Account'}
+                label="Account"
                 value={accountId}
                 onChange={(value) => setAccountId(value)}
                 action={{ label: 'New account…', onSelect: () => setNewAccountFor('from') }}
@@ -826,34 +868,20 @@ export const AddTransactionSheet = ({
                 ))}
               </SelectField>
 
-              {type === 'transfer' ? (
-                <SelectField
-                  label="To account"
-                  value={toAccountId}
-                  onChange={(value) => setToAccountId(value)}
-                  action={{ label: 'New account…', onSelect: () => setNewAccountFor('to') }}
-                >
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id} data-hint={money(a.balance)}>
-                      {a.name}
-                    </option>
-                  ))}
-                </SelectField>
-              ) : (
-                <SelectField
-                  label="Category"
-                  value={categoryId}
-                  onChange={chooseCategory}
-                  action={{ label: 'New category…', onSelect: () => setNewCategoryOpen(true) }}
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </SelectField>
-              )}
+              <SelectField
+                label="Category"
+                value={categoryId}
+                onChange={chooseCategory}
+                action={{ label: 'New category…', onSelect: () => setNewCategoryOpen(true) }}
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </SelectField>
             </div>
+            )
           )}
 
           {type !== 'transfer' && accounts.length > 0 && (

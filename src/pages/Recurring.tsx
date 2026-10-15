@@ -27,6 +27,7 @@ import { sumField, sumHint } from '@/lib/calc';
 import { reanchor, type DraftRule } from '@/lib/recurringDraft';
 import { Icon } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
+import { TransferAccounts } from '@/components/TransferAccounts';
 import { EmptyState, SkeletonRows } from '@/components/ui/States';
 import { useToast } from '@/components/ui/Toast';
 import type { Frequency, RecurringPayment, RecurringStatus, WeekendMode } from '@/lib/types';
@@ -617,44 +618,76 @@ const RecurringForm = ({
             ))}
           </SelectField>
 
-          <SelectField
-            label={isTransfer ? 'From account' : 'Account'}
-            value={draft.accountId}
-            onChange={(value) =>
-              setDraft({
-                ...draft,
-                accountId: value,
-                // Never leave the two ends pointing at the same account.
-                toAccountId:
-                  isTransfer && draft.toAccountId === value
-                    ? (accounts.find((a) => a.id !== value)?.id ?? '')
-                    : draft.toAccountId,
-              })
-            }
-          >
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </SelectField>
-
-          {isTransfer && (
+          {isTransfer ? (
+            <TransferAccounts
+              onSwap={() => setDraft({ ...draft, accountId: draft.toAccountId, toAccountId: draft.accountId })}
+              disabled={!draft.toAccountId}
+              toHint="Where the money lands. Still yours either way."
+              from={
+                <SelectField
+                  label="From account"
+                  hideLabel
+                  value={draft.accountId}
+                  onChange={(value) =>
+                    setDraft({
+                      ...draft,
+                      accountId: value,
+                      // Never leave the two ends pointing at the same account.
+                      toAccountId:
+                        isTransfer && draft.toAccountId === value
+                          ? (accounts.find((a) => a.id !== value)?.id ?? '')
+                          : draft.toAccountId,
+                    })
+                  }
+                >
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </SelectField>
+              }
+              to={
+                <SelectField
+                  label="To account"
+                  hideLabel
+                  value={draft.toAccountId}
+                  onChange={(value) => setDraft({ ...draft, toAccountId: value })}
+                >
+                  {accounts
+                    .filter((a) => a.id !== draft.accountId)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                </SelectField>
+              }
+            />
+          ) : (
             <SelectField
-              label="To account"
-              value={draft.toAccountId}
-              onChange={(value) => setDraft({ ...draft, toAccountId: value })}
-              hint="Where the money lands. Still yours either way."
+              label="Account"
+              value={draft.accountId}
+              onChange={(value) =>
+                setDraft({
+                  ...draft,
+                  accountId: value,
+                  // Never leave the two ends pointing at the same account.
+                  toAccountId:
+                    isTransfer && draft.toAccountId === value
+                      ? (accounts.find((a) => a.id !== value)?.id ?? '')
+                      : draft.toAccountId,
+                })
+              }
             >
-              {accounts
-                .filter((a) => a.id !== draft.accountId)
-                .map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
             </SelectField>
           )}
+
 
           <SelectField
             label="Frequency"
