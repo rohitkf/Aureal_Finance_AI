@@ -1,6 +1,6 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
-import { clampToStep } from '@/lib/amount';
+import { clampToStep, sanitizeAmount } from '@/lib/amount';
 import { Icon } from './Icon';
 
 /**
@@ -19,6 +19,11 @@ import { Icon } from './Icon';
  * `sliderMax` lets the track cover the useful part of a long range: interval
  * runs to 99 in the database, but a track from 1 to 99 makes every value
  * anybody uses a few pixels wide. The + button still reaches `max`.
+ *
+ * A rate is different: a card's APR is 32.96%, not "about 33". With `typed`,
+ * the readout is a box you can type the exact figure into, to `decimals`
+ * places — the slider and the buttons still move in `step`, for getting
+ * near quickly, and the box is for getting it exact.
  */
 interface RangeFieldProps {
   label: string;
@@ -36,6 +41,11 @@ interface RangeFieldProps {
   render?: (value: number) => ReactNode;
   /** Offers "Not set" and a way back to it. */
   optional?: boolean;
+  /**
+   * The readout becomes a box the exact figure can be typed into, to
+   * `decimals` places, with `unit` after it ("% APR").
+   */
+  typed?: { decimals: number; unit: string };
   hint?: string;
   error?: string;
   className?: string;
@@ -52,10 +62,14 @@ export const RangeField = ({
   describe,
   render,
   optional,
+  typed,
   hint,
   error,
   className,
 }: RangeFieldProps) => {
+  // What is in the box while it is being typed in, so a half-typed `32.` is
+  // not tidied to 32 under the cursor. Null when nobody is typing.
+  const [draft, setDraft] = useState<string | null>(null);
   const id = useId();
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
@@ -103,16 +117,50 @@ export const RangeField = ({
           >
             <Icon name="minus" size={15} />
           </button>
-          <output
-            htmlFor={id}
-            aria-live="polite"
-            className={cn(
-              'tnum min-w-0 flex-1 text-center font-display text-[17px] font-semibold tracking-[-0.02em]',
-              unset ? 'text-faint' : 'text-text',
-            )}
-          >
-            {unset ? 'Not set' : render ? render(shown) : describe(shown)}
-          </output>
+          {typed ? (
+            <span className="flex min-w-0 flex-1 items-baseline justify-center font-display text-[17px] font-semibold tracking-[-0.02em]">
+              <input
+                inputMode="decimal"
+                autoComplete="off"
+                aria-label={`${label} — exact figure`}
+                placeholder="Not set"
+                value={draft ?? (unset ? '' : String(Number(shown.toFixed(typed.decimals))))}
+                onFocus={(e) => e.currentTarget.select()}
+                onChange={(e) => {
+                  const text = sanitizeAmount(e.target.value, typed.decimals);
+                  setDraft(text);
+                  if (text === '') {
+                    if (optional) onChange(null);
+                    return;
+                  }
+                  const n = Number(text);
+                  // Kept as typed, to the places it allows; only held inside
+                  // the range, never snapped to the slider's step.
+                  if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
+                }}
+                onBlur={() => setDraft(null)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                }}
+                className={cn(
+                  'tnum w-auto min-w-[2ch] max-w-[7ch] border-0 bg-transparent p-0 text-right [field-sizing:content]',
+                  'text-text placeholder:font-normal placeholder:text-faint focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+                )}
+              />
+              {!(unset && draft === null) && <span className="whitespace-pre text-text">{typed.unit}</span>}
+            </span>
+          ) : (
+            <output
+              htmlFor={id}
+              aria-live="polite"
+              className={cn(
+                'tnum min-w-0 flex-1 text-center font-display text-[17px] font-semibold tracking-[-0.02em]',
+                unset ? 'text-faint' : 'text-text',
+              )}
+            >
+              {unset ? 'Not set' : render ? render(shown) : describe(shown)}
+            </output>
+          )}
           <button
             type="button"
             aria-label={`More — ${label}`}

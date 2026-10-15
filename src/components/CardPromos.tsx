@@ -214,6 +214,7 @@ export const CardPromoDialog = ({ account, editing, open, onClose }: CardPromoDi
           max={200}
           sliderMax={20}
           step={0.1}
+          typed={{ decimals: 2, unit: '% a year' }}
           describe={(v) => `${ratePhrase(v)} a year`}
           hint="Usually 0%."
         />
