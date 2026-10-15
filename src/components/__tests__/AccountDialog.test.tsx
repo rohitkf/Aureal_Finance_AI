@@ -843,3 +843,81 @@ describe('a balance worked out as a sum', () => {
     expect(screen.getByRole('button', { name: /Add account/ })).toBeDisabled();
   });
 });
+
+/*
+ * A card's statement shows what you owe and the credit left side by side.
+ * Typed into the wrong one, £851 of debt went down as £148.
+ */
+describe('a credit card balance, said either way round', () => {
+  const newCard = async (user: ReturnType<typeof userEvent.setup>) => {
+    open();
+    await choose(user, 'Account type', 'Credit Card');
+    await user.type(screen.getByLabelText('Account name'), 'Amex');
+    await user.type(screen.getByLabelText('Credit limit'), '1000');
+  };
+
+  it('asks for the account type first, before any amount', () => {
+    open();
+    const type = screen.getByRole('combobox', { name: 'Account type' });
+    const amount = screen.getByLabelText(/Balance today/);
+    expect(type.compareDocumentPosition(amount) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('records what is owed when the credit left is typed', async () => {
+    const user = userEvent.setup();
+    await newCard(user);
+    await user.click(screen.getByRole('radio', { name: 'Credit left' }));
+    await user.type(screen.getByLabelText('Credit left to spend'), '148.37');
+    expect(screen.getByText('You owe £851.63 of your £1,000.00 limit, with £148.37 left to spend.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Add account/ }));
+    expect(sent()[0]).toMatchObject({ openingBalance: 851.63, account: { creditLimit: 1000 } });
+  });
+
+  it('records what is owed as typed, and says so', async () => {
+    const user = userEvent.setup();
+    await newCard(user);
+    await user.type(screen.getByLabelText('Balance owed today'), '148.37');
+    expect(screen.getByText('You owe £148.37 of your £1,000.00 limit, with £851.63 left to spend.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Add account/ }));
+    expect(sent()[0].openingBalance).toBe(148.37);
+  });
+
+  it('will not take credit left without a limit, or more than the limit', async () => {
+    const user = userEvent.setup();
+    open();
+    await choose(user, 'Account type', 'Credit Card');
+    await user.type(screen.getByLabelText('Account name'), 'Amex');
+    await user.click(screen.getByRole('radio', { name: 'Credit left' }));
+    await user.type(screen.getByLabelText('Credit left to spend'), '200');
+    expect(screen.getByText(/Set the credit limit above first/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add account/ })).toBeDisabled();
+
+    await user.type(screen.getByLabelText('Credit limit'), '150');
+    expect(screen.getByText(/That is more than the £150\.00 limit/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add account/ })).toBeDisabled();
+  });
+
+  it('keeps the same debt when switching which figure is shown', async () => {
+    const user = userEvent.setup();
+    const card = { ...EXISTING, id: 'card', type: 'credit' as const, balance: 300, creditLimit: 1000, groupId: 'g-Credit Card' };
+    render(<AccountDialog open onClose={vi.fn()} editing={card} />);
+    await user.click(screen.getByRole('radio', { name: 'Credit left' }));
+    expect(screen.getByLabelText('Credit left to spend')).toHaveValue('700');
+    await user.click(screen.getByRole('button', { name: /Save changes/ }));
+    // Nothing changed, so nothing is recorded as an adjustment.
+    expect(sent().map((a) => a.type)).toEqual(['upsert-account']);
+  });
+
+  it('records a corrected card balance as the difference in what is owed', async () => {
+    const user = userEvent.setup();
+    const card = { ...EXISTING, id: 'card', type: 'credit' as const, balance: 148.37, creditLimit: 1000, groupId: 'g-Credit Card' };
+    render(<AccountDialog open onClose={vi.fn()} editing={card} />);
+    await user.click(screen.getByRole('radio', { name: 'Credit left' }));
+    const field = screen.getByLabelText('Credit left to spend');
+    await user.clear(field);
+    await user.type(field, '148.37');
+    await user.click(screen.getByRole('button', { name: /Save changes/ }));
+    // Owing more on a card is spending: £851.63 − £148.37.
+    expect(sent()[1].transaction).toMatchObject({ amount: 703.26, type: 'expense' });
+  });
+});
