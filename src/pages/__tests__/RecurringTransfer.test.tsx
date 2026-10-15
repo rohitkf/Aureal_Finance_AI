@@ -80,6 +80,7 @@ beforeEach(() => {
     goals: [],
     netWorthHistory: [],
   recurringSkips: [],
+  cardPromos: [],
     settings: SETTINGS,
   };
 });

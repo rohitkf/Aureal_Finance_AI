@@ -60,6 +60,7 @@ const stateWith = (transactions: Transaction[]): AppState => ({
   goals: [],
   netWorthHistory: [],
   recurringSkips: [],
+  cardPromos: [],
   settings: SETTINGS,
 });
 

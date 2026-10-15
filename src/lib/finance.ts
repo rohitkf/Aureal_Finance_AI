@@ -2,6 +2,7 @@ import type {
   Account,
   AccountGroup,
   BalanceSide,
+  CardPromo,
   AppState,
   Budget,
   Forecast,
@@ -11,7 +12,7 @@ import type {
   NetWorthPoint,
   Transaction,
 } from './types';
-import { addDays, addMonths, daysBetween, endOfMonth, monthKey } from './date';
+import { ISO, addDays, addMonths, daysBetween, endOfMonth, monthKey } from './date';
 import { expandRecurrence, monthlyEquivalent } from './recurrence';
 import { round2 } from './format';
 
@@ -939,6 +940,84 @@ export const monthlyRecurringIncome = (state: AppState): number => {
 /* Debt                                                                */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Promotional rates                                                   */
+/* ------------------------------------------------------------------ */
+
+/** Whether an offer's rate still applies on a day: up to and including its end date. */
+export const promoActive = (promo: CardPromo, on: string): boolean => on <= promo.endsOn;
+
+/** The offers on one account still running on a day, cheapest first. */
+export const activePromos = (accountId: string, promos: CardPromo[], on: string): CardPromo[] =>
+  promos.filter((p) => p.accountId === accountId && promoActive(p, on)).sort((a, b) => a.rate - b.rate);
+
+/**
+ * A month's interest on what is owed on an account, on a given day.
+ *
+ * The balance is filled into the running offers first, cheapest first, and
+ * whatever is left is charged the account's own APR. That is the order a UK
+ * card applies it in: payments go to the most expensive part first, so the
+ * 0% part is the last thing left — the promotional balance does not shrink
+ * just because you paid something off. An offer with no amount covers all of
+ * it. Once an offer's end date has passed, its part is charged the APR.
+ */
+export const monthlyInterestOn = (account: Account, balance: number, promos: CardPromo[], on: string): number => {
+  if (balance <= 0) return 0;
+  let left = balance;
+  let interest = 0;
+  for (const promo of activePromos(account.id, promos, on)) {
+    const part = promo.amount === undefined ? left : Math.min(left, promo.amount);
+    interest += (part * promo.rate) / 100 / 12;
+    left -= part;
+    if (left <= 0) break;
+  }
+  return interest + (left * (account.apr ?? 0)) / 100 / 12;
+};
+
+/** One offer as the debt screen and the card describe it. */
+export interface PromoStatus {
+  promo: CardPromo;
+  /** What it covers today: its amount, or the whole balance, capped at what is owed. */
+  covers: number;
+  /** Days until its last day: 0 on the last day itself, and once it has ended. */
+  daysLeft: number;
+  ended: boolean;
+  /** Ends within sixty days — time to plan a payment or another transfer. */
+  endingSoon: boolean;
+  /** What its part would cost a month at the card's APR, once it ends. */
+  interestAfter: number;
+}
+
+/**
+ * Every offer on an account, with what it covers and how long it has left.
+ * Running offers first, by the day they end; ended ones after.
+ */
+export const promoStatuses = (account: Account, promos: CardPromo[], today: string): PromoStatus[] => {
+  let left = Math.max(0, account.balance);
+  const covered = new Map<string, number>();
+  for (const promo of activePromos(account.id, promos, today)) {
+    const part = promo.amount === undefined ? left : Math.min(left, promo.amount);
+    covered.set(promo.id, round2(part));
+    left -= part;
+  }
+  return promos
+    .filter((p) => p.accountId === account.id)
+    .map((promo) => {
+      const ended = !promoActive(promo, today);
+      const daysLeft = ended ? 0 : daysBetween(today, promo.endsOn);
+      const covers = covered.get(promo.id) ?? 0;
+      return {
+        promo,
+        covers,
+        daysLeft,
+        ended,
+        endingSoon: !ended && daysLeft <= 60,
+        interestAfter: round2((covers * (account.apr ?? 0)) / 100 / 12),
+      };
+    })
+    .sort((a, b) => Number(a.ended) - Number(b.ended) || a.promo.endsOn.localeCompare(b.promo.endsOn));
+};
+
 export interface DebtSummary {
   /** Every counted account that is owed: cards, loans, and anything in a liability group. */
   facilities: Account[];
@@ -956,8 +1035,12 @@ export interface DebtSummary {
    * into an owed account, which is what paying a card or a loan is.
    */
   monthlyPayments: number;
-  /** Interest added each month at today's balances and rates. */
+  /** Interest added each month at today's balances and rates, offers included. */
   monthlyInterest: number;
+  /** What it would be at today's balances once every offer has ended. */
+  interestAfterPromos: number;
+  /** Running offers ending within sixty days, soonest first. */
+  promosEndingSoon: Array<PromoStatus & { account: Account }>;
   /** Months to clear everything at that rate of payment, or null if it never clears. */
   payoffMonths: number | null;
 }
@@ -969,7 +1052,7 @@ export interface DebtSummary {
  * literally `debt` — true of the sample data and of nobody else, so for every
  * real account it was £0 and the payoff estimate was always "never".
  */
-export const debtSummary = (state: AppState): DebtSummary => {
+export const debtSummary = (state: AppState, today: string = ISO(new Date())): DebtSummary => {
   // Excluded accounts are not part of any figure; see `reported`.
   state = reported(state);
 
@@ -987,17 +1070,29 @@ export const debtSummary = (state: AppState): DebtSummary => {
   );
 
   // Interest by each balance's own rate. An average of the rates, unweighted,
-  // let a £50 card at 30% decide the interest on a £5,000 loan at 6%.
-  const interestOn = (balance: number) =>
-    facilities.reduce((sum, a) => sum + (total > 0 ? (a.balance / total) * balance : 0) * ((a.apr ?? 0) / 100 / 12), 0);
-  const monthlyInterest = round2(interestOn(total));
+  // let a £50 card at 30% decide the interest on a £5,000 loan at 6%. And by
+  // the day: a 0% offer costs nothing until it ends, then the card's APR.
+  const promos = state.cardPromos ?? [];
+  const interestOn = (balance: number, on: string, offers: CardPromo[] = promos) =>
+    facilities.reduce(
+      (sum, a) => sum + monthlyInterestOn(a, total > 0 ? (a.balance / total) * balance : 0, offers, on),
+      0,
+    );
+  const monthlyInterest = round2(interestOn(total, today));
+  const interestAfterPromos = round2(interestOn(total, today, []));
+  const promosEndingSoon = facilities
+    .flatMap((account) => promoStatuses(account, promos, today).map((s) => ({ ...s, account })))
+    .filter((s) => s.endingSoon && s.covers > 0)
+    .sort((a, b) => a.daysLeft - b.daysLeft);
 
   let payoffMonths: number | null = null;
   if (total <= 0) payoffMonths = 0;
   else if (monthlyPayments > 0) {
     let balance = total;
     for (let month = 1; month <= 600; month += 1) {
-      balance = balance + interestOn(balance) - monthlyPayments;
+      // Each month at that month's rates, so an offer ending a year from
+      // now starts costing interest a year into the estimate.
+      balance = balance + interestOn(balance, addMonths(today, month - 1)) - monthlyPayments;
       if (balance <= 0) {
         payoffMonths = month;
         break;
@@ -1014,6 +1109,8 @@ export const debtSummary = (state: AppState): DebtSummary => {
     toThirtyPercent: round2(Math.max(0, cardDebt - cardLimit * 0.3)),
     monthlyPayments,
     monthlyInterest,
+    interestAfterPromos,
+    promosEndingSoon,
     payoffMonths,
   };
 };

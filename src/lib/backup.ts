@@ -38,6 +38,7 @@ export const BACKUP_TABLES = [
   'recurring_skips',
   'budgets',
   'goals',
+  'card_promos',
   'net_worth_snapshots',
 ] as const;
 
@@ -124,6 +125,7 @@ export const TABLE_LABELS: Record<BackupTable, string> = {
   recurring_skips: 'skipped occurrences',
   budgets: 'budgets',
   goals: 'goals',
+  card_promos: 'card offers',
   net_worth_snapshots: 'net-worth snapshots',
 };
 

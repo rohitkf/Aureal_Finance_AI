@@ -336,6 +336,27 @@ export interface Settings {
   tint: Tint;
 }
 
+/** What a credit card's promotional rate is on. */
+export type PromoKind = 'balance_transfer' | 'money_transfer' | 'purchase' | 'other';
+
+/**
+ * A promotional rate on a credit card: 0% on a balance transfer until a date,
+ * say. Until `endsOn` the covered part of the balance costs `rate`; from the
+ * day after, the card's own APR.
+ */
+export interface CardPromo {
+  id: string;
+  accountId: string;
+  kind: PromoKind;
+  /** Percent a year; usually 0. */
+  rate: number;
+  /** How much of the balance it covers. Absent means all of it. */
+  amount?: number;
+  /** The last day the promotional rate applies. */
+  endsOn: string;
+  note?: string;
+}
+
 /** One occurrence of a rule that should not be projected at all. */
 export interface RecurringSkip {
   id: string;
@@ -354,6 +375,7 @@ export interface AppState {
   goals: Goal[];
   netWorthHistory: NetWorthPoint[];
   recurringSkips: RecurringSkip[];
+  cardPromos: CardPromo[];
   settings: Settings;
 }
 

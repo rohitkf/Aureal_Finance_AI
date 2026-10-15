@@ -62,6 +62,7 @@ const minimal = (): AppState => ({
   goals: [],
   netWorthHistory: [],
   recurringSkips: [],
+  cardPromos: [],
   settings: {
     currency: 'GBP',
     locale: 'en-GB',

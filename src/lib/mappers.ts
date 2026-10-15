@@ -12,6 +12,7 @@ import type {
   NetWorthPoint,
   RecurringPayment,
   RecurringSkip,
+  CardPromo,
   Settings,
   Transaction,
 } from './types';
@@ -24,6 +25,7 @@ import type {
   LabelRow,
   NetWorthRow,
   RecurringSkipRow,
+  CardPromoRow,
   ProfileRow,
   RecurringRow,
   TransactionRow,
@@ -173,6 +175,25 @@ export const toRecurringSkip = (row: RecurringSkipRow): RecurringSkip => ({
   occurrenceDate: row.occurrence_date,
 });
 
+export const toCardPromo = (row: CardPromoRow): CardPromo => ({
+  id: row.id,
+  accountId: row.account_id,
+  kind: row.kind,
+  rate: num(row.rate),
+  amount: row.amount === null ? undefined : num(row.amount),
+  endsOn: row.ends_on,
+  note: row.note ?? undefined,
+});
+
+export const cardPromoToRow = (p: Omit<CardPromo, 'id'>) => ({
+  account_id: p.accountId,
+  kind: p.kind,
+  rate: p.rate,
+  amount: p.amount ?? null,
+  ends_on: p.endsOn,
+  note: p.note?.trim() ? p.note.trim() : null,
+});
+
 export const toNetWorthPoint = (row: NetWorthRow): NetWorthPoint => ({
   month: row.month,
   assets: num(row.assets),
@@ -301,5 +322,6 @@ export const emptyAppState = (settings: Settings): AppState => ({
   goals: [],
   netWorthHistory: [],
   recurringSkips: [],
+  cardPromos: [],
   settings,
 });

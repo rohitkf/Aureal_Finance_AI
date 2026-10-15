@@ -11,12 +11,15 @@ import {
   isVirtual,
   owesMoney,
   pocketsOf,
+  promoStatuses,
 } from '@/lib/finance';
 import { groupOf } from '@/lib/accountGroups';
 import { formatMediumDate, monthKey, nextMonthlyDate, ordinal } from '@/lib/date';
 import { money, percent } from '@/lib/format';
 import { useAppState, useSettings, useToday } from '@/lib/store';
 import { BalanceChart } from '@/components/charts/BalanceChart';
+import { CardPromos } from '@/components/CardPromos';
+import { ratePhrase } from '@/lib/promos';
 import { AccountPockets, VirtualAccountPanel } from '@/components/Pockets';
 import { TransactionRow } from '@/components/TransactionRow';
 import { Badge } from '@/components/ui/Badge';
@@ -77,6 +80,8 @@ export const AccountDetail = () => {
 
   const isCredit = account.type === 'credit';
   const util = accountUtilisation(account);
+  // The offer that ends first, for the badge under the card's name.
+  const firstOffer = isCredit ? promoStatuses(account, state.cardPromos, today).find((s) => !s.ended) : undefined;
   const virtual = isVirtual(account, groupOf(account, state.accountGroups)?.name);
   const parent = account.parentAccountId ? state.accounts.find((a) => a.id === account.parentAccountId) : undefined;
   /** With pockets, the headline is everything the account holds, as Revolut shows it. */
@@ -123,6 +128,9 @@ export const AccountDetail = () => {
               </Badge>
               {account.aer && <Badge tone="success">{account.aer}% AER</Badge>}
               {isCredit && account.apr && <Badge tone="warning">{account.apr}% APR</Badge>}
+              {isCredit && firstOffer && (
+                <Badge tone="success">{`${ratePhrase(firstOffer.promo.rate)} until ${formatMediumDate(firstOffer.promo.endsOn)}`}</Badge>
+              )}
             </div>
           </div>
         </div>
@@ -218,11 +226,13 @@ export const AccountDetail = () => {
             </div>
             <div>
               <dt className="text-label-sm text-faint">Interest rate</dt>
-              <dd className="text-body-md text-text">{account.apr}% APR variable</dd>
+              <dd className="text-body-md text-text">{account.apr ? `${account.apr}% APR variable` : 'Not set'}</dd>
             </div>
           </dl>
         </Card>
       )}
+
+      {isCredit && <CardPromos account={account} />}
 
       <Card className="space-y-4">
         <CardHeader
