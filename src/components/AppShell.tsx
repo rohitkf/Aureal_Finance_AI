@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useScrollReset } from '@/hooks/useScrollReset';
 import { cn } from '@/lib/cn';
 import { greeting } from '@/lib/date';
 import { useAppState, useSettings, useStore } from '@/lib/store';
@@ -132,6 +133,8 @@ export const AppShell = () => {
   useEffect(() => {
     setQuickOpen(false);
   }, [location.pathname]);
+
+  useScrollReset();
 
   const leave = async () => {
     try {
