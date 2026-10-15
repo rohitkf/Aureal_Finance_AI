@@ -4,7 +4,7 @@ import { cn, pillClass } from '@/lib/cn';
 import { formatMediumDate, ordinal, relativeDueLabel } from '@/lib/date';
 import { money } from '@/lib/format';
 import { FREQUENCY_LABELS, WEEKEND_LABELS, cadencePhrase, monthlyEquivalent, previewOccurrences } from '@/lib/recurrence';
-import { isSelectable, monthlyCommitments, monthlyRecurringIncome, monthlyTransfers, subscriptionTotals } from '@/lib/finance';
+import { isSelectable, monthlyCommitments, monthlyRecurringIncome, monthlyTransfers, owesMoney, subscriptionTotals } from '@/lib/finance';
 import { newId, useAppState, useCategories, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { Badge } from '@/components/ui/Badge';
@@ -152,11 +152,25 @@ export const Recurring = () => {
     // Arriving from the old /subscriptions route, or from search.
     if (params.get('filter') === 'subscriptions') setKind('subscriptions');
     if (params.get('new') !== null) {
-      setDraft(emptyDraft(today, state.accounts[0]?.id ?? '', '', params.get('filter') === 'subscriptions'));
+      // From a card or a loan's "Set up a payment": a standing order into it,
+      // from the first other account that can pay it.
+      const payTo = state.accounts.find((a) => a.id === params.get('payTo'));
+      if (payTo) {
+        const from = state.accounts.find((a) => a.id !== payTo.id && !owesMoney(a) && !a.archived);
+        setDraft({
+          ...emptyDraft(today, from?.id ?? '', payTo.id),
+          name: `Pay ${payTo.name}`,
+          direction: 'transfer',
+          categoryId: state.categories.find((c) => c.kind === 'transfer')?.id ?? '',
+        });
+      } else {
+        setDraft(emptyDraft(today, state.accounts[0]?.id ?? '', '', params.get('filter') === 'subscriptions'));
+      }
       params.delete('new');
+      params.delete('payTo');
       setParams(params, { replace: true });
     }
-  }, [params, setParams, today, state.accounts]);
+  }, [params, setParams, today, state.accounts, state.categories]);
 
   const rules = useMemo(
     () =>

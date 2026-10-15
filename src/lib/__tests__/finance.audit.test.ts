@@ -12,6 +12,7 @@ import { nextMonthlyDate, ordinal } from '@/lib/date';
 import {
   accountTrace,
   monthlyInterestOn,
+  payoffPlan,
   promoStatuses,
   balanceHistory,
   budgetProgress,
@@ -378,6 +379,85 @@ describe('promotional rates on a card', () => {
     // £3,000 at £150 a month with no interest is 20 months.
     expect(debtSummary(forever, '2026-10-15').payoffMonths).toBe(20);
     expect(debtSummary(ending, '2026-10-15').payoffMonths).toBeGreaterThan(20);
+  });
+});
+
+describe('when a card is paid off', () => {
+  const current = account('current', 'current', 3000);
+  const pay = (amount: number, over: Partial<RecurringPayment> = {}) =>
+    rule({ id: 'card-bill', direction: 'transfer', accountId: 'current', toAccountId: 'card', amount, anchorDay: 20, ...over });
+
+  it('has nothing to plan when nothing is owed', () => {
+    const s = state({ accounts: [current, account('card', 'credit', 0, { apr: 24 })] });
+    expect(payoffPlan(s, 'card', TODAY).status).toBe('clear');
+  });
+
+  it('says plainly when nothing is scheduled to pay it, with what would clear it in two years', () => {
+    const s = state({ accounts: [current, account('card', 'credit', 1200, { apr: 24 })] });
+    const plan = payoffPlan(s, 'card', TODAY);
+    expect(plan.status).toBe('no-plan');
+    // £1,200 at 2% a month over 24 months: about £63.45.
+    expect(plan.suggestedMonthly).toBeCloseTo(63.45, 1);
+  });
+
+  it('clears a 0% balance on the day of the payment that finishes it, and pays no more than is owed', () => {
+    const s = state({ accounts: [current, account('card', 'credit', 450, { apr: 0 })], recurring: [pay(100)] });
+    const plan = payoffPlan(s, 'card', TODAY);
+    // 20 Oct, Nov, Dec, Jan: £400; 20 Feb takes the last £50.
+    expect(plan.status).toBe('paid-off');
+    expect(plan.payoffDate).toBe('2027-02-20');
+    expect(plan.totalPaid).toBe(450);
+    expect(plan.totalInterest).toBe(0);
+    expect(plan.months.map((m) => m.closing)).toEqual([350, 250, 150, 50, 0]);
+  });
+
+  it('adds interest each month, so it takes longer and costs more than the balance', () => {
+    const s = state({ accounts: [current, account('card', 'credit', 1000, { apr: 24 })], recurring: [pay(100)] });
+    const plan = payoffPlan(s, 'card', TODAY);
+    expect(plan.status).toBe('paid-off');
+    expect(plan.totalInterest).toBeGreaterThan(80);
+    expect(plan.totalPaid).toBeCloseTo(1000 + plan.totalInterest, 1);
+    // The first month charges only its last 29 days; every month after, a
+    // full month's 2% on what was owed as it began.
+    expect(plan.months[0].interest).toBeCloseTo((1000 * 0.02 * 29) / 31, 2);
+    expect(plan.months[1].paid).toBe(100);
+    expect(plan.months[1].interest).toBeCloseTo(plan.months[1].opening * 0.02, 2);
+  });
+
+  it('charges nothing while a 0% offer runs, and the APR once it ends', () => {
+    const s = state({
+      accounts: [current, account('card', 'credit', 1000, { apr: 24 })],
+      recurring: [pay(100)],
+      cardPromos: [{ id: 'bt', accountId: 'card', kind: 'balance_transfer', rate: 0, endsOn: '2026-12-31' }],
+    });
+    const plan = payoffPlan(s, 'card', TODAY);
+    expect(plan.months.slice(0, 3).map((m) => m.interest)).toEqual([0, 0, 0]);
+    expect(plan.months[3].interest).toBeGreaterThan(0);
+  });
+
+  it('counts what is spent on the card, as well as what pays it', () => {
+    const s = state({
+      accounts: [current, account('card', 'credit', 300, { apr: 0 })],
+      recurring: [pay(100), rule({ id: 'netflix', accountId: 'card', amount: 10, anchorDay: 5 })],
+    });
+    const plan = payoffPlan(s, 'card', TODAY);
+    expect(plan.months[1]).toMatchObject({ paid: 100, charged: 10 });
+  });
+
+  it('says never when the payments do not keep up with the interest', () => {
+    const s = state({ accounts: [current, account('card', 'credit', 5000, { apr: 30 })], recurring: [pay(50)] });
+    const plan = payoffPlan(s, 'card', TODAY);
+    expect(plan.status).toBe('never');
+    expect(plan.payoffDate).toBeNull();
+    expect(plan.suggestedMonthly).toBeGreaterThan(250);
+  });
+
+  it('stops paying when the standing order ends', () => {
+    const s = state({
+      accounts: [current, account('card', 'credit', 1000, { apr: 0 })],
+      recurring: [pay(100, { startDate: '2026-10-01', occurrences: 3 })],
+    });
+    expect(payoffPlan(s, 'card', TODAY).status).toBe('never');
   });
 });
 
