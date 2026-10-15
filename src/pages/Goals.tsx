@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { addMonths, formatMonthYear } from '@/lib/date';
 import { money, percent } from '@/lib/format';
+import { parseAmount } from '@/lib/amount';
 import { newId, useAppState, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { Badge } from '@/components/ui/Badge';
 import { Button, IconButton } from '@/components/ui/Button';
@@ -55,14 +56,14 @@ export const Goals = () => {
 
   const save = () => {
     if (!draft) return;
-    const target = Number.parseFloat(draft.target);
+    const target = parseAmount(draft.target) ?? Number.NaN;
     // `draft.target` is the raw text of the field, so "abc" is truthy and got
     // straight past the button's disabled check into a silent no-op.
     if (!Number.isFinite(target) || target <= 0) {
       setDraft({ ...draft, error: 'Enter a target greater than £0.' });
       return;
     }
-    const saved = Number.parseFloat(draft.saved) || 0;
+    const saved = parseAmount(draft.saved) ?? 0;
     if (saved > target) {
       setDraft({ ...draft, error: 'Saved so far cannot be more than the target.' });
       return;
@@ -79,7 +80,7 @@ export const Goals = () => {
       target,
       saved,
       targetDate: draft.targetDate,
-      monthlyContribution: Number.parseFloat(draft.monthlyContribution) || 0,
+      monthlyContribution: parseAmount(draft.monthlyContribution) ?? 0,
       icon: existing?.icon ?? 'target',
       linkedAccountId: draft.linkedAccountId || undefined,
     };
@@ -304,7 +305,7 @@ export const Goals = () => {
                 value={draft.saved}
                 // Up to the target when there is one: saving past it is still
                 // typeable, but the track is for the part that matters.
-                max={Math.min(1_000_000, Math.max(100, Number.parseFloat(draft.target) || 50_000))}
+                max={Math.min(1_000_000, Math.max(100, parseAmount(draft.target) || 50_000))}
                 onChange={(saved) => setDraft({ ...draft, saved })}
               />
               <DateField
@@ -338,7 +339,7 @@ export const Goals = () => {
               icon="check"
               onClick={() => {
                 if (!contributing) return;
-                const amount = Number.parseFloat(contributing.amount);
+                const amount = parseAmount(contributing.amount) ?? Number.NaN;
                 if (!Number.isFinite(amount) || amount <= 0) {
                   setContributing({ ...contributing, error: 'Enter an amount greater than £0.' });
                   return;

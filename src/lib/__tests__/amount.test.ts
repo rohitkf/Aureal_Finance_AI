@@ -101,3 +101,24 @@ describe('keeping a number on its scale', () => {
     expect(clampToStep(-3, 1, 99, 1)).toBe(1);
   });
 });
+
+describe('reading a money field that holds a sum', () => {
+  it('works the sum out rather than reading the first number off it', () => {
+    // parseFloat('20*2') is 20.
+    expect(parseAmount('20*2')).toBe(40);
+    expect(parseAmount('(18+4)/2')).toBe(11);
+    expect(parseAmount('12.40 + 3.60')).toBe(16);
+    expect(parseAmount('20 × 2')).toBe(40);
+  });
+
+  it('is nothing while the sum is half-typed, or beyond nine digits of pounds', () => {
+    expect(parseAmount('20*')).toBeNull();
+    expect(parseAmount('(20+2')).toBeNull();
+    expect(parseAmount('5/0')).toBeNull();
+    expect(parseAmount('999999999*10')).toBeNull();
+  });
+
+  it('rounds to the penny, halves up', () => {
+    expect(parseAmount('2.01/2')).toBe(1.01);
+  });
+});

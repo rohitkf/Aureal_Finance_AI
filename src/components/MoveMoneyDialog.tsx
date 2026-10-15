@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { sanitizeAmount } from '@/lib/amount';
+import { parseAmount } from '@/lib/amount';
+import { sumField, sumHint } from '@/lib/calc';
 import { ordinal } from '@/lib/date';
-import { money, round2 } from '@/lib/format';
+import { money } from '@/lib/format';
 import { newId, useAppState, useStore, useToday } from '@/lib/store';
 import type { Account, RecurringPayment, Transaction } from '@/lib/types';
 import { Button } from './ui/Button';
@@ -77,7 +78,7 @@ export const MoveMoneyDialog = ({
   }, [open, initialDirection, initialRepeat, parent?.id, today]);
 
   const other = state.accounts.find((a) => a.id === otherId);
-  const parsed = round2(Number.parseFloat(amount) || 0);
+  const parsed = parseAmount(amount) ?? 0;
   const adding = direction === 'add';
   // A Pot cannot be emptied below nothing, and neither can this.
   const tooMuch = !adding && parsed > account.balance;
@@ -177,9 +178,9 @@ export const MoveMoneyDialog = ({
 
         <AmountField
           label="Amount"
-          value={amount}
           tone="transfer"
-          onChange={(e) => setAmount(sanitizeAmount(e.target.value))}
+          {...sumField(amount, setAmount)}
+          hint={sumHint(amount)}
           error={tooMuch ? `${account.name} holds ${money(account.balance)}.` : undefined}
         />
 

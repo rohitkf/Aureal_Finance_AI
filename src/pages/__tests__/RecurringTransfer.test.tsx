@@ -257,4 +257,17 @@ describe('how often, and how many times', () => {
 
     expect(saved().amount).toBe(12.34);
   });
+
+  it('takes a sum as the amount', async () => {
+    const user = userEvent.setup();
+    render();
+    await openForm(user);
+
+    await user.type(screen.getByLabelText('Amount'), '12.5*4');
+    expect(screen.getByText('12.5 × 4 = £50.00')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Name'), 'Gym');
+    await user.click(screen.getByRole('button', { name: /Create payment/ }));
+
+    expect(saved().amount).toBe(50);
+  });
 });

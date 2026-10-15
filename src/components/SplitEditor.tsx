@@ -1,10 +1,10 @@
-import { useMemo } from 'react';
-import { sanitizeAmount } from '@/lib/amount';
+import { useMemo, useRef, useState } from 'react';
+import { sumField, sumHint } from '@/lib/calc';
 import { cn } from '@/lib/cn';
 import { money } from '@/lib/format';
 import { splitTotals, type SplitKind, type SplitPart } from '@/lib/splits';
 import { Button, IconButton } from './ui/Button';
-import { SelectField, SegmentedControl, TextField } from './ui/Field';
+import { CalculatorKeys, SelectField, SegmentedControl, TextField } from './ui/Field';
 import { Icon } from './ui/Icon';
 
 /**
@@ -55,6 +55,15 @@ export const SplitEditor = ({
   const update = (key: string, patch: Partial<SplitPart>) =>
     onPartsChange(parts.map((p) => (p.key === key ? { ...p, ...patch } : p)));
 
+  /**
+   * The part whose amount was last typed in, which gets the calculator keys —
+   * one row, under that part, rather than a row under every part. Not cleared
+   * on blur: the row vanishing would move everything under the pointer as a
+   * press on Save went down.
+   */
+  const [typing, setTyping] = useState<string | null>(null);
+  const amountInputs = useRef<Record<string, HTMLInputElement | null>>({});
+
   const add = () =>
     onPartsChange([
       ...parts,
@@ -95,52 +104,75 @@ export const SplitEditor = ({
       )}
 
       <ul className="space-y-3">
-        {parts.map((part, index) => (
-          <li key={part.key} className="rounded-2xl bg-[rgb(var(--hairline)/0.03)] p-3">
-            <div className="flex items-start gap-2">
-              <div className="grid flex-1 gap-3 sm:grid-cols-[1fr_130px]">
-                <SelectField
-                  label={kind === 'category' ? `Part ${index + 1} category` : `Part ${index + 1} account`}
-                  hideLabel
-                  value={part.targetId}
-                  onChange={(targetId) => update(part.key, { targetId })}
-                  placeholder={kind === 'category' ? 'Choose a category' : 'Choose an account'}
-                >
-                  {options.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
-                    </option>
-                  ))}
-                </SelectField>
+        {parts.map((part, index) => {
+          const amount = sumField(part.amount, (text) => update(part.key, { amount: text }));
+          const sum = sumHint(part.amount);
+          return (
+            <li key={part.key} className="rounded-2xl bg-[rgb(var(--hairline)/0.03)] p-3">
+              <div className="flex items-start gap-2">
+                <div className="grid flex-1 gap-3 sm:grid-cols-[1fr_130px]">
+                  <SelectField
+                    label={kind === 'category' ? `Part ${index + 1} category` : `Part ${index + 1} account`}
+                    hideLabel
+                    value={part.targetId}
+                    onChange={(targetId) => update(part.key, { targetId })}
+                    placeholder={kind === 'category' ? 'Choose a category' : 'Choose an account'}
+                  >
+                    {options.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </SelectField>
 
-                <TextField
-                  label={`Part ${index + 1} amount`}
-                  hideLabel
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={part.amount}
-                  onChange={(e) => update(part.key, { amount: sanitizeAmount(e.target.value) })}
+                  <TextField
+                    ref={(node) => {
+                      amountInputs.current[part.key] = node;
+                    }}
+                    label={`Part ${index + 1} amount`}
+                    hideLabel
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={amount.value}
+                    onChange={amount.onChange}
+                    onKeyDown={amount.onKeyDown}
+                    onFocus={() => setTyping(part.key)}
+                    onBlur={amount.onBlur}
+                  />
+                </div>
+
+                <IconButton
+                  icon="trash"
+                  label={`Remove part ${index + 1}`}
+                  size={15}
+                  onClick={() => onPartsChange(parts.filter((p) => p.key !== part.key))}
                 />
               </div>
 
-              <IconButton
-                icon="trash"
-                label={`Remove part ${index + 1}`}
-                size={15}
-                onClick={() => onPartsChange(parts.filter((p) => p.key !== part.key))}
+              <TextField
+                label={`Part ${index + 1} note`}
+                hideLabel
+                placeholder="What this part was for (optional)"
+                value={part.note}
+                onChange={(e) => update(part.key, { note: e.target.value })}
+                containerClassName="mt-3"
               />
-            </div>
 
-            <TextField
-              label={`Part ${index + 1} note`}
-              hideLabel
-              placeholder="What this part was for (optional)"
-              value={part.note}
-              onChange={(e) => update(part.key, { note: e.target.value })}
-              containerClassName="mt-3"
-            />
-          </li>
-        ))}
+              {/* Under the row, not in the amount's narrow column: seven keys in
+                  130px would be smaller than a fingertip. */}
+              {sum && <p className="mt-2 pl-1 text-[12.5px] text-faint">{sum}</p>}
+              {typing === part.key && (
+                <div className="mt-3">
+                  <CalculatorKeys
+                    input={{ current: amountInputs.current[part.key] ?? null }}
+                    {...amount.calculator}
+                    compact
+                  />
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

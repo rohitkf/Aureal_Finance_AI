@@ -64,3 +64,11 @@ describe('whether it is a split worth saving', () => {
     expect(splitIsValid([part('60'), part('50')], 100)).toBe(false);
   });
 });
+
+describe('a part written as a sum', () => {
+  it('counts for what it comes to', () => {
+    expect(partAmount(part('10+5'))).toBe(15);
+    expect(partAmount(part('10+'))).toBe(0);
+    expect(splitIsValid([part('12.5*2'), part('25')], 50)).toBe(true);
+  });
+});

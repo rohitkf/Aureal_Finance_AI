@@ -3,6 +3,7 @@ import { cn } from '@/lib/cn';
 import { budgetProgress, effectiveBudgets, monthIncome, safeToSpend, spendByCategory } from '@/lib/finance';
 import { formatMonthYear, monthKey } from '@/lib/date';
 import { money, percent, round2 } from '@/lib/format';
+import { parseAmount } from '@/lib/amount';
 import { useAppState, useCategories, useCategoryLookup, useLoading, useSettings, useStore, useToday } from '@/lib/store';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { SafeToSpendCard } from '@/components/SafeToSpendCard';
@@ -69,7 +70,7 @@ export const Budget = () => {
 
   const saveBudget = () => {
     if (!editing) return;
-    const limit = Number.parseFloat(editing.limit);
+    const limit = parseAmount(editing.limit) ?? Number.NaN;
     // A button that looks live and does nothing when pressed is worse than one
     // that is plainly disabled, so the dialog says what is wrong instead.
     if (!Number.isFinite(limit) || limit <= 0) {

@@ -767,4 +767,48 @@ describe('a new pocket, opened from inside its account', () => {
 
     expect(sent()[0].account).toMatchObject({ id: 'subs', parentAccountId: 'rainy', groupId: 'g-Virtual Accounts' });
   });
+
+});
+
+describe('a balance worked out as a sum', () => {
+  const setBalance = async (user: ReturnType<typeof userEvent.setup>, value: string) => {
+    const field = screen.getByLabelText(/Balance (owed )?today/);
+    await user.clear(field);
+    await user.type(field, value);
+  };
+
+  it('takes a sum as the balance, and records the difference it comes to', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={EXISTING} />);
+    await setBalance(user, '1200-12.40');
+    expect(screen.getByText('1200 − 12.40 = £1,187.60')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Save changes/ }));
+    expect(sent()[1].transaction).toMatchObject({ amount: 12.4, type: 'expense' });
+  });
+
+  it('saves nothing while the sum is half-typed', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={EXISTING} />);
+    await setBalance(user, '1200-');
+    expect(screen.getByText('Finish the sum to see what it comes to.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Save changes/ })).toBeDisabled();
+  });
+
+  it('opens a new account with what the sum comes to', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.type(screen.getByLabelText('Balance today'), '200+50');
+    await user.type(screen.getByLabelText('Account name'), 'Rohit Revolut');
+    await user.click(screen.getByRole('button', { name: /Add account/ }));
+    expect(sent()[0]).toMatchObject({ type: 'upsert-account', openingBalance: 250 });
+  });
+
+  it('will not open an account below zero', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.type(screen.getByLabelText('Balance today'), '20-50');
+    await user.type(screen.getByLabelText('Account name'), 'Rohit Revolut');
+    expect(screen.getByText('An opening balance can’t be below £0.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add account/ })).toBeDisabled();
+  });
 });

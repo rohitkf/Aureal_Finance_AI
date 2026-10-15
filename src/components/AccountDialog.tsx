@@ -10,7 +10,8 @@ import { DayOfMonthPicker } from './ui/DayOfMonthPicker';
 import { DigitsField } from './ui/DigitsField';
 import { MoneyDial } from './ui/MoneyDial';
 import { RangeField } from './ui/RangeField';
-import { sanitizeAmount } from '@/lib/amount';
+import { parseAmount } from '@/lib/amount';
+import { sumField, sumHint } from '@/lib/calc';
 import { Modal } from './ui/Modal';
 import { useToast } from './ui/Toast';
 import { AccountGroupDialog } from './AccountGroupDialog';
@@ -212,15 +213,31 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
   const countsInBalance = counted ?? Boolean(parent);
 
   const isCredit = type === 'credit';
-  const parsedBalance = Number.parseFloat(balance) || 0;
+  /** The balance field can hold a sum, so it is worked out rather than read off. */
+  const balanceValue = parseAmount(balance);
+  const parsedBalance = balanceValue ?? 0;
+  /** A sum still being typed, like `120-` — nothing to save yet. */
+  const unfinished = balance.trim() !== '' && balanceValue === null;
+  /**
+   * Only an account that holds money can be below zero, and only once it
+   * exists: overdrawn is a state a current account gets into, not one it is
+   * opened in, and what is owed on a card is already a positive figure.
+   */
+  const belowZero = balanceValue !== null && balanceValue < 0 && (!editing || owesMoney(editing));
+  const balanceError = belowZero
+    ? owesMoney(editing ?? { type })
+      ? 'What is owed can’t be below £0.'
+      : 'An opening balance can’t be below £0.'
+    : undefined;
   /**
    * Setting an existing account's balance by hand — for the payments that
    * never got logged. The database derives every balance from transactions,
    * so the difference is recorded as one: a Balance adjustment, dated today,
    * that counts as spending or income like anything else.
    */
-  const adjustment = editing && balance.trim() !== '' && balance !== '-' ? round2(parsedBalance - editing.balance) : 0;
-  const valid = name.trim().length > 0 && (Boolean(group) || (needsGroup && Boolean(parent)));
+  const adjustment = editing && balanceValue !== null ? round2(balanceValue - editing.balance) : 0;
+  const valid =
+    name.trim().length > 0 && (Boolean(group) || (needsGroup && Boolean(parent))) && !unfinished && !belowZero;
 
   const save = () => {
     if (!valid) return;
@@ -262,7 +279,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
       // already was, so editing a connected account does not quietly
       // demote it to a manual one.
       syncStatus: editing?.syncStatus ?? 'manual',
-      creditLimit: isCredit ? Number.parseFloat(creditLimit) || undefined : undefined,
+      creditLimit: isCredit ? parseAmount(creditLimit) || undefined : undefined,
       apr: isCredit ? Number.parseFloat(apr) || undefined : undefined,
       paymentDueDay: isCredit ? Number.parseInt(dueDay, 10) || undefined : undefined,
       aer: holdsMoney ? Number.parseFloat(aer) || undefined : undefined,
@@ -279,7 +296,7 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
             : undefined,
       note: note.trim() || undefined,
       statementDay: isCredit ? Number.parseInt(statementDay, 10) || undefined : undefined,
-      minimumPayment: isCredit ? Number.parseFloat(minimumPayment) || undefined : undefined,
+      minimumPayment: isCredit ? parseAmount(minimumPayment) || undefined : undefined,
       // Excluding implies archiving: an account left out of every figure has
       // no business being offered when a payment is recorded.
       archived: archived || excluded || undefined,
@@ -362,34 +379,33 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
         {editing ? (
           <AmountField
             label={owesMoney(editing) ? 'Balance owed today' : 'Balance today'}
-            value={balance}
             tone={(adjustment < 0) === !owesMoney(editing) ? 'expense' : 'income'}
-            onChange={(e) => {
-              // An overdrawn account is below zero, so a leading minus is kept
-              // here; what is owed on a card is already a positive figure.
-              const minus = !owesMoney(editing) && e.target.value.trim().startsWith('-');
-              setBalance((minus ? '-' : '') + sanitizeAmount(e.target.value));
-            }}
+            {...sumField(balance, setBalance)}
+            error={balanceError}
             hint={
-              adjustment === 0
+              sumHint(balance) ??
+              (unfinished
+                ? 'Finish the sum to see what it comes to.'
+                : adjustment === 0
                 ? 'Change it to match your bank. The difference is recorded as a Balance adjustment.'
                 : `${adjustment > 0 ? '+' : '−'}${money(Math.abs(adjustment))} will be recorded as a Balance adjustment today, and counted as ${
                     (adjustment > 0) === !owesMoney(editing) ? 'income' : 'spending'
-                  }.`
+                  }.`)
             }
           />
         ) : (
           <AmountField
             label={parent ? 'In the pocket today' : owesMoney({ type }) ? 'Balance owed today' : 'Balance today'}
-            value={balance}
             tone={owesMoney({ type }) ? 'expense' : 'income'}
-            onChange={(e) => setBalance(sanitizeAmount(e.target.value))}
+            {...sumField(balance, setBalance)}
+            error={balanceError}
             hint={
-              parent
+              sumHint(balance) ??
+              (parent
                 ? `What it holds now, as your bank shows it. ${parent.name}'s main balance stays as it is; its total worth is the two together.`
                 : virtual
                   ? 'What it holds today, recorded as an opening balance. Move money in later with a transfer.'
-                  : 'Recorded as an opening balance you can edit later.'
+                  : 'Recorded as an opening balance you can edit later.')
             }
           />
         )}

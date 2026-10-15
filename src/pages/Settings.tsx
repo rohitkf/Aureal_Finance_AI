@@ -32,6 +32,7 @@ import { useDevMode } from '@/lib/devMode';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { cn, pillClass } from '@/lib/cn';
 import { money } from '@/lib/format';
+import { parseAmount } from '@/lib/amount';
 import { useAppState, useCategories, useLabels, useStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/hooks/useTheme';
@@ -360,7 +361,7 @@ export const Settings = () => {
               setMinimumError(undefined);
             }}
             onCommit={() => {
-              const value = Number.parseFloat(minimum);
+              const value = parseAmount(minimum) ?? Number.NaN;
               // It used to put the old figure back without a word, which looks
               // like the app losing what you typed. Say what was wrong and keep
               // it on screen so it can be corrected rather than retyped.

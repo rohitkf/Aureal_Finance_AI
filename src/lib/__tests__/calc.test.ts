@@ -6,7 +6,7 @@
  * as "no value yet" rather than as a wrong one.
  */
 import { describe, expect, it } from 'vitest';
-import { evaluateExpression, isPlainNumber, stripToExpression } from '../calc';
+import { evaluateExpression, isPlainNumber, stripToExpression, sumHint, sumOf } from '../calc';
 
 describe('sums a person actually types', () => {
   it('adds a bill up', () => {
@@ -104,5 +104,33 @@ describe('the signs a phone or a calculator writes', () => {
     expect(prettyExpression('(18+4)/2')).toBe('(18 + 4) ÷ 2');
     expect(prettyExpression('50-12.5')).toBe('50 − 12.5');
     expect(prettyExpression('-5+3')).toBe('-5 + 3');
+  });
+});
+
+describe('the rules of an amount, inside a sum', () => {
+  it('holds every number in it to one point and pennies, as it is typed', () => {
+    expect(stripToExpression('1.2.3+12.999')).toBe('1.23+12.99');
+    expect(stripToExpression('007*2')).toBe('7*2');
+    expect(stripToExpression('.5+1')).toBe('0.5+1');
+    expect(stripToExpression('1234567890123')).toBe('123456789');
+  });
+
+  it('rounds a sum to the penny, halves away from zero', () => {
+    // toFixed(2) gave 2.67 and 1.00 for these.
+    expect(evaluateExpression('5.35/2')).toBe(2.68);
+    expect(evaluateExpression('2.01/2')).toBe(1.01);
+    expect(evaluateExpression('0-2.01/2')).toBe(-1.01);
+    expect(evaluateExpression('10/3')).toBe(3.33);
+    expect(evaluateExpression('20/3')).toBe(6.67);
+  });
+});
+
+describe('what a field holding a sum shows', () => {
+  it('works the sum out, and has nothing to say about a bare number', () => {
+    expect(sumOf('20*2')).toBe(40);
+    expect(sumOf('20')).toBeNull();
+    expect(sumOf('20*')).toBeNull();
+    expect(sumHint('20*2')).toBe('20 × 2 = £40.00');
+    expect(sumHint('20')).toBeUndefined();
   });
 });

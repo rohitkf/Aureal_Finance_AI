@@ -1,8 +1,10 @@
-import { useId, useMemo } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { moneyStops, nearestStop, nudgeStep, parseAmount, sanitizeAmount } from '@/lib/amount';
+import { moneyStops, nearestStop, nudgeStep, parseAmount } from '@/lib/amount';
+import { evaluateExpression, stripToExpression, sumHint, sumOf } from '@/lib/calc';
 import { money } from '@/lib/format';
 import { currencySymbol } from '@/lib/intl';
+import { CalculatorKeys } from './Field';
 import { Icon } from './Icon';
 
 /**
@@ -14,7 +16,9 @@ import { Icon } from './Icon';
  * `moneyStops`), so nothing it can produce is wrong. The figure above it
  * stays typeable for the amount the slider steps over, and what can be typed
  * there is held to the same rule as everywhere else: an amount, in pennies,
- * or nothing.
+ * or nothing. Like every amount field it also takes a sum — `450*12` for a
+ * year of rent — with the calculator keys showing while the figure is being
+ * typed, and the sum settles to its answer when you leave it.
  *
  * `max` is where the slider ends, not a limit on the amount. A typed figure
  * above it is kept; the thumb waits at the end of the track.
@@ -58,7 +62,19 @@ export const MoneyDial = ({
   onCommit,
 }: MoneyDialProps) => {
   const id = useId();
-  const hintId = hint ? `${id}-hint` : undefined;
+  const figure = useRef<HTMLInputElement | null>(null);
+  // The calculator keys, from the first time the figure is typed in. They
+  // stay once shown: taking them away on blur shrank a centred dialog under
+  // the pointer, so a press on Save landed where the button had just been.
+  const [typing, setTyping] = useState(false);
+  // A sum being typed says what it comes to, in place of the usual hint.
+  const shown = sumHint(value) ?? hint;
+  const settle = () => {
+    const sum = sumOf(value);
+    if (sum !== null) onChange(String(sum));
+    return sum !== null;
+  };
+  const hintId = shown ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [errorId, hintId].filter(Boolean).join(' ') || undefined;
 
@@ -125,6 +141,7 @@ export const MoneyDial = ({
             </span>
             <input
               id={id}
+              ref={figure}
               inputMode="decimal"
               autoComplete="off"
               autoFocus={autoFocus}
@@ -132,11 +149,16 @@ export const MoneyDial = ({
               value={value}
               aria-describedby={describedBy}
               aria-invalid={error ? true : undefined}
-              onChange={(e) => onChange(sanitizeAmount(e.target.value))}
+              onChange={(e) => onChange(stripToExpression(e.target.value))}
+              onFocus={() => setTyping(true)}
+              onBlur={settle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && settle()) e.preventDefault();
+              }}
               className={cn(
                 'tnum w-auto min-w-[2ch] max-w-full border-0 bg-transparent p-0 text-center font-display [field-sizing:content]',
                 'text-[30px] font-light leading-none tracking-[-0.04em] text-text',
-                'placeholder:text-faint/40 focus:outline-none focus:ring-0',
+                'placeholder:text-faint/40 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
               )}
             />
           </div>
@@ -145,6 +167,15 @@ export const MoneyDial = ({
             <Icon name="plus" size={15} />
           </button>
         </div>
+
+        {typing && (
+          <CalculatorKeys
+            input={figure}
+            evaluate={evaluateExpression}
+            onInput={(text) => onChange(stripToExpression(text))}
+            compact
+          />
+        )}
 
         <input
           type="range"
@@ -180,9 +211,9 @@ export const MoneyDial = ({
           <Icon name="alert" size={13} />
           {error}
         </p>
-      ) : hint ? (
+      ) : shown ? (
         <p id={hintId} className="text-[12.5px] leading-snug text-faint">
-          {hint}
+          {shown}
         </p>
       ) : null}
     </div>

@@ -6,6 +6,7 @@
  * the form refuses a split Postgres would have taken, or offers one it would
  * reject — and a component file is not where a shared rule should live.
  */
+import { parseAmount } from './amount';
 import { round2 } from './format';
 
 export type SplitKind = 'category' | 'account';
@@ -20,10 +21,8 @@ export interface SplitPart {
   note: string;
 }
 
-export const partAmount = (part: SplitPart): number => {
-  const n = Number.parseFloat(part.amount);
-  return Number.isFinite(n) ? round2(n) : 0;
-};
+/** A part's amount, which may be a sum still on screen as `12.40+3.60`. */
+export const partAmount = (part: SplitPart): number => parseAmount(part.amount) ?? 0;
 
 /** What the parts come to, and what is left of the payment. */
 export const splitTotals = (parts: SplitPart[], total: number) => {

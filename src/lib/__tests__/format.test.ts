@@ -120,12 +120,18 @@ describe('round2', () => {
     expect(round2(0.1 + 0.2)).toBe(0.3);
   });
 
-  it('rounds a value the float cannot hold down, not up', () => {
-    // 1.005 is really 1.00499999999999989, so x100 lands below the halfway
-    // point and rounds down. Documented rather than worked around: every
-    // figure reaching this function is already a sum of two-decimal amounts
-    // from Postgres `numeric`, where the case does not arise, and a
-    // string-based rounder would be slower everywhere to fix nothing.
-    expect(round2(1.005)).toBe(1);
+  it('rounds a half penny away from zero, even where the float holds it short', () => {
+    // 1.005 is really 1.00499999999999989, so a plain x100-and-round lands
+    // below the halfway point. That used to be documented as harmless, since
+    // every figure arrived as a sum of two-decimal amounts. The calculator
+    // changed that: £2.01 ÷ 2 is £1.005, and it should be £1.01.
+    expect(round2(1.005)).toBe(1.01);
+    expect(round2(2.675)).toBe(2.68);
+    expect(round2(1.255)).toBe(1.26);
+    expect(round2(-1.005)).toBe(-1.01);
+    expect(round2(-0.5)).toBe(-0.5);
+    expect(round2(-0.001)).toBe(0);
+    expect(Object.is(round2(-0.001), -0)).toBe(false);
+    expect(round2(999_999_999.995)).toBe(1_000_000_000);
   });
 });

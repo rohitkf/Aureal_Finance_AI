@@ -5,6 +5,7 @@ import {
   useState,
   type InputHTMLAttributes,
   type ReactNode,
+  type RefObject,
   type TextareaHTMLAttributes,
 } from 'react';
 import { flushSync } from 'react-dom';
@@ -356,6 +357,83 @@ const insertAtCaret = (input: HTMLInputElement, insert: string): { text: string;
   return { text: input.value.slice(0, start) + insert + input.value.slice(end), caret: start + insert.length };
 };
 
+export interface Calculator {
+  /** What `=` writes back. */
+  evaluate: (text: string) => number;
+  /** The field's new text, as its `onChange` would receive it. */
+  onInput: (text: string) => void;
+}
+
+/**
+ * A row of + − × ÷ ( ) = keys for an amount field. A phone's number pad has
+ * none of them, so without these a field's arithmetic could only be used
+ * from a keyboard.
+ */
+export const CalculatorKeys = ({
+  input,
+  evaluate,
+  onInput,
+  compact,
+}: Calculator & { input: RefObject<HTMLInputElement | null>; compact?: boolean }) => {
+  const press = (next: (field: HTMLInputElement) => { text: string; caret: number } | null) => {
+    const field = input.current;
+    if (!field) return;
+    const result = next(field);
+    if (!result) return;
+    // Written back before this handler returns, so the next keystroke lands
+    // on the new text and the caret goes after the sign, with no frame in
+    // between for either to slip.
+    flushSync(() => onInput(result.text));
+    field.focus();
+    field.setSelectionRange(result.caret, result.caret);
+  };
+  const key = cn(
+    'tnum flex items-center justify-center rounded-2xl font-medium transition-all duration-200 ease-fluid active:scale-[0.94]',
+    compact ? 'h-9 text-[16px]' : 'h-11 text-[19px]',
+  );
+  // A keyboard has these keys already, so a row that appears as you type
+  // does not add seven more stops to every Tab through the form.
+  const tabIndex = compact ? -1 : undefined;
+  return (
+    <div role="group" aria-label="Calculator" className="grid grid-cols-7 gap-1.5">
+      {CALC_KEYS.map((k) => (
+        <button
+          key={k.name}
+          type="button"
+          aria-label={k.name}
+          tabIndex={tabIndex}
+          // Keep the caret in the figure: a tap here must not take focus
+          // away from the field it is typing into.
+          onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => press((field) => insertAtCaret(field, k.type))}
+          className={cn(key, 'bg-fill text-text hover:bg-[rgb(var(--fill)/calc(var(--fill-alpha)*1.8))]')}
+        >
+          {k.show}
+        </button>
+      ))}
+      <button
+        type="button"
+        aria-label="Equals"
+        tabIndex={tabIndex}
+        onPointerDown={(e) => e.preventDefault()}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() =>
+          press((field) => {
+            const value = evaluate(field.value);
+            if (!Number.isFinite(value)) return null;
+            const text = String(value);
+            return { text, caret: text.length };
+          })
+        }
+        className={cn(key, 'bg-primary-strong font-semibold text-[rgb(var(--on-primary))] hover:brightness-[1.06]')}
+      >
+        =
+      </button>
+    </div>
+  );
+};
+
 export const AmountField = forwardRef<
   HTMLInputElement,
   InputProps & {
@@ -366,7 +444,7 @@ export const AmountField = forwardRef<
      * used from a keyboard. `evaluate` works out what `=` writes back;
      * `onInput` receives the field's new text, as its `onChange` would.
      */
-    calculator?: { evaluate: (text: string) => number; onInput: (text: string) => void };
+    calculator?: Calculator;
   }
 >(({ label, hint, error, tone = 'expense', className, calculator, ...rest }, ref) => {
   const color = tone === 'income' ? 'text-success' : tone === 'transfer' ? 'text-primary' : 'text-text';
@@ -419,52 +497,7 @@ export const AmountField = forwardRef<
             ref={setRefs}
           />
         </div>
-        {calculator && (
-          <div role="group" aria-label="Calculator" className="grid grid-cols-7 gap-1.5">
-            {CALC_KEYS.map((key) => (
-              <button
-                key={key.name}
-                type="button"
-                aria-label={key.name}
-                // Keep the caret in the figure: a tap here must not take focus
-                // away from the field it is typing into.
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  const input = inner.current;
-                  if (!input) return;
-                  const { text, caret } = insertAtCaret(input, key.type);
-                  // Written back before this handler returns, so the next
-                  // keystroke lands on the new text and the caret goes after
-                  // the sign, with no frame in between for either to slip.
-                  flushSync(() => calculator.onInput(text));
-                  input.focus();
-                  input.setSelectionRange(caret, caret);
-                }}
-                className="tnum flex h-11 items-center justify-center rounded-2xl bg-fill text-[19px] font-medium text-text transition-all duration-200 ease-fluid hover:bg-[rgb(var(--fill)/calc(var(--fill-alpha)*1.8))] active:scale-[0.94]"
-              >
-                {key.show}
-              </button>
-            ))}
-            <button
-              type="button"
-              aria-label="Equals"
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={() => {
-                const input = inner.current;
-                if (!input) return;
-                const value = calculator.evaluate(input.value);
-                if (!Number.isFinite(value)) return;
-                const text = String(value);
-                flushSync(() => calculator.onInput(text));
-                input.focus();
-                input.setSelectionRange(text.length, text.length);
-              }}
-              className="flex h-11 items-center justify-center rounded-2xl bg-primary-strong text-[19px] font-semibold text-[rgb(var(--on-primary))] transition-all duration-200 ease-fluid hover:brightness-[1.06] active:scale-[0.94]"
-            >
-              =
-            </button>
-          </div>
-        )}
+        {calculator && <CalculatorKeys input={inner} {...calculator} />}
         </div>
       )}
     </Field>

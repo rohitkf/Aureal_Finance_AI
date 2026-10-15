@@ -120,4 +120,15 @@ describe('a virtual account that stands on its own', () => {
     await user.click(screen.getByRole('button', { name: 'Add money' }));
     expect(sent()[0].transaction).toMatchObject({ accountId: 'rainy', toAccountId: 'portal', amount: 200 });
   });
+
+  it('takes a sum as the amount, and moves what it comes to', async () => {
+    const user = userEvent.setup();
+    render(<MoveMoneyDialog open onClose={vi.fn()} account={SUBS} />);
+    await user.type(screen.getByLabelText('Amount'), '12.5');
+    await user.click(screen.getByRole('button', { name: 'Times' }));
+    await user.keyboard('2');
+    expect(screen.getByText('12.5 × 2 = £25.00')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add money' }));
+    expect(sent()[0].transaction).toMatchObject({ amount: 25 });
+  });
 });
