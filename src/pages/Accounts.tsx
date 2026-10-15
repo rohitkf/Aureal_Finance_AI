@@ -281,23 +281,33 @@ export const Accounts = () => {
                                         ? `${percent(accountUtilisation(account), 0)} of ${money(account.creditLimit, { compact: true })}`
                                         : '',
                                       account.aer ? `${account.aer}% AER` : '',
-                                      // With pockets, the figure is everything
-                                      // the account holds; this is what is
-                                      // left to spend once they are set aside.
-                                      pockets.length ? `${money(account.balance, { masked: maskBalances })} main balance` : '',
                                       account.note ?? '',
                                     ]
                                       .filter(Boolean)
                                       .join(' · ')}
                                   </span>
                                 </span>
-                                <span
-                                  className={cn(
-                                    'tnum shrink-0 text-[15px] font-medium',
-                                    owesMoney(account) && account.balance > 0 ? 'text-danger' : 'text-text',
+                                {/* With pockets, two figures: everything the
+                                    account holds, and beneath it the main
+                                    balance — what is left once the pockets are
+                                    set aside. Beside the total rather than at
+                                    the end of the line under the name, where a
+                                    phone cut it off. */}
+                                <span className="flex shrink-0 flex-col items-end">
+                                  <span
+                                    className={cn(
+                                      'tnum text-[15px] font-medium',
+                                      owesMoney(account) && account.balance > 0 ? 'text-danger' : 'text-text',
+                                    )}
+                                  >
+                                    {pockets.length > 0 && <span className="sr-only">Total </span>}
+                                    {money(pockets.length ? accountTotal(account, state.accounts) : account.balance, { masked: maskBalances })}
+                                  </span>
+                                  {pockets.length > 0 && (
+                                    <span className="tnum text-[12px] text-muted">
+                                      Main {money(account.balance, { masked: maskBalances })}
+                                    </span>
                                   )}
-                                >
-                                  {money(pockets.length ? accountTotal(account, state.accounts) : account.balance, { masked: maskBalances })}
                                 </span>
                               </Link>
                               {/* Beside the link, not inside it: a button in a
