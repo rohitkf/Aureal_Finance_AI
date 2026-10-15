@@ -230,6 +230,30 @@ describe('Add transaction', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('two different accounts');
   });
 
+  it('swaps the two ends of a transfer with one press', async () => {
+    const user = userEvent.setup();
+    open();
+
+    await user.keyboard('100');
+    await user.click(screen.getByRole('radio', { name: 'Transfer' }));
+    const from = () => screen.getByRole('combobox', { name: 'From account' }).textContent;
+    const to = () => screen.getByRole('combobox', { name: 'To account' }).textContent;
+    const [before, after] = [from(), to()];
+    expect(before).not.toBe(after);
+
+    await user.click(screen.getByRole('button', { name: 'Swap from and to accounts' }));
+    expect(from()).toBe(after);
+    expect(to()).toBe(before);
+
+    await user.click(screen.getByRole('button', { name: /save transaction/i }));
+    const t = dispatch.mock.calls[0][0].transaction;
+    // Saved the way round it now reads, not the way it was first set.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect([t.accountId, t.toAccountId]).toEqual(
+      [after, before].map((name) => accounts.find((a) => name?.includes(a.name))?.id),
+    );
+  });
+
   it('says so plainly when there is nowhere to record the transaction', async () => {
     const user = userEvent.setup();
     accounts = [];

@@ -146,6 +146,20 @@ describe('saving a standing order', () => {
     expect(saved().toAccountId).toBe('acc-1');
   });
 
+  it('swaps which account the standing order comes from and goes to', async () => {
+    const user = userEvent.setup();
+    render();
+    await openForm(user);
+    await user.click(screen.getByRole('radio', { name: 'Transfer' }));
+    await user.click(screen.getByRole('button', { name: 'Swap from and to accounts' }));
+    await user.type(screen.getByLabelText('Amount'), '200');
+    await user.type(screen.getByLabelText('Name'), 'Back again');
+    await user.click(screen.getByRole('button', { name: /Create payment/ }));
+
+    expect(saved().accountId).toBe('acc-2');
+    expect(saved().toAccountId).toBe('acc-1');
+  });
+
   it('offers only the other accounts as a destination', async () => {
     const user = userEvent.setup();
     render();
