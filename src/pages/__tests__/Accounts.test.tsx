@@ -371,3 +371,23 @@ describe('Cash flow setup', () => {
     expect(dispatch).toHaveBeenCalledWith({ type: 'set-cash-flow', id: 'acc-2', cashFlow: false });
   });
 });
+
+describe('an account with pockets', () => {
+  it('shows everything it holds and, beneath it, its main balance', () => {
+    state.accounts = [
+      ...ACCOUNTS,
+      { id: 'p-1', name: 'Church tithe', type: 'current', institution: 'Monzo', balance: 258, maskedNumber: '', syncStatus: 'manual', parentAccountId: 'acc-1' } as Account,
+    ];
+    render();
+    const row = screen.getByRole('link', { name: /^Current/ });
+    expect(row).toHaveTextContent('Total £1,458.00');
+    expect(row).toHaveTextContent('Main £1,200.00');
+  });
+
+  it('shows one figure, and no stray zero, for an account without pockets', () => {
+    render();
+    const row = screen.getByRole('link', { name: /^Savings/ });
+    expect(row).not.toHaveTextContent('Main');
+    expect(row.textContent).not.toMatch(/£5,000\.000|0£/);
+  });
+});
