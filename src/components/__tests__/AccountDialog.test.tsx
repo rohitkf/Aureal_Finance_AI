@@ -484,6 +484,37 @@ describe('fields the form never asked for', () => {
     });
   });
 
+  it('takes an APR typed to two decimal places, as the card statement gives it', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'credit', apr: 32.9 }} />);
+    const box = screen.getByLabelText('APR % — exact figure');
+    expect(box).toHaveValue('32.9');
+    await user.clear(box);
+    // A third decimal place is not kept.
+    await user.type(box, '32.964');
+    expect(box).toHaveValue('32.96');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    expect(sent()[0].account.apr).toBe(32.96);
+  });
+
+  it('holds a typed APR inside the range the database allows', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'credit', apr: 20 }} />);
+    const box = screen.getByLabelText('APR % — exact figure');
+    await user.clear(box);
+    await user.type(box, '450');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    expect(sent()[0].account.apr).toBe(200);
+  });
+
+  it('takes a savings AER to two decimal places', async () => {
+    const user = userEvent.setup();
+    render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'savings' }} />);
+    await user.type(screen.getByLabelText('Interest rate (AER %) — exact figure'), '4.37');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    expect(sent()[0].account.aer).toBe(4.37);
+  });
+
   it('leaves an optional rate and day unset unless they are set', async () => {
     const user = userEvent.setup();
     render(<AccountDialog open onClose={vi.fn()} editing={{ ...EXISTING, type: 'credit' }} />);

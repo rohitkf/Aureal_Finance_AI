@@ -77,6 +77,18 @@ describe('adding an offer to a card', () => {
     expect(sent()[0].promo).toMatchObject({ kind: 'purchase', amount: undefined });
   });
 
+  it('takes a promotional rate to two decimal places', async () => {
+    const user = userEvent.setup();
+    render(<CardPromos account={CARD} />);
+    await user.click(screen.getByRole('button', { name: 'Add an offer' }));
+    const dialog = screen.getByRole('dialog');
+    const rate = within(dialog).getByLabelText('Rate during the offer — exact figure');
+    await user.clear(rate);
+    await user.type(rate, '3.95');
+    await user.click(within(dialog).getByRole('button', { name: 'Add offer' }));
+    expect(sent()[0].promo.rate).toBe(3.95);
+  });
+
   it('takes the amount as a sum, like every amount field', async () => {
     const user = userEvent.setup();
     render(<CardPromos account={CARD} />);

@@ -576,7 +576,8 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
                 max={200}
                 sliderMax={60}
                 step={0.1}
-                describe={(v) => `${v.toFixed(1)}% APR`}
+                typed={{ decimals: 2, unit: '% APR' }}
+                describe={(v) => `${Number(v.toFixed(2))}% APR`}
               />
               <DayOfMonthPicker
                 label="Payment due day"
@@ -614,7 +615,8 @@ export const AccountDialog = ({ open, onClose, editing, onCreated, onDelete, poc
               max={100}
               sliderMax={10}
               step={0.05}
-              describe={(v) => `${v.toFixed(2)}% AER`}
+              typed={{ decimals: 2, unit: '% AER' }}
+              describe={(v) => `${Number(v.toFixed(2))}% AER`}
             />
           )}
         </div>
