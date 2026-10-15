@@ -15,6 +15,7 @@ import type {
   AppState,
   Budget,
   Category,
+  CardPromo,
   Goal,
   Label,
   RecurringPayment,
@@ -45,6 +46,8 @@ import {
   toNetWorthPoint,
   toRecurring,
   toRecurringSkip,
+  toCardPromo,
+  cardPromoToRow,
   toSettings,
   toTransaction,
   transactionToRow,
@@ -66,7 +69,8 @@ type Slice =
   | 'budgets'
   | 'goals'
   | 'netWorth'
-  | 'recurringSkips';
+  | 'recurringSkips'
+  | 'cardPromos';
 
 export type Action =
   | { type: 'add-transaction'; transaction: Transaction }
@@ -101,6 +105,8 @@ export type Action =
   | { type: 'delete-budget'; month: string; categoryId: string }
   | { type: 'upsert-goal'; goal: Goal }
   | { type: 'delete-goal'; id: string }
+  | { type: 'upsert-card-promo'; promo: CardPromo }
+  | { type: 'delete-card-promo'; id: string }
   | { type: 'contribute-goal'; id: string; amount: number }
   | {
       type: 'upsert-account';
@@ -348,6 +354,18 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
             }),
         );
       }
+      if (wanted.has('cardPromos')) {
+        jobs.push(
+          supabase
+            .from('card_promos')
+            .select('*')
+            .order('ends_on')
+            .then(({ data, error: e }) => {
+              if (e) throw e;
+              next.cardPromos = (data ?? []).map(toCardPromo);
+            }),
+        );
+      }
       if (wanted.has('recurringSkips')) {
         jobs.push(
           supabase
@@ -391,6 +409,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       'goals',
       'netWorth',
       'recurringSkips',
+      'cardPromos',
     ],
     [],
   );
@@ -926,6 +945,21 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
           });
           break;
 
+        case 'upsert-card-promo':
+          run('save that offer', async () => {
+            const p = action.promo;
+            check(await supabase.from('card_promos').upsert({ id: p.id, ...cardPromoToRow(p) }));
+            return ['cardPromos'];
+          });
+          break;
+
+        case 'delete-card-promo':
+          run('remove that offer', async () => {
+            check(await supabase.from('card_promos').delete().eq('id', action.id));
+            return ['cardPromos'];
+          });
+          break;
+
         case 'delete-goal':
           run('delete that goal', async () => {
             check(await supabase.from('goals').delete().eq('id', action.id));
@@ -997,7 +1031,8 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
         case 'delete-account':
           run('delete that account', async () => {
             check(await supabase.from('accounts').delete().eq('id', action.id));
-            return ['accounts', 'transactions'];
+            // Its offers go with it, by cascade.
+            return ['accounts', 'transactions', 'cardPromos'];
           });
           break;
 
@@ -1090,6 +1125,7 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
       'goals',
       'net_worth_snapshots',
       'recurring_skips',
+      'card_promos',
       'accounts',
     ] as const) {
       const { error: e } = await supabase.from(table).delete().eq('user_id', uid);

@@ -11,6 +11,8 @@ import { DEFAULT_ACCENTS } from '@/lib/accents';
 import { nextMonthlyDate, ordinal } from '@/lib/date';
 import {
   accountTrace,
+  monthlyInterestOn,
+  promoStatuses,
   balanceHistory,
   budgetProgress,
   buildForecast,
@@ -29,7 +31,7 @@ import {
   spendByCategory,
 } from '@/lib/finance';
 import { emptyAppState } from '@/lib/mappers';
-import type { Account, AccountGroup, AccountType, AppState, RecurringPayment, Settings, Transaction } from '@/lib/types';
+import type { Account, AccountGroup, AccountType, AppState, CardPromo, RecurringPayment, Settings, Transaction } from '@/lib/types';
 
 const SETTINGS: Settings = {
   currency: 'GBP',
@@ -294,6 +296,88 @@ describe('the debt screen', () => {
     expect(d.payoffMonths).toBeGreaterThan(13);
     expect(d.payoffMonths).toBeLessThan(15);
     expect(debtSummary(state({ accounts: s.accounts })).payoffMonths).toBeNull();
+  });
+});
+
+describe('promotional rates on a card', () => {
+  const card = account('card', 'credit', 3000, { creditLimit: 5000, apr: 24 });
+  const promo = (over: Partial<CardPromo>): CardPromo => ({
+    id: 'p1',
+    accountId: 'card',
+    kind: 'balance_transfer',
+    rate: 0,
+    endsOn: '2027-03-31',
+    ...over,
+  });
+
+  it('charges nothing on the part an offer covers, and the APR on the rest', () => {
+    // £2,000 at 0%, £1,000 at 24%: £20 a month, not £60.
+    expect(monthlyInterestOn(card, 3000, [promo({ amount: 2000 })], '2026-10-15')).toBeCloseTo(20);
+  });
+
+  it('covers the whole balance when the offer names no amount', () => {
+    expect(monthlyInterestOn(card, 3000, [promo({ kind: 'purchase' })], '2026-10-15')).toBe(0);
+  });
+
+  it('charges a low promotional rate rather than none', () => {
+    // £3,000 at 3%: £7.50.
+    expect(monthlyInterestOn(card, 3000, [promo({ rate: 3 })], '2026-10-15')).toBeCloseTo(7.5);
+  });
+
+  it('applies the offer through its last day, and the APR from the day after', () => {
+    const offers = [promo({ amount: 3000 })];
+    expect(monthlyInterestOn(card, 3000, offers, '2027-03-31')).toBe(0);
+    expect(monthlyInterestOn(card, 3000, offers, '2027-04-01')).toBeCloseTo(60);
+  });
+
+  it('only touches the card it is on', () => {
+    const other = account('other', 'credit', 1000, { apr: 12 });
+    expect(monthlyInterestOn(other, 1000, [promo({})], '2026-10-15')).toBeCloseTo(10);
+  });
+
+  it('says what each offer covers, how long it has, and what it will cost after', () => {
+    const [bt, purchase, old] = promoStatuses(
+      card,
+      [
+        promo({ id: 'bt', amount: 2000, endsOn: '2026-11-30' }),
+        promo({ id: 'purchase', kind: 'purchase', endsOn: '2027-06-30' }),
+        promo({ id: 'old', endsOn: '2026-01-31' }),
+      ],
+      '2026-10-15',
+    );
+    expect(bt).toMatchObject({ covers: 2000, daysLeft: 46, ended: false, endingSoon: true, interestAfter: 40 });
+    // What is left after the transfer: the other £1,000.
+    expect(purchase).toMatchObject({ covers: 1000, ended: false, endingSoon: false });
+    expect(old).toMatchObject({ ended: true, daysLeft: 0, covers: 0 });
+  });
+
+  it('is on its last day, not ended, on its end date', () => {
+    const [last] = promoStatuses(card, [promo({ endsOn: '2026-10-15' })], '2026-10-15');
+    expect(last).toMatchObject({ ended: false, daysLeft: 0, endingSoon: true });
+  });
+
+  it('feeds the debt screen: interest now, interest after, and what ends soon', () => {
+    const s = state({
+      accounts: [card],
+      cardPromos: [promo({ amount: 2000, endsOn: '2026-11-30' })],
+      recurring: [rule({ id: 'card-bill', direction: 'transfer', toAccountId: 'card', amount: 150, anchorDay: 20 })],
+    });
+    const d = debtSummary(s, '2026-10-15');
+    expect(d.monthlyInterest).toBe(20);
+    expect(d.interestAfterPromos).toBe(60);
+    expect(d.promosEndingSoon.map((p) => p.promo.id)).toEqual(['p1']);
+  });
+
+  it('estimates the payoff with the offer ending part-way, not as if it lasted for ever', () => {
+    const forever = state({
+      accounts: [card],
+      cardPromos: [promo({ endsOn: '2099-12-31' })],
+      recurring: [rule({ id: 'card-bill', direction: 'transfer', toAccountId: 'card', amount: 150, anchorDay: 20 })],
+    });
+    const ending = { ...forever, cardPromos: [promo({ endsOn: '2027-01-31' })] };
+    // £3,000 at £150 a month with no interest is 20 months.
+    expect(debtSummary(forever, '2026-10-15').payoffMonths).toBe(20);
+    expect(debtSummary(ending, '2026-10-15').payoffMonths).toBeGreaterThan(20);
   });
 });
 

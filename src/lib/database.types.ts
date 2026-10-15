@@ -185,6 +185,19 @@ export interface NetWorthRow {
   created_at: string;
 }
 
+export interface CardPromoRow {
+  id: string;
+  user_id: string;
+  account_id: string;
+  kind: 'balance_transfer' | 'money_transfer' | 'purchase' | 'other';
+  rate: number;
+  amount: number | null;
+  ends_on: string;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface RecurringSkipRow {
   id: string;
   user_id: string;

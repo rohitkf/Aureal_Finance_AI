@@ -39,7 +39,7 @@ export const More = () => {
     const over = budgets.filter((b) => b.state === 'over').length;
     const forecast = buildForecast(state, today, 30);
     const goals = goalTotals(state.goals);
-    const debts = debtSummary(state);
+    const debts = debtSummary(state, today);
     const worth = netWorth(state.accounts, state.accountGroups);
     return {
       '/budget':

@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
-import { accountUtilisation, availableCredit, debtSummary } from '@/lib/finance';
+import { accountUtilisation, availableCredit, debtSummary, monthlyInterestOn, promoStatuses } from '@/lib/finance';
 import { formatMediumDate, nextMonthlyDate } from '@/lib/date';
 import { money, percent } from '@/lib/format';
 import { useAppState, useLoading, useSettings, useToday } from '@/lib/store';
+import { PROMO_NAMES, promoPhrase } from '@/lib/promos';
 import { Badge } from '@/components/ui/Badge';
 import { ButtonLink } from '@/components/ui/Button';
 import { Card, CardHeader, PageHeader, StatGroup } from '@/components/ui/Card';
@@ -20,7 +21,7 @@ export const Debts = () => {
   const { maskBalances } = useSettings();
   const loading = useLoading();
 
-  const summary = useMemo(() => debtSummary(state), [state]);
+  const summary = useMemo(() => debtSummary(state, today), [state, today]);
   const { facilities, total: debt, cardLimit: limit, utilisation, payoffMonths, monthlyPayments } = summary;
   const cards = facilities.filter((a) => a.type === 'credit');
   const loans = facilities.filter((a) => a.type !== 'credit');
@@ -111,6 +112,22 @@ export const Debts = () => {
         </div>
       )}
 
+      {summary.promosEndingSoon.length > 0 && (
+        <div className="plate flex items-start gap-3 p-4">
+          <Icon name="alert" size={18} className="mt-0.5 shrink-0 text-warning" />
+          <div className="space-y-1 text-body-sm text-muted">
+            {summary.promosEndingSoon.map((s) => (
+              <p key={s.promo.id}>
+                <strong className="text-text">
+                  {`${s.account.name}: ${PROMO_NAMES[s.promo.kind].toLowerCase()} ends ${s.daysLeft === 0 ? 'today' : s.daysLeft === 1 ? 'tomorrow' : `in ${s.daysLeft} days`}.`}
+                </strong>{' '}
+                {`${money(s.covers, { masked: maskBalances })} goes onto the card’s ${s.account.apr ? `${s.account.apr}% ` : ''}APR then — about ${money(s.interestAfter)} a month. Clearing it, or moving it to another 0% card before ${formatMediumDate(s.promo.endsOn)}, avoids that.`}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+
       {cards.length > 0 && (
       <section className="space-y-3">
         <CardHeader title="Your credit cards" description="Ordered by how much of the limit is used." />
@@ -121,8 +138,10 @@ export const Debts = () => {
               const util = accountUtilisation(card);
               const tone = util >= 80 ? 'danger' : util >= 50 ? 'warning' : 'success';
               const due = card.paymentDueDay ? nextMonthlyDate(card.paymentDueDay, today) : null;
-              // How much interest this balance costs each month if left as is.
-              const monthlyInterest = (card.balance * (card.apr ?? 0)) / 100 / 12;
+              // How much interest this balance costs each month if left as
+              // is — nothing on the part a 0% offer covers, until it ends.
+              const monthlyInterest = monthlyInterestOn(card, card.balance, state.cardPromos, today);
+              const offers = promoStatuses(card, state.cardPromos, today).filter((s) => !s.ended);
 
               return (
                 // In ember, like the card in a wallet — as the reference
@@ -164,6 +183,18 @@ export const Debts = () => {
                     <Item label="Minimum" value={money(card.minimumPayment ?? 0, { compact: true })} tone="danger" />
                     <Item label="Interest / month" value={money(monthlyInterest, { compact: true })} tone="warning" />
                   </dl>
+
+                  {offers.length > 0 && (
+                    <ul className="flex flex-wrap gap-2" aria-label={`Promotional rates on ${card.name}`}>
+                      {offers.map((s) => (
+                        <li key={s.promo.id}>
+                          <Badge tone={s.endingSoon ? 'warning' : 'success'}>
+                            {`${PROMO_NAMES[s.promo.kind]}: ${promoPhrase(s)}`}
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </Card>
               );
             })}
