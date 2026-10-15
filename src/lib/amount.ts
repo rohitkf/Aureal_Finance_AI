@@ -8,6 +8,7 @@
  * screen — `1.2.3` is quietly £1.20. One rule, applied as the person types,
  * means a field can only ever hold an amount.
  */
+import { evaluateExpression, stripToExpression } from './calc';
 
 /** Nine whole digits: £999,999,999.99 is more than anyone keeps here. */
 const MAX_WHOLE_DIGITS = 9;
@@ -34,11 +35,22 @@ export function sanitizeAmount(raw: string, decimals = 2): string {
   return `${whole || '0'}.${fraction}`;
 }
 
-/** The amount a field holds, or `null` when it holds nothing usable yet. */
+/**
+ * The amount a field holds, to the penny, or `null` when it holds nothing
+ * usable yet.
+ *
+ * A field can hold a sum — `20*2`, `(18+4)/2` — so this works it out rather
+ * than reading the leading number off it. `parseFloat('20*2')` is 20, and a
+ * form that read its field that way saved £20 for a sum that came to £40.
+ * Anything half-typed, `1.2.3`, or worth more than nine digits of pounds is
+ * nothing usable, never a guess.
+ */
 export function parseAmount(text: string): number | null {
-  if (text.trim() === '' || text === '.') return null;
-  const value = Number.parseFloat(text);
-  return Number.isFinite(value) ? value : null;
+  // A lone point is a number about to be typed, not £0.
+  if (/^\s*\.?\s*$/.test(text)) return null;
+  const value = evaluateExpression(stripToExpression(text));
+  if (!Number.isFinite(value)) return null;
+  return Math.abs(value) < 10 ** MAX_WHOLE_DIGITS ? value : null;
 }
 
 /**

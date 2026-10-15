@@ -188,4 +188,49 @@ describe('the last four of a card', () => {
     await user.paste('4111 1111 1111 8291');
     expect(value()).toBe('4111');
   });
+
+  it('takes a sum, shows what it comes to, and settles it on leaving', async () => {
+    const user = userEvent.setup();
+    render(<Money />);
+    await user.type(screen.getByLabelText('Monthly limit'), '450*12');
+    expect(screen.getByText('450 × 12 = £5,400.00')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Elsewhere' }));
+    expect(value()).toBe('5400');
+  });
+
+  it('offers the calculator keys once the figure is being typed', async () => {
+    const user = userEvent.setup();
+    render(<Money />);
+    expect(screen.queryByRole('button', { name: 'Times' })).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Monthly limit'), '25');
+    await user.click(screen.getByRole('button', { name: 'Times' }));
+    await user.keyboard('4');
+    await user.click(screen.getByRole('button', { name: 'Equals' }));
+    expect(value()).toBe('100');
+    expect(screen.getByLabelText('Monthly limit')).toHaveFocus();
+    // And they stay when focus leaves: taking them away would move what is
+    // under the pointer as a press on Save went down.
+    await user.click(screen.getByRole('button', { name: 'Elsewhere' }));
+    expect(screen.getByRole('button', { name: 'Times' })).toBeInTheDocument();
+  });
+
+  it('commits what the sum comes to', async () => {
+    const user = userEvent.setup();
+    const seen: Array<string> = [];
+    const Probe = () => {
+      const [v, setV] = useState('');
+      return (
+        <>
+          <MoneyDial label="Monthly limit" value={v} onChange={setV} max={2_000} onCommit={() => seen.push(v)} />
+          <button type="button">Elsewhere</button>
+        </>
+      );
+    };
+    render(<Probe />);
+    await user.type(screen.getByLabelText('Monthly limit'), '100+50');
+    await user.click(screen.getByRole('button', { name: 'Elsewhere' }));
+    // Whatever text the commit sees, it reads as £150.
+    const { parseAmount } = await import('@/lib/amount');
+    expect(seen.map((v) => parseAmount(v))).toEqual([150]);
+  });
 });

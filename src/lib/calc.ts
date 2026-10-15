@@ -10,6 +10,7 @@
  * typed is an arbitrary-code hole, and `Function` is the same hole wearing a
  * hat. Four operators and brackets is a small enough grammar to just read.
  */
+import { money, round2 } from './format';
 
 /** Everything the field will accept: digits, a point, the four operators, brackets, spaces. */
 const ALLOWED = /^[0-9.+\-*/() ]*$/;
@@ -25,7 +26,22 @@ export const stripToExpression = (raw: string): string =>
     .replace(/÷/g, '/')
     .replace(/[−–]/g, '-')
     .replace(/,/g, '')
-    .replace(/[^0-9.+\-*/() ]/g, '');
+    .replace(/[^0-9.+\-*/() ]/g, '')
+    // And every number in it is an amount: one point, pennies at most, nine
+    // whole digits. `1.2.3` is 1.23 and `12.999` stops at 12.99 as it is
+    // typed, the same rule a plain amount field has always kept.
+    .replace(/[0-9.]+/g, tidyNumber);
+
+/** One number in a sum, held to the rules of an amount (see `sanitizeAmount`). */
+const tidyNumber = (run: string): string => {
+  const dot = run.indexOf('.');
+  // `007` is 7. A single 0 stays, because `0.50` starts with one.
+  const whole = (dot === -1 ? run : run.slice(0, dot)).replace(/^0+(?=\d)/, '').slice(0, 9);
+  if (dot === -1) return whole;
+  // A second point is a typo, not a second decimal part.
+  const fraction = run.slice(dot + 1).replace(/\./g, '').slice(0, 2);
+  return `${whole || '0'}.${fraction}`;
+};
 
 /**
  * The sum as it should read on screen: × and ÷ and a true minus, with a
@@ -128,6 +144,50 @@ export const evaluateExpression = (raw: string): number => {
   if (cursor.at !== cursor.text.length) return Number.NaN;
   if (!Number.isFinite(value)) return Number.NaN;
 
-  // Money, so two decimal places. `+` drops a trailing `.00` that toFixed adds.
-  return Number(value.toFixed(2));
+  // Money, so to the penny — and halves up, which `toFixed` gets wrong:
+  // (2.675).toFixed(2) is "2.67".
+  return round2(value);
+};
+
+/**
+ * What a field holding a sum comes to, or `null` when it holds a bare number
+ * (nothing to work out) or a sum that is not finished yet.
+ */
+export const sumOf = (text: string): number | null => {
+  if (isPlainNumber(text)) return null;
+  const value = evaluateExpression(text);
+  return Number.isFinite(value) ? value : null;
+};
+
+/** The line under a field holding a sum: `20 × 2 = £40.00`. */
+export const sumHint = (text: string): string | undefined => {
+  const sum = sumOf(text);
+  return sum === null ? undefined : `${prettyExpression(text)} = ${money(sum)}`;
+};
+
+/**
+ * Everything an amount field needs to take a sum instead of a number: what
+ * it keeps of a keystroke, the calculator keys, and settling the sum to its
+ * answer when you leave the field or press Enter — so what is saved is what
+ * the line under it has been showing.
+ *
+ * `set` receives the field's text, already stripped to what a sum can hold.
+ */
+export const sumField = (value: string, set: (text: string) => void) => {
+  const settle = () => {
+    const sum = sumOf(value);
+    if (sum !== null) set(String(sum));
+    return sum !== null;
+  };
+  return {
+    value,
+    onChange: (e: { target: { value: string } }) => set(stripToExpression(e.target.value)),
+    onBlur: () => {
+      settle();
+    },
+    onKeyDown: (e: { key: string; preventDefault: () => void }) => {
+      if (e.key === 'Enter' && settle()) e.preventDefault();
+    },
+    calculator: { evaluate: evaluateExpression, onInput: (text: string) => set(stripToExpression(text)) },
+  };
 };

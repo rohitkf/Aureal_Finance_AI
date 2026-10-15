@@ -22,7 +22,8 @@ import {
 } from '@/components/ui/Field';
 import { DayOfMonthPicker, LAST_DAY } from '@/components/ui/DayOfMonthPicker';
 import { RangeField } from '@/components/ui/RangeField';
-import { sanitizeAmount } from '@/lib/amount';
+import { parseAmount } from '@/lib/amount';
+import { sumField, sumHint } from '@/lib/calc';
 import { reanchor, type DraftRule } from '@/lib/recurringDraft';
 import { Icon } from '@/components/ui/Icon';
 import { ConfirmDialog, Modal } from '@/components/ui/Modal';
@@ -110,7 +111,7 @@ const intervalHint = (draft: DraftRule): string => {
 const toRule = (draft: DraftRule): RecurringPayment => ({
   id: draft.id ?? newId(),
   name: draft.name.trim() || 'Recurring payment',
-  amount: Math.round((Number.parseFloat(draft.amount) || 0) * 100) / 100,
+  amount: parseAmount(draft.amount) ?? 0,
   direction: draft.direction,
   categoryId: draft.categoryId,
   accountId: draft.accountId,
@@ -519,7 +520,7 @@ const RecurringForm = ({
   if (!draft) return null;
   const isTransfer = draft.direction === 'transfer';
   const valid =
-    Number.parseFloat(draft.amount) > 0 &&
+    (parseAmount(draft.amount) ?? 0) > 0 &&
     draft.name.trim().length > 0 &&
     (!isTransfer || (Boolean(draft.toAccountId) && draft.toAccountId !== draft.accountId));
   const isMonthly = ['monthly', 'bimonthly', 'quarterly', 'semiannual', 'yearly'].includes(draft.frequency);
@@ -543,9 +544,9 @@ const RecurringForm = ({
       <div className="space-y-8">
         <AmountField
           label="Amount"
-          value={draft.amount}
           tone={draft.direction === 'in' ? 'income' : draft.direction === 'transfer' ? 'transfer' : 'expense'}
-          onChange={(e) => setDraft({ ...draft, amount: sanitizeAmount(e.target.value) })}
+          {...sumField(draft.amount, (amount) => setDraft({ ...draft, amount }))}
+          hint={sumHint(draft.amount)}
         />
 
         <SegmentedControl
@@ -814,7 +815,7 @@ const RecurringForm = ({
                   <span className="text-text">{formatMediumDate(date)}</span>
                   <span className={cn('tnum font-medium', draft.direction === 'in' ? 'text-success' : 'text-muted')}>
                     {draft.direction === 'in' ? '+' : '-'}
-                    {money(Number.parseFloat(draft.amount) || 0)}
+                    {money(parseAmount(draft.amount) ?? 0)}
                   </span>
                 </li>
               ))}

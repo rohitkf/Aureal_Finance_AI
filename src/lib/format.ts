@@ -86,4 +86,19 @@ export const initials = (name: string): string => {
   return (source[0] ?? name).slice(0, 2).toUpperCase();
 };
 
-export const round2 = (n: number): number => Math.round(n * 100) / 100;
+/**
+ * Money to the penny, halves away from zero: £1.005 is £1.01 and −£1.005 is
+ * −£1.01, as a bank rounds it.
+ *
+ * `Math.round(n * 100) / 100` looked right and was not. 1.005 is stored as
+ * 1.00499999…, so it rounded down to £1.00; and `Math.round` takes −0.5 up to
+ * 0, so a negative half went the other way from a positive one. Reading the
+ * product back at twelve significant figures drops the binary noise before
+ * the rounding decides anything.
+ */
+export const round2 = (n: number): number => {
+  if (!Number.isFinite(n)) return n;
+  const pennies = Math.round(Number((Math.abs(n) * 100).toPrecision(12)));
+  // `|| 0` so a sum that comes to nothing is 0, not −0 printed as "−£0.00".
+  return (Math.sign(n) * pennies) / 100 || 0;
+};
