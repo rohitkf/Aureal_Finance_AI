@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
-import { accountUtilisation, availableCredit, debtSummary, monthlyInterestOn, promoStatuses } from '@/lib/finance';
-import { formatMediumDate, nextMonthlyDate } from '@/lib/date';
+import { accountUtilisation, availableCredit, debtSummary, monthlyInterestOn, payoffPlan, promoStatuses, type PayoffPlan } from '@/lib/finance';
+import { formatMediumDate, formatMonthYear, nextMonthlyDate } from '@/lib/date';
 import { money, percent } from '@/lib/format';
 import { useAppState, useLoading, useSettings, useToday } from '@/lib/store';
 import { PROMO_NAMES, promoPhrase } from '@/lib/promos';
@@ -25,6 +25,11 @@ export const Debts = () => {
   const { facilities, total: debt, cardLimit: limit, utilisation, payoffMonths, monthlyPayments } = summary;
   const cards = facilities.filter((a) => a.type === 'credit');
   const loans = facilities.filter((a) => a.type !== 'credit');
+  // When each is paid off at what is scheduled to it — see `payoffPlan`.
+  const plans = useMemo(
+    () => new Map(facilities.map((a) => [a.id, payoffPlan(state, a.id, today)])),
+    [facilities, state, today],
+  );
 
   if (loading) {
     return (
@@ -184,6 +189,8 @@ export const Debts = () => {
                     <Item label="Interest / month" value={money(monthlyInterest, { compact: true })} tone="warning" />
                   </dl>
 
+                  <PayoffLine plan={plans.get(card.id)} />
+
                   {offers.length > 0 && (
                     <ul className="flex flex-wrap gap-2" aria-label={`Promotional rates on ${card.name}`}>
                       {offers.map((s) => (
@@ -220,6 +227,7 @@ export const Debts = () => {
                     <p className="text-body-sm text-muted">
                       {loan.apr ? `${loan.apr}% APR · about ${money((loan.balance * loan.apr) / 100 / 12, { compact: true })} interest a month` : 'No rate set'}
                     </p>
+                    <PayoffLine plan={plans.get(loan.id)} />
                   </div>
                   <span className="tnum shrink-0 font-display text-metric-md text-text">
                     {money(loan.balance, { masked: maskBalances })}
@@ -243,6 +251,25 @@ export const Debts = () => {
         </ButtonLink>
       </Card>
     </div>
+  );
+};
+
+/** When it is paid off, in a line, or why there is no date. */
+const PayoffLine = ({ plan }: { plan?: PayoffPlan }) => {
+  if (!plan || plan.status === 'clear') return null;
+  return (
+    <p className="text-body-sm text-muted">
+      {plan.status === 'paid-off' && plan.payoffDate ? (
+        <>
+          Paid off by <strong className="text-text">{formatMonthYear(plan.payoffDate)}</strong>
+          {plan.totalInterest > 0 && ` · ${money(plan.totalInterest, { compact: true })} interest on the way`}
+        </>
+      ) : plan.status === 'never' ? (
+        'Not paid off at the payments scheduled'
+      ) : (
+        'No payment scheduled to it yet'
+      )}
+    </p>
   );
 };
 

@@ -18,6 +18,7 @@ import { formatMediumDate, monthKey, nextMonthlyDate, ordinal } from '@/lib/date
 import { money, percent } from '@/lib/format';
 import { useAppState, useSettings, useToday } from '@/lib/store';
 import { BalanceChart } from '@/components/charts/BalanceChart';
+import { CardPayoff } from '@/components/CardPayoff';
 import { CardPromos } from '@/components/CardPromos';
 import { ratePhrase } from '@/lib/promos';
 import { AccountPockets, VirtualAccountPanel } from '@/components/Pockets';
@@ -200,6 +201,9 @@ export const AccountDetail = () => {
       )}
 
       {virtual ? <VirtualAccountPanel account={account} /> : canHoldPockets(account) && <AccountPockets account={account} />}
+
+      {/* When it is paid off is the first thing worth knowing about a debt. */}
+      {owesMoney(account) && <CardPayoff account={account} />}
 
       {isCredit && (
         <Card className="space-y-4">

@@ -1018,6 +1018,158 @@ export const promoStatuses = (account: Account, promos: CardPromo[], today: stri
     .sort((a, b) => Number(a.ended) - Number(b.ended) || a.promo.endsOn.localeCompare(b.promo.endsOn));
 };
 
+/* ------------------------------------------------------------------ */
+/* Paying a debt off                                                   */
+/* ------------------------------------------------------------------ */
+
+/** One month on the way to clearing a debt. */
+export interface PayoffMonth {
+  /** `YYYY-MM`. */
+  month: string;
+  /** Owed as the month starts. */
+  opening: number;
+  /** Paid in during the month, by the payments that are scheduled. */
+  paid: number;
+  /** Spent on it during the month, by charges that are scheduled to it. */
+  charged: number;
+  /** Interest added at the month's end, at that month's rates. */
+  interest: number;
+  /** Owed as the month ends. */
+  closing: number;
+}
+
+export interface PayoffPlan {
+  /**
+   * `paid-off` — the scheduled payments clear it; `never` — they never catch
+   * up with the interest and the spending; `no-plan` — nothing is scheduled
+   * to pay it; `clear` — nothing is owed.
+   */
+  status: 'paid-off' | 'never' | 'no-plan' | 'clear';
+  /** The day of the payment that clears it. */
+  payoffDate: string | null;
+  months: PayoffMonth[];
+  totalInterest: number;
+  totalPaid: number;
+  /** What the scheduled payments come to in the first full month. */
+  monthlyPayment: number;
+  /**
+   * Roughly what a month would clear it in two years at the account's APR,
+   * offered when there is no plan or the plan never gets there.
+   */
+  suggestedMonthly: number | null;
+}
+
+/** How far ahead a payoff is followed before calling it never. */
+const PAYOFF_HORIZON_MONTHS = 360;
+
+/**
+ * When a debt will be paid off at the payments already scheduled to it, and
+ * the month-by-month way there.
+ *
+ * Read from the same projection as everything else (`forecastEvents`), so a
+ * skipped occurrence, an end date or a payment already scheduled by hand are
+ * all honoured. Each month: the payments and any charges scheduled to it
+ * land on their days, and interest is added at the month's end on what was
+ * owed as it started, at that month's rates — a 0% offer costs nothing until
+ * it ends (`monthlyInterestOn`). The first month is charged only for the days
+ * left in it. The last payment is only as much as is left, so the total paid
+ * is what it costs, not the sum of every standing order. An estimate: the
+ * card's own statement cycle and daily interest move it by a few pounds.
+ */
+export const payoffPlan = (state: AppState, accountId: string, today: string): PayoffPlan => {
+  const account = state.accounts.find((a) => a.id === accountId);
+  const promos = state.cardPromos ?? [];
+  const empty = { months: [], totalInterest: 0, totalPaid: 0, monthlyPayment: 0 };
+  if (!account || account.balance <= 0) return { status: 'clear', payoffDate: null, suggestedMonthly: null, ...empty };
+
+  const apr = account.apr ?? 0;
+  const r = apr / 100 / 12;
+  // The standard instalment that clears a balance in 24 months at the APR.
+  const suggestedMonthly = round2(r > 0 ? (account.balance * r) / (1 - (1 + r) ** -24) : account.balance / 24);
+
+  const end = addMonths(today, PAYOFF_HORIZON_MONTHS);
+  const events = forecastEvents(state, today, end).filter(
+    (e) => e.toAccountId === accountId || e.accountId === accountId,
+  );
+  // What each event does to what is owed: a payment in brings it down; a
+  // charge on it, or money moved out of it, puts it up; a refund brings it down.
+  const effect = (e: ForecastEvent): number =>
+    e.toAccountId === accountId ? -e.amount : e.direction === 'in' && !e.toAccountId ? -e.amount : e.amount;
+  if (!events.some((e) => effect(e) < 0)) {
+    return { status: 'no-plan', payoffDate: null, suggestedMonthly, ...empty };
+  }
+
+  const byMonth = new Map<string, ForecastEvent[]>();
+  for (const e of events) {
+    // Overdue is owed now: it lands in the first month.
+    const key = monthKey(e.date < today ? today : e.date);
+    byMonth.set(key, [...(byMonth.get(key) ?? []), e]);
+  }
+
+  const months: PayoffMonth[] = [];
+  let owed = account.balance;
+  let totalInterest = 0;
+  let totalPaid = 0;
+  let payoffDate: string | null = null;
+
+  for (let i = 0; i < PAYOFF_HORIZON_MONTHS && payoffDate === null; i += 1) {
+    const start = i === 0 ? today : `${monthKey(addMonths(today, i))}-01`;
+    const key = monthKey(start);
+    const opening = round2(owed);
+    let paid = 0;
+    let charged = 0;
+
+    for (const e of (byMonth.get(key) ?? []).sort((a, b) => a.date.localeCompare(b.date))) {
+      const change = effect(e);
+      if (change < 0) {
+        // Never more than is owed: the last payment clears it, no more.
+        const pay = Math.min(-change, Math.max(0, owed));
+        paid += pay;
+        owed -= pay;
+        if (owed <= 0.005 && pay > 0) {
+          payoffDate = e.date < today ? today : e.date;
+          break;
+        }
+      } else {
+        charged += change;
+        owed += change;
+      }
+    }
+
+    let interest = 0;
+    if (payoffDate === null) {
+      const full = monthlyInterestOn(account, Math.max(0, opening), promos, start);
+      // The first month from today, not from the 1st.
+      const days = daysBetween(start, endOfMonth(start)) + 1;
+      const inMonth = daysBetween(`${key}-01`, endOfMonth(start)) + 1;
+      interest = round2(i === 0 ? (full * days) / inMonth : full);
+      owed += interest;
+    }
+
+    totalInterest += interest;
+    totalPaid += paid;
+    months.push({
+      month: key,
+      opening,
+      paid: round2(paid),
+      charged: round2(charged),
+      interest,
+      closing: round2(Math.max(0, owed)),
+    });
+  }
+
+  const firstFull = months[1] ?? months[0];
+  return {
+    status: payoffDate ? 'paid-off' : 'never',
+    payoffDate,
+    months,
+    totalInterest: round2(totalInterest),
+    totalPaid: round2(totalPaid),
+    monthlyPayment: firstFull ? firstFull.paid : 0,
+    suggestedMonthly: payoffDate ? null : suggestedMonthly,
+  };
+};
+
 export interface DebtSummary {
   /** Every counted account that is owed: cards, loans, and anything in a liability group. */
   facilities: Account[];
