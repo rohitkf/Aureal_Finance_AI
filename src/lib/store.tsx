@@ -28,6 +28,7 @@ import { BACKUP_TABLES, rowsToRestore, type Backup } from './backup';
 import { batch } from '@/data/sample';
 import { describeError, errorMessage } from './errors';
 import { supabase } from './supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './auth';
 import { useToast } from '@/components/ui/Toast';
 import { ISO, addDays } from './date';
@@ -168,6 +169,33 @@ interface StoreValue {
  * not cost the person a manual refresh.
  */
 const BACKOFF_MS = [400, 1200];
+
+/**
+ * Which table feeds which slice, and the column that names a row's owner —
+ * what the live stream is filtered on. The profile is keyed by the person's
+ * own id; a split belongs to a transaction rather than to a person, so it
+ * is left to row-level security alone.
+ */
+export const LIVE_TABLES: Array<[table: string, slice: Slice, owner: 'user_id' | 'id' | null]> = [
+  ['profiles', 'profile', 'id'],
+  ['categories', 'categories', 'user_id'],
+  ['labels', 'labels', 'user_id'],
+  ['account_groups', 'accountGroups', 'user_id'],
+  ['accounts', 'accounts', 'user_id'],
+  ['recurring_payments', 'recurring', 'user_id'],
+  ['transactions', 'transactions', 'user_id'],
+  ['transaction_splits', 'transactions', null],
+  ['transaction_labels', 'transactions', 'user_id'],
+  ['budgets', 'budgets', 'user_id'],
+  ['goals', 'goals', 'user_id'],
+  ['card_promos', 'cardPromos', 'user_id'],
+  ['recurring_skips', 'recurringSkips', 'user_id'],
+  ['net_worth_snapshots', 'netWorth', 'user_id'],
+];
+/** A burst of rows — a restore writing a thousand — becomes one fetch. */
+export const LIVE_SETTLE_MS = 150;
+/** How long the app may be out of sight before its socket closes. */
+export const LIVE_IDLE_MS = 60_000;
 
 const StoreContext = createContext<StoreValue | null>(null);
 
@@ -509,6 +537,94 @@ export const StoreProvider = ({ children }: { children: ReactNode }) => {
     },
     [fetchSlices],
   );
+
+  /* ---------------------------------------------------------------- */
+  /* Hearing                                                           */
+  /* ---------------------------------------------------------------- */
+
+  /**
+   * A change made on another device arrives here on its own.
+   *
+   * The app loaded once per session and again on the way back from another
+   * tab, so a transaction added on the phone reached the laptop only when
+   * the laptop was next woken — and never while both were open side by
+   * side. Postgres publishes every change to these tables as it commits;
+   * Realtime hands on the ones in this person's own rows (the owner filter
+   * below, with row-level security behind it); each one marks its slice to
+   * be fetched again, and a burst becomes one fetch.
+   *
+   * The socket follows the screen. Hidden for a minute it closes — a phone
+   * in a pocket would otherwise listen all day to changes it never shows —
+   * and on the way back it reopens and refetches everything, which covers
+   * whatever happened while it was shut.
+   */
+  useEffect(() => {
+    if (!userId) return;
+    let channel: RealtimeChannel | null = null;
+    let pending = new Set<Slice>();
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    let idle: ReturnType<typeof setTimeout> | undefined;
+
+    const flush = () => {
+      settle = undefined;
+      const slices = [...pending];
+      pending = new Set();
+      // A failed refetch is not news: the screen keeps what it has, and
+      // the next change, or the next wake, tries again.
+      void refresh(slices).catch(() => {});
+    };
+    const open = () => {
+      if (channel) return;
+      const opening = supabase.channel(`live-${userId}`);
+      for (const [table, slice, owner] of LIVE_TABLES) {
+        opening.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table, ...(owner ? { filter: `${owner}=eq.${userId}` } : {}) },
+          () => {
+            pending.add(slice);
+            if (settle === undefined) settle = setTimeout(flush, LIVE_SETTLE_MS);
+          },
+        );
+      }
+      opening.subscribe();
+      channel = opening;
+    };
+    const close = () => {
+      idle = undefined;
+      if (!channel) return;
+      void supabase.removeChannel(channel);
+      channel = null;
+      pending = new Set();
+      if (settle !== undefined) {
+        clearTimeout(settle);
+        settle = undefined;
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        if (idle !== undefined) {
+          clearTimeout(idle);
+          idle = undefined;
+        }
+        if (!channel) {
+          open();
+          void refresh(ALL).catch(() => {});
+        }
+        return;
+      }
+      if (idle === undefined) idle = setTimeout(close, LIVE_IDLE_MS);
+    };
+
+    if (document.visibilityState === 'visible') open();
+    else idle = setTimeout(close, LIVE_IDLE_MS);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (settle !== undefined) clearTimeout(settle);
+      if (idle !== undefined) clearTimeout(idle);
+      close();
+    };
+  }, [userId, refresh, ALL]);
 
   /* ---------------------------------------------------------------- */
   /* Writing                                                           */

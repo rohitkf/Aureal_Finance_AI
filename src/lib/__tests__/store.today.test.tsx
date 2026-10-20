@@ -27,7 +27,15 @@ const chain = () => {
 };
 
 vi.mock('@/lib/supabase', () => ({
-  supabase: { from: () => chain() },
+  supabase: {
+    from: () => chain(),
+    // The live stream (store.tsx › Hearing): a channel that accepts bindings and is never heard from.
+    channel: () => {
+      const ch = { on: () => ch, subscribe: () => ch };
+      return ch;
+    },
+    removeChannel: () => Promise.resolve('ok'),
+  },
   isSupabaseConfigured: true,
 }));
 vi.mock('@/lib/auth', () => ({ useAuth: () => ({ user: null, loading: false }) }));

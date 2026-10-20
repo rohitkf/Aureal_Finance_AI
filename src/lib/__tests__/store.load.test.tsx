@@ -31,7 +31,15 @@ const chain = (table: string) => {
 };
 
 vi.mock('@/lib/supabase', () => ({
-  supabase: { from: (table: string) => chain(table) },
+  supabase: {
+    from: (table: string) => chain(table),
+    // The live stream (store.tsx › Hearing): a channel that accepts bindings and is never heard from.
+    channel: () => {
+      const ch = { on: () => ch, subscribe: () => ch };
+      return ch;
+    },
+    removeChannel: () => Promise.resolve('ok'),
+  },
   isSupabaseConfigured: true,
 }));
 
