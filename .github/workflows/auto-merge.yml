@@ -83,6 +83,12 @@ jobs:
               if (pr.state !== 'open' || pr.merged) { say('already closed'); continue }
               if (pr.draft) { say('still a draft'); continue }
               if (pr.base.ref !== 'main') { say(`targets ${pr.base.ref}, not main`); continue }
+              // main moves only from develop, in this repository: not from a
+              // fork, and not from any other branch a green CI run would
+              // otherwise wave through without a review.
+              if (pr.head.repo?.full_name !== `${owner}/${repo}` || pr.head.ref !== 'develop') {
+                say(`comes from ${pr.head.label}, not develop here`); continue
+              }
               if (pr.labels.some((l) => l.name === 'do-not-merge')) { say('held by do-not-merge'); continue }
               if (pr.mergeable === false) { say('has a merge conflict'); continue }
 

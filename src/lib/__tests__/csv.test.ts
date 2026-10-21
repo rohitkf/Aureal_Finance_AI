@@ -94,3 +94,22 @@ describe('downloadCsv', () => {
     expect(blobs[0]!.type).toBe('text/csv;charset=utf-8');
   });
 });
+
+describe('a cell a spreadsheet would run as a formula', () => {
+  it('is kept as text, whatever sign it starts with', () => {
+    expect(toCsv([['=HYPERLINK("https://example.test","click")']])).toBe('"\'=HYPERLINK(""https://example.test"",""click"")"');
+    expect(toCsv([['+cmd|calc']])).toBe("'+cmd|calc");
+    expect(toCsv([['@SUM(A1)']])).toBe("'@SUM(A1)");
+    expect(toCsv([['-2+3']])).toBe("'-2+3");
+    // A tab or carriage return in front does not smuggle the sign past.
+    expect(toCsv([['\t=1+1']])).toBe("'\t=1+1");
+  });
+
+  it('leaves a figure alone, negative or not', () => {
+    expect(toCsv([[-12.4, '-12.40', '45.00', 0]])).toBe('-12.4,-12.40,45.00,0');
+  });
+
+  it('leaves ordinary words alone', () => {
+    expect(toCsv([['Tesco', 'Dunn, Baker & Co']])).toBe('Tesco,"Dunn, Baker & Co"');
+  });
+});

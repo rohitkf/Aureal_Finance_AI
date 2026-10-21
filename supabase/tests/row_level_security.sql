@@ -118,7 +118,10 @@ begin
     insert into public.transactions (user_id, account_id, occurred_on, amount, type)
     select v_bob, id, current_date, 1, 'expense' from public.accounts limit 1;
     assert false, 'Alice should not be able to create a transaction owned by Bob';
-  exception when insufficient_privilege then null;
+  -- Refused at the door by `check_transaction_accounts` (the account named is
+  -- not Bob's) before the policy gets to say so; either gate is the right
+  -- answer. transactions_own_accounts.sql covers the door on its own.
+  exception when insufficient_privilege or check_violation then null;
   end;
 
   --------------------------------------------- touching somebody else's rows

@@ -251,6 +251,14 @@ holding.
 - Every table carries `user_id` with `default auth.uid()`, and a `with check`
   that rejects a row owned by anybody else. A client can always edit the
   array it posts; the policy is what stops it mattering.
+- **A foreign key is checked without row-level security.** `with check` on
+  `user_id` alone still accepts a row that names somebody else's account by
+  id, and the balance trigger — security definer — then moves that account.
+  Any column that names another table's row, where a trigger or a figure
+  acts on that row, is checked at the door: `check_transaction_accounts`
+  (`account_id`, `to_account_id`), `check_account_parent`
+  (`parent_account_id`), and the `card_promos` policy (`account_id`) are the
+  pattern. `supabase/tests/transactions_own_accounts.sql` is the test.
 - Policies use `(select auth.uid())`, which Postgres evaluates once per
   statement rather than once per row. **A `default` cannot use that form** —
   a subquery in a `DEFAULT` expression is a syntax error. Plain `auth.uid()`
