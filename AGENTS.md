@@ -162,7 +162,8 @@ src/
   lib/recurrence.ts     nine frequencies, expanded over a window
   lib/timeMachine.ts    the Time Machine: a window's balance, replayed then projected
   lib/store.tsx         Supabase-backed state; keeps the AppState shape so
-                        the engine and the pages never learn there is a database
+                        the engine and the pages never learn there is a database.
+                        Also hears changes from another device (› Hearing)
   lib/mappers.ts        Postgres row ↔ domain model. `num()` lives here
   lib/date.ts           date arithmetic on YYYY-MM-DD strings
   lib/auth.tsx          useAuth(): signIn, signUp, reset, updatePassword
@@ -302,6 +303,14 @@ used:
 
 Each of these has already cost real time here.
 
+- **A new table is not live until two lists say so.** A change on another
+  device reaches the app through Realtime, which streams only the tables in
+  the `supabase_realtime` publication, and the store refetches only the
+  slices named in `LIVE_TABLES` (`store.tsx`). A table in neither still loads
+  and still saves; it just goes stale on the other device until the next wake.
+  A new table needs a migration adding it to the publication (with
+  `replica identity full`, so its deletions carry their owner) and a row in
+  `LIVE_TABLES`.
 - **A dialog must not focus its close button.** It is first in the DOM, so
   "focus the first focusable element" lands on X. Worse, `onClose` written
   inline by the caller is a new function each render: as an effect dependency
