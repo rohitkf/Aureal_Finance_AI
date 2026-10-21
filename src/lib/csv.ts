@@ -7,9 +7,28 @@
  * implementation, so neither screen has to remember that.
  */
 
-/** A single field, quoted only where a quote is actually needed. */
+/**
+ * Text a spreadsheet would run rather than show.
+ *
+ * Excel, Sheets and LibreOffice read a cell beginning with `=`, `+`, `-` or
+ * `@` as a formula — `=HYPERLINK(...)`, or a DDE call on older Excel — and
+ * a tab or carriage return in front hides the sign from a naive check. A
+ * merchant name is typed by a person today and will arrive from a bank feed
+ * tomorrow; either way it is not a formula. A number is: `-12.40` is a
+ * figure, and must stay one.
+ */
+const looksLikeFormula = (text: string): boolean =>
+  /^[\t\r]*[=+\-@]/.test(text) && !/^-?\d+(\.\d+)?$/.test(text);
+
+/**
+ * A single field, quoted only where a quote is actually needed.
+ *
+ * A field that reads as a formula is kept as text by a leading apostrophe,
+ * which every spreadsheet treats as "this is literal" and does not show.
+ */
 const cell = (value: unknown): string => {
-  const text = value === null || value === undefined ? '' : String(value);
+  const raw = value === null || value === undefined ? '' : String(value);
+  const text = typeof value !== 'number' && looksLikeFormula(raw) ? `'${raw}` : raw;
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 
