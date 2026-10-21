@@ -306,7 +306,10 @@ describe('an account and its opening balance', () => {
          values ('${missing}', current_date, 'Opening balance', 250, 'income', 'cleared')`,
         true,
       ),
-    ).toThrow(/transactions_account_id_fkey/);
+      // Refused at the door by `check_transaction_accounts` — an account that
+      // does not exist is not one of yours — before the foreign key gets its
+      // turn; either refusal is the right answer.
+    ).toThrow(/transactions_account_id_fkey|one of your own accounts/);
 
     psql(`delete from auth.users where id = '${UID}'`, false);
   });
